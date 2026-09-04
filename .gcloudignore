@@ -1,0 +1,17 @@
+# Build only the server image context; never upload local credentials or browser artifacts.
+.gcloudignore
+.git/
+.github/
+.env
+.env.*
+!.env.example
+.firebase/
+tasks/
+*.log
+node_modules/
+frontend/
+server/node_modules/
+server/test/
+server/e2e/
+server/test-results/
+server/playwright-report/

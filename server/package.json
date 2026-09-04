@@ -1,0 +1,38 @@
+{
+  "name": "dealforge-core",
+  "version": "1.0.0",
+  "description": "DealForge AI Sales Agent — Cloud Run Backend",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test",
+    "test:browser": "playwright test",
+    "check": "node --check src/index.js && node --check src/app.js"
+  },
+  "dependencies": {
+    "@google-cloud/vertexai": "^1.9.0",
+    "agora-token": "^2.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "firebase-admin": "^14.3.0",
+    "uuid": "^11.1.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
+    "@playwright/test": "^1.52.0",
+    "supertest": "^7.1.0"
+  },
+  "overrides": {
+    "qs": "6.16.0",
+    "uuid": "$uuid",
+    "gaxios": {
+      "uuid": "11.1.1"
+    },
+    "teeny-request": {
+      "uuid": "11.1.1"
+    }
+  }
+}

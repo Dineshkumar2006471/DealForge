@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DealForge — AI Voice Sales Agent</title>
+  <meta name="description" content="DealForge is an AI-powered voice sales agent that qualifies leads using MEDDIC, negotiates with policy guardrails, and closes deals.">
+  <link rel="icon" href="/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <nav class="navbar" id="navbar">
+    <div class="container navbar-inner">
+      <a href="#" class="logo">
+        <img src="DealForge-logo.png" alt="DealForge Logo">
+      </a>
+      <ul class="nav-links">
+        <li><a href="#problem">Problem</a></li>
+        <li><a href="#solution">Solution</a></li>
+        <li><a href="#demo">Live Demo</a></li>
+        <li><a href="#faq">FAQ</a></li>
+      </ul>
+      <a href="/login.html" class="nav-cta">Sign In</a>
+    </div>
+  </nav>
+
+  <section class="hero section" id="hero">
+    <div class="container">
+      <div class="hero-bento reveal">
+        <!-- LEFT COLUMN (Info Card) -->
+        <div class="bento-card bento-left">
+          <div class="pill-badge">
+            <span class="dot"></span> HACKATHON PREVIEW
+          </div>
+          <h1 class="headline-xl">
+            Close more deals.<br>
+            <span style="color: var(--amber)">Without losing control.</span>
+          </h1>
+          <p class="body-lg">
+            DealForge is the AI sales agent that qualifies leads using MEDDIC, negotiates within your policy guardrails, and books meetings — all in a single voice call. Every decision is auditable.
+          </p>
+          <div class="hero-actions">
+            <a href="/login.html" class="btn-primary">Manager Sign In →</a>
+            <a href="#demo" class="btn-secondary">See How It Works</a>
+          </div>
+        </div>
+
+        <!-- RIGHT COLUMN (Vector/Visual Card) -->
+        <div class="bento-card bento-right">
+          <!-- Vector Art generated visually -->
+          <img src="hero-visual.jpg" alt="Voice AI Vector Art">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- §2. SOCIAL PROOF -->
+  <section class="social-proof section" id="social-proof">
+    <div class="container">
+      <div class="stats-row reveal-stagger">
+        <div class="stat-item reveal">
+          <div class="stat-number">MEDDIC</div>
+          <div class="stat-label">Qualification Framework</div>
+        </div>
+        <div class="stat-item reveal">
+          <div class="stat-number">LIVE</div>
+          <div class="stat-label">Deal Intelligence</div>
+        </div>
+        <div class="stat-item reveal">
+          <div class="stat-number">POLICY</div>
+          <div class="stat-label">Bounded Negotiation</div>
+        </div>
+        <div class="stat-item reveal">
+          <div class="stat-number">HUMAN</div>
+          <div class="stat-label">Approval for Exceptions</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- §3. PROBLEM -->
+  <section class="problem section" id="problem">
+    <div class="container">
+      <div class="problem-grid">
+        <div class="problem-content">
+          <div class="pill-badge reveal"><span class="dot" style="background:var(--red);"></span> THE PROBLEM</div>
+          <h2 class="headline-lg reveal" style="transition-delay: 100ms">Your reps are winging it.<br>And it's costing you.</h2>
+          <p class="body-lg reveal" style="transition-delay: 200ms; color: var(--ink);">
+            68% of sales deals are lost not because the product is wrong — but because the process is. Reps skip qualification questions. Give away unauthorized discounts.
+          </p>
+          <ul class="pain-list reveal" style="transition-delay: 300ms">
+            <li><span class="icon">[✕]</span> Reps give 25-35% discounts without approval</li>
+            <li><span class="icon">[✕]</span> MEDDIC questions skipped in 4 out of 5 calls</li>
+            <li><span class="icon">[✕]</span> Deals fall through the cracks with zero visibility</li>
+          </ul>
+        </div>
+        <div class="problem-visual reveal" style="transition-delay: 200ms">
+          <!-- We fallback to empty styling block if no image, but preserving the container -->
+          <img src="images/problem-visual.jpg" onerror="this.style.display='none'; this.parentNode.style.background='var(--surface)'; this.parentNode.style.minHeight='400px'; this.parentNode.style.border='1px solid var(--hairline)';" alt="Problem visualization">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- §4. SOLUTION / FEATURES -->
+  <section class="solution section" id="solution">
+    <div class="container">
+      <div class="solution-header">
+        <div class="pill-badge reveal"><span class="dot"></span> THE SOLUTION</div>
+        <h2 class="headline-lg reveal" style="margin-top: var(--sp-4);">An AI agent that sells<br>the way your best rep would.</h2>
+      </div>
+      <div class="features-grid reveal-stagger">
+        <div class="feature-card reveal">
+          <div class="feature-icon">[VOICE]</div>
+          <h3>Real-Time Voice AI</h3>
+          <p>Real-time voice conversations powered by Agora RTC and Gemini 2.5 Flash.</p>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon">[POLICY]</div>
+          <h3>Policy Guardrails</h3>
+          <p>3-tier permission engine. No discount above your limit. No promise without approval.</p>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon">[LIVE]</div>
+          <h3>Live Deal Intelligence</h3>
+          <p>Real-time dashboard shows every deal field updating live as the conversation progresses.</p>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon">[FRAMEWORK]</div>
+          <h3>MEDDIC Qualification</h3>
+          <p>Automatically qualifies every lead against your MEDDIC framework during the call.</p>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon">[NEGOTIATE]</div>
+          <h3>Smart Negotiation</h3>
+          <p>Counters unreasonable requests with alternatives from your concession catalog.</p>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon">[HUMAN]</div>
+          <h3>Human-in-the-Loop</h3>
+          <p>Exceptional deals pause for manager approval. One click to approve or reject.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- §5. HOW IT WORKS -->
+  <section class="how-it-works section" id="how-it-works">
+    <div class="container">
+      <div class="how-header">
+        <div class="pill-badge reveal"><span class="dot"></span> HOW IT WORKS</div>
+        <h2 class="headline-lg reveal" style="margin-top: var(--sp-4);">Three steps. One call.<br>Deal forged.</h2>
+      </div>
+
+      <div class="steps-container">
+        <div class="steps-list reveal-stagger">
+          <div class="step-item reveal">
+            <div class="step-number">01</div>
+            <div class="step-content">
+              <h3>Customer Calls</h3>
+              <p>A prospect opens a link on their phone and starts talking. No app download, no forms.</p>
+            </div>
+          </div>
+          <div class="step-item reveal">
+            <div class="step-number">02</div>
+            <div class="step-content">
+              <h3>AI Negotiates</h3>
+              <p>DealForge qualifies with MEDDIC, handles objections, and checks pricing policy.</p>
+            </div>
+          </div>
+          <div class="step-item reveal">
+            <div class="step-number">03</div>
+            <div class="step-content">
+              <h3>Deal Qualified</h3>
+              <p>Meeting booked. Deal State populated. Audit trail complete on the dashboard.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-visual reveal" style="transition-delay: 300ms">
+           <img src="images/how-it-works-visual.jpg" onerror="this.style.display='none'; this.parentNode.style.background='var(--surface)'; this.parentNode.style.minHeight='400px'; this.parentNode.style.border='1px solid var(--hairline)';" alt="How it works visual">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- §6. DEMO / TERMINAL -->
+  <section class="demo-preview section" id="demo">
+    <div class="container">
+      <div class="demo-header">
+        <div class="pill-badge reveal"><span class="dot"></span> SEE IT IN ACTION</div>
+        <!-- Enforced Single Line -->
+        <h2 class="headline-lg reveal" style="margin-top: var(--sp-4);">See an illustrative negotiation workflow</h2>
+      </div>
+      <div class="demo-terminal reveal" id="demo-terminal">
+        <div class="terminal-header">
+          <div class="terminal-dots">
+            <div class="terminal-dot red"></div><div class="terminal-dot yellow"></div><div class="terminal-dot green"></div>
+          </div>
+          <span class="terminal-title">dealforge-session — live</span>
+          <div></div>
+        </div>
+        <div style="padding: 24px;">
+          <div class="terminal-line">
+            <div class="t-num">01</div><div class="t-content"><span class="t-prompt">customer →</span> "We need 300 seats. What's the best price you can do?"</div>
+          </div>
+          <div class="terminal-line">
+            <div class="t-num">02</div><div class="t-content"><span class="t-muted">[evidence] teamSize = 300, confidence: 0.94 ✓</span></div>
+          </div>
+          <div class="terminal-line">
+            <div class="t-num">03</div><div class="t-content"><span class="t-prompt">dealforge →</span> "For 300 seats on our Enterprise plan, I can offer 12% off..."</div>
+          </div>
+          <div class="terminal-line">
+            <div class="t-num">04</div><div class="t-content"><span class="t-prompt">customer →</span> "We're looking at Salesforce too. Can you do 35%?"</div>
+          </div>
+          <div class="terminal-line">
+            <div class="t-num">05</div><div class="t-content"><span class="t-red">[policy] 35% → REJECTED — exceeds tier-2 limit (18%)</span></div>
+          </div>
+          <div class="terminal-line">
+            <div class="t-num">06</div><div class="t-content"><span class="t-prompt">dealforge →</span> "I can't go to 35%, but I can offer 18% with priority onboarding..."</div>
+          </div>
+          <div class="terminal-line">
+            <div class="t-num">07</div><div class="t-content"><span class="t-success">[approval] → requesting manager approval for 25%...</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- §7. FAQ -->
+  <section class="faq section" id="faq">
+    <div class="container">
+      <div class="faq-header">
+        <div class="pill-badge reveal"><span class="dot"></span> FREQUENTLY ASKED</div>
+        <h2 class="headline-lg reveal" style="margin-top: var(--sp-4);">Questions you're probably thinking</h2>
+      </div>
+      <div class="faq-list">
+        <details class="faq-item reveal">
+          <summary class="faq-trigger">
+            Does it replace my sales team?
+            <span class="faq-chevron">+</span>
+          </summary>
+          <div class="faq-answer">
+            <p>No. DealForge handles initial qualification and negotiation within your defined guardrails. It escalates to human reps for exceptional cases, complex objections, or any situation outside its policy boundaries. Think of it as a tireless SDR that never goes off-script.</p>
+          </div>
+        </details>
+        <details class="faq-item reveal">
+          <summary class="faq-trigger">
+            Can the AI give unauthorized discounts?
+            <span class="faq-chevron">+</span>
+          </summary>
+          <div class="faq-answer">
+            <p>Impossible by design. The 3-tier policy engine enforces hard limits. The AI literally cannot bypass the policy — it's not a prompt, it's deterministic code.</p>
+          </div>
+        </details>
+        <details class="faq-item reveal">
+          <summary class="faq-trigger">
+            How does the human approval flow work?
+            <span class="faq-chevron">+</span>
+          </summary>
+          <div class="faq-answer">
+            <p>When the AI needs approval, it says "Let me check with my manager". An approval card appears on the manager's dashboard in real-time. The manager clicks Approve or Reject. On the next customer turn, the AI picks up the decision and responds accordingly.</p>
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- §8. FINAL CTA -->
+  <section class="final-cta section" id="cta">
+    <div class="container" style="max-width: 100%;">
+      <h2 class="headline-lg reveal">Stop losing deals to<br>process failures.</h2>
+      <p class="body-lg reveal" style="transition-delay: 100ms">
+        Every conversation qualified. Every discount controlled. Every decision auditable.
+      </p>
+      <div class="cta-actions reveal" style="transition-delay: 200ms">
+        <a href="/login.html" class="btn-primary" style="padding: 20px 40px; font-size: 16px;">
+          Manager sign in →
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-col">
+          <img src="DealForge-logo.png" alt="DealForge Logo" style="height: 32px; margin-bottom: 16px;">
+          <p class="body-lg" style="font-size: 14px; max-width: 300px;">AI-powered voice sales agent that qualifies leads, negotiates within guardrails, and closes deals.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Product</h4>
+          <ul><li><a href="#solution">Features</a></li><li><a href="/login.html">Sign In</a></li></ul>
+        </div>
+        <div class="footer-col">
+          <h4>Company</h4>
+          <ul><li><a href="#faq">FAQ</a></li><li><a href="mailto:support@dealforge.ai">Support</a></li></ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>© 2026 DealForge. Built with Gemini + Agora.</p>
+        <p>HACKATHON PREVIEW</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+    const navbar = document.getElementById('navbar');
+    window.addEventListener('scroll', () => {
+      navbar.classList.toggle('scrolled', window.scrollY > 20);
+    }, { passive: true });
+
+    const terminalObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const lines = entry.target.querySelectorAll('.terminal-line');
+          lines.forEach(line => {
+            line.style.animation = 'none';
+            line.offsetHeight;
+            line.style.animation = '';
+          });
+          terminalObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.3 });
+    const demoTerminal = document.getElementById('demo-terminal');
+    if (demoTerminal) terminalObserver.observe(demoTerminal);
+
+    document.querySelectorAll('.faq-item').forEach(item => {
+      const trigger = item.querySelector('.faq-trigger');
+      const chevron = item.querySelector('.faq-chevron');
+      trigger.addEventListener('click', () => {
+        if (!item.hasAttribute('open')) { chevron.style.transform = 'rotate(45deg)'; }
+        else { chevron.style.transform = 'rotate(0deg)'; }
+      });
+    });
+  </script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="/__/firebase/init.js"></script>
+  <script src="/js/firebaseConfig.js"></script>
+  <script>
+    initFirebase();
+    firebase.auth().onAuthStateChanged((user) => {
+      const navCta = document.querySelector('.nav-cta');
+      if (user && navCta) {
+        navCta.href = '/overview.html';
+        navCta.textContent = (user.displayName || user.email || 'Dashboard').split('@')[0];
+        navCta.style.background = 'transparent';
+        navCta.style.color = 'var(--ink)';
+        navCta.style.border = '1px solid var(--hairline)';
+
+        // Also update the hero actions
+        const heroActions = document.querySelector('.hero-actions');
+        if (heroActions) {
+          const workspace = document.createElement('a');
+          workspace.href = '/overview.html';
+          workspace.className = 'btn-primary';
+          workspace.textContent = 'Open workspace →';
+          const demo = document.createElement('a');
+          demo.href = '#demo';
+          demo.className = 'btn-secondary';
+          demo.textContent = 'See How It Works';
+          heroActions.replaceChildren(workspace, demo);
+        }
+      }
+    });
+  </script>
+</body>
+</html>

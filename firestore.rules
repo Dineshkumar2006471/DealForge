@@ -1,0 +1,26 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function member() { return signedIn() && exists(/databases/$(database)/documents/members/$(request.auth.uid)); }
+    function manager() { return member() && request.auth.token.role == 'manager' && request.auth.token.organizationId == get(/databases/$(database)/documents/members/$(request.auth.uid)).data.organizationId && get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role == 'manager' && get(/databases/$(database)/documents/members/$(request.auth.uid)).data.status == 'ACTIVE'; }
+    function sameOrganization(orgId) { return manager() && get(/databases/$(database)/documents/members/$(request.auth.uid)).data.organizationId == orgId; }
+
+    match /organizations/{organizationId} { allow read: if sameOrganization(organizationId); allow write: if false; }
+    match /members/{memberId} { allow read: if signedIn() && request.auth.uid == memberId; allow write: if false; }
+
+    match /deals/{dealId} { allow read: if sameOrganization(resource.data.organizationId); allow write: if false; }
+    match /callSessions/{sessionId} {
+      allow read: if sameOrganization(resource.data.organizationId);
+      allow write: if false;
+      match /messages/{messageId} { allow read: if sameOrganization(resource.data.organizationId); allow write: if false; }
+    }
+    match /approvals/{approvalId} { allow read: if sameOrganization(resource.data.organizationId); allow write: if false; }
+    match /auditEvents/{eventId} { allow read: if sameOrganization(resource.data.organizationId); allow write: if false; }
+    match /evidence/{evidenceId} { allow read: if sameOrganization(resource.data.organizationId); allow write: if false; }
+    match /meetings/{meetingId} { allow read: if sameOrganization(resource.data.organizationId); allow write: if false; }
+    match /operations/{operationId} { allow read: if sameOrganization(resource.data.organizationId); allow write: if false; }
+    match /{document=**} { allow read, write: if false; }
+  }
+}

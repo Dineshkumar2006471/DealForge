@@ -1,0 +1,38 @@
+name: Release candidate checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npx firebase-tools emulators:exec --only firestore "node --test test/firestore-emulator.test.js"
+
+  publication-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify secret-bearing files are not tracked
+        run: |
+          ! git ls-files | grep -E '(^|/)(\.env|firebaseConfig\.local\.js|.*\.log)$'
+      - name: Scan tracked text for private keys and Firebase API keys
+        run: |
+          ! git grep -nE 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|AIza[0-9A-Za-z_-]{20,}'

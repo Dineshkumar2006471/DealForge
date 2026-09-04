@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analytics — DealForge</title>
+  <link rel="icon" href="/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="layout-app">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo"><a href="/"><img src="/DealForge-logo.png" alt="DealForge"></a></div>
+    <nav class="nav-links-sidebar">
+      <a href="/overview.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>Dashboard</a>
+      <a href="/deals.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>Active Deals</a>
+      <a href="/recordings.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>Call Activity</a>
+      <a href="/agents.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"></circle><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"></path></svg>AI Agents</a>
+      <a href="/analytics.html" class="active"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>Analytics</a>
+      <a href="/integrations.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>Integrations</a>
+      <a href="/settings.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>Settings</a>
+    </nav>
+    <div class="sidebar-footer" style="justify-content: center;">
+      <button class="btn-secondary" onclick="signOut()" style="padding: 12px; width: 100%; justify-content: center;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+        Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-left"><div class="topbar-title">Analytics</div></div>
+      <div class="topbar-right">
+        <div class="user-profile" style="flex-direction: row-reverse;">
+          <div class="user-info" style="align-items: flex-start; margin-right: 12px;">
+            <span class="user-name" id="user-display-name">Loading...</span>
+            <span class="user-role">Sales Manager</span>
+          </div>
+          <div class="user-avatar" id="user-email" style="width: 36px; height: 36px;">...</div>
+        </div>
+      </div>
+    </header>
+
+    <main class="container" style="padding: 24px 32px 48px;">
+      <!-- Summary Stats -->
+      <div class="analytics-stats">
+        <div class="bento-card" style="align-items: center; text-align: center;">
+          <div style="font-family: var(--font-mono); font-size: 11px; color: var(--mute); text-transform: uppercase; margin-bottom: 8px;">Total Pipeline</div>
+          <div class="viz-value-xl" id="stat-pipeline">$0</div>
+        </div>
+        <div class="bento-card" style="align-items: center; text-align: center;">
+          <div style="font-family: var(--font-mono); font-size: 11px; color: var(--mute); text-transform: uppercase; margin-bottom: 8px;">Active Deals</div>
+          <div class="viz-value-xl" id="stat-active">0</div>
+        </div>
+        <div class="bento-card" style="align-items: center; text-align: center;">
+          <div style="font-family: var(--font-mono); font-size: 11px; color: var(--mute); text-transform: uppercase; margin-bottom: 8px;">Won Deals</div>
+          <div class="viz-value-xl" style="color: var(--green);" id="stat-won">0</div>
+        </div>
+        <div class="bento-card" style="align-items: center; text-align: center;">
+          <div style="font-family: var(--font-mono); font-size: 11px; color: var(--mute); text-transform: uppercase; margin-bottom: 8px;">Evidence Confidence</div>
+          <div class="viz-value-xl" style="color: var(--amber);" id="stat-confidence">—</div>
+        </div>
+      </div>
+
+      <div class="analytics-grid">
+        <!-- Tool Usage -->
+        <div class="bento-card">
+          <div class="bento-header"><h3>Tool Execution Breakdown</h3></div>
+          <div id="tool-stats" style="display: flex; flex-direction: column; gap: 12px;">
+            <div style="color: var(--mute); font-size: 13px;">Loading...</div>
+          </div>
+        </div>
+
+        <!-- Policy Events -->
+        <div class="bento-card">
+          <div class="bento-header"><h3>Policy Engine Activity</h3></div>
+          <div id="policy-stats" style="display: flex; flex-direction: column; gap: 12px;">
+            <div style="color: var(--mute); font-size: 13px;">Loading...</div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="/__/firebase/init.js"></script>
+  <script src="/js/firebaseConfig.js"></script>
+  <script src="/js/auth.js"></script>
+  <script>
+    const db = getFirestore();
+    function node(tag, text, styles = {}) {
+      const element = document.createElement(tag);
+      if (text !== undefined) element.textContent = text;
+      Object.assign(element.style, styles);
+      return element;
+    }
+
+    function unavailable(message) {
+      return node('div', message, { color: 'var(--mute)', fontSize: '13px' });
+    }
+
+    firebase.auth().onAuthStateChanged(async (user) => {
+      if (user) {
+        if (!await window.managerReady) return;
+        renderProfileIcon('user-email');
+        document.getElementById('user-display-name').innerText = user.displayName || user.email || 'User';
+        loadAnalytics();
+      } else { window.location.href = '/login.html'; }
+    });
+
+    async function loadAnalytics() {
+      const toolEl = document.getElementById('tool-stats');
+      const policyEl = document.getElementById('policy-stats');
+      try {
+      // Pipeline stats from deals
+      const dealsSnap = await db.collection('deals').where('organizationId', '==', window.managerOrganizationId).get();
+      let totalArr = 0, activeCount = 0, wonCount = 0;
+      dealsSnap.forEach(doc => {
+        const d = doc.data();
+        totalArr += d.arr || 0;
+        if (d.status === 'ACTIVE' || d.status === 'QUALIFIED') activeCount++;
+        if (d.status === 'CLOSED_WON') wonCount++;
+      });
+      document.getElementById('stat-pipeline').innerText = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(totalArr);
+      document.getElementById('stat-active').innerText = activeCount;
+      document.getElementById('stat-won').innerText = wonCount;
+      document.getElementById('stat-confidence').innerText = '—';
+
+      // Load without an ordered remote query so the dashboard has a graceful path while
+      // the optional analytics index is building; the rendered set is still bounded.
+      const auditSnap = await db.collection('auditEvents').where('organizationId', '==', window.managerOrganizationId).get();
+      const toolCounts = {};
+      const policyCounts = {};
+      auditSnap.docs.sort((left, right) => {
+        const a = left.data().timestamp, b = right.data().timestamp;
+        const at = a?.toMillis?.() || Date.parse(a || '') || 0, bt = b?.toMillis?.() || Date.parse(b || '') || 0;
+        return bt - at;
+      }).slice(0, 50).forEach(doc => {
+        const ev = doc.data();
+        if (ev.eventType === 'TOOL_EXECUTED') {
+          const name = String(ev.trigger || 'unknown').split('(')[0] || 'unknown';
+          toolCounts[name] = (toolCounts[name] || 0) + 1;
+        }
+        policyCounts[ev.eventType] = (policyCounts[ev.eventType] || 0) + 1;
+      });
+
+      // Render event labels through DOM text nodes; audit data is untrusted.
+      const maxTool = Math.max(...Object.values(toolCounts), 1);
+      const toolNodes = [];
+      Object.entries(toolCounts).forEach(([name, count]) => {
+        const pct = (count / maxTool) * 100;
+        const item = node('div');
+        const top = node('div', undefined, { display: 'flex', justifyContent: 'space-between', marginBottom: '4px' });
+        top.append(node('span', name, { fontFamily: 'var(--font-mono)', fontSize: '12px', textTransform: 'uppercase' }), node('span', `${count}x`, { fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--amber)' }));
+        const track = node('div', undefined, { height: '6px', background: 'var(--canvas)', borderRadius: '3px', overflow: 'hidden' });
+        track.append(node('div', undefined, { height: '100%', width: `${pct}%`, background: 'var(--amber)', borderRadius: '3px', transition: 'width 0.6s' }));
+        item.append(top, track);
+        toolNodes.push(item);
+      });
+      toolEl.replaceChildren(...(toolNodes.length ? toolNodes : [unavailable('No tool executions recorded.')]));
+
+      // Render policy stats
+      const policyNodes = [];
+      Object.entries(policyCounts).forEach(([type, count]) => {
+        const color = String(type).includes('WARNING') ? 'var(--red)' : String(type).includes('EXECUTED') ? 'var(--green)' : 'var(--amber)';
+        const item = node('div', undefined, { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px', background: 'var(--canvas)', borderRadius: '8px' });
+        const badge = node('span', String(count), { fontSize: '10px', padding: '2px 8px', color, borderColor: color });
+        badge.className = 'pill-badge';
+        item.append(node('span', type.replace(/_/g, ' '), { fontFamily: 'var(--font-mono)', fontSize: '11px', textTransform: 'uppercase', color: 'var(--ink)' }), badge);
+        policyNodes.push(item);
+      });
+      policyEl.replaceChildren(...(policyNodes.length ? policyNodes : [unavailable('No policy events.')]));
+      } catch (error) {
+        console.error('Unable to load analytics:', error);
+        document.getElementById('stat-pipeline').innerText = '—';
+        document.getElementById('stat-active').innerText = '—';
+        document.getElementById('stat-won').innerText = '—';
+        document.getElementById('stat-confidence').innerText = '—';
+        toolEl.replaceChildren(unavailable('Analytics are temporarily unavailable. Refresh this workspace to try again.'));
+        policyEl.replaceChildren(unavailable('Analytics are temporarily unavailable. Refresh this workspace to try again.'));
+      }
+    }
+  </script>
+</body>
+</html>

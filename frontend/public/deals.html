@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DealForge — Active Deals</title>
+  <link rel="icon" href="/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="layout-app">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <a href="/"><img src="/DealForge-logo.png" alt="DealForge"></a>
+    </div>
+
+    <nav class="nav-links-sidebar">
+      <a href="/overview.html">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+        Dashboard
+      </a>
+      <a href="/deals.html" class="active">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+        Active Deals
+      </a>
+      <a href="/recordings.html">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        Call Activity
+      </a>
+      <a href="/agents.html">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"></path></svg>
+        AI Agents
+      </a>
+      <a href="/analytics.html">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+        Analytics
+      </a>
+      <a href="/integrations.html">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+        Integrations
+      </a>
+      <a href="/settings.html">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        Settings
+      </a>
+    </nav>
+
+    <div class="sidebar-footer" style="justify-content: center;">
+      <button class="btn-secondary" onclick="signOut()" style="padding: 12px; width: 100%; justify-content: center;" title="Sign Out">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+        Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="topbar-title">Deal Intelligence</div>
+      </div>
+      <div class="topbar-right">
+        <div class="search-bar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input id="deal-search" type="search" placeholder="Search active deals..." aria-label="Search active deals">
+        </div>
+        <div class="user-profile" style="flex-direction: row-reverse;">
+          <div class="user-info" style="align-items: flex-start; margin-right: 12px;">
+            <span class="user-name" id="user-display-name">Loading...</span>
+            <span class="user-role">Sales Manager</span>
+          </div>
+          <div class="user-avatar" id="user-email" style="width: 36px; height: 36px;">...</div>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="bento-card" style="margin-bottom: 20px; padding: 22px 24px; display: flex; align-items: center; justify-content: space-between; gap: 20px;">
+        <div>
+          <div style="font-family: var(--font-mono); font-size: 11px; color: var(--amber); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 6px;">Manager workspace</div>
+          <h1 style="font-size: 24px; margin: 0;">Open a deal to run its live call workspace.</h1>
+          <p style="margin: 8px 0 0; color: var(--mute); font-size: 14px;">Choose a deal to create a secure customer call link, review live evidence, and resolve approvals.</p>
+        </div>
+        <div id="deal-count" class="pill-badge dark" aria-live="polite">LOADING</div>
+      </section>
+      <div id="deals-list" class="bento-card">
+        <div style="padding: 24px; color: var(--mute);">Loading active deals…</div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+  <!-- Auth Integration -->
+  <script src="/__/firebase/init.js"></script>
+  <script src="/js/firebaseConfig.js"></script>
+  <script src="/js/auth.js"></script>
+
+  <script>
+    const db = firebase.firestore();
+    function node(tag, text, styles = {}) {
+      const element = document.createElement(tag);
+      if (text !== undefined) element.textContent = text;
+      Object.assign(element.style, styles);
+      return element;
+    }
+
+    function emptyState(title, message, retry) {
+      const wrapper = node('div', undefined, { padding: '48px 32px', textAlign: 'center' });
+      wrapper.append(
+        node('div', title, { fontFamily: 'var(--font-mono)', fontSize: '12px', color: retry ? 'var(--red)' : 'var(--amber)', textTransform: 'uppercase', marginBottom: '10px' }),
+        node('p', message, { margin: '0', color: 'var(--mute)' })
+      );
+      if (retry) {
+        const button = node('button', 'Retry');
+        button.className = 'btn-secondary';
+        Object.assign(button.style, { marginTop: '18px' });
+        button.addEventListener('click', loadDeals);
+        wrapper.append(button);
+      }
+      return wrapper;
+    }
+
+    // Auth observer to load data once authenticated
+    firebase.auth().onAuthStateChanged(async (user) => {
+      if (user) {
+        if (!await window.managerReady) return;
+        renderProfileIcon('user-email');
+        document.getElementById('user-display-name').innerText = user.displayName || user.email || 'User';
+        loadDeals();
+      } else {
+        window.location.href = '/login.html';
+      }
+    });
+
+    let allDeals = [];
+
+    function timestampValue(value) {
+      if (value && typeof value.toMillis === 'function') return value.toMillis();
+      const parsed = Date.parse(value || '');
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+
+    function renderDeals() {
+      const dealsList = document.getElementById('deals-list');
+      const needle = document.getElementById('deal-search').value.trim().toLowerCase();
+      const visibleDeals = allDeals.filter(({ data }) => {
+        const haystack = [data.company?.value, data.status, data.conversationStage, data.owner?.value].join(' ').toLowerCase();
+        return haystack.includes(needle);
+      });
+      document.getElementById('deal-count').textContent = `${visibleDeals.length} ${visibleDeals.length === 1 ? 'DEAL' : 'DEALS'}`;
+
+      if (!visibleDeals.length) {
+        dealsList.replaceChildren(emptyState(
+          allDeals.length ? 'No matching deals' : 'No active deals yet',
+          allDeals.length ? 'Try a company, stage, or status.' : 'Once a server-authorized deal is added to this organization, it will appear here.'
+        ));
+        return;
+      }
+
+      const table = node('table', undefined, { width: '100%', borderCollapse: 'collapse', textAlign: 'left' });
+      const headerRow = node('tr', undefined, { borderBottom: '1px solid var(--hairline)', color: 'var(--mute)' });
+      ['Company', 'Status', 'Stage', 'Target ARR', 'Action'].forEach(label => headerRow.append(node('th', label, { padding: '16px', fontFamily: 'var(--font-mono)', fontSize: '12px', textTransform: 'uppercase' })));
+      const thead = document.createElement('thead');
+      thead.append(headerRow);
+      const tbody = document.createElement('tbody');
+      visibleDeals.forEach(({ id, data: deal }) => {
+          const companyName = deal.company?.value || 'Unknown';
+          const status = deal.status || 'ACTIVE';
+          const stage = deal.conversationStage || 'N/A';
+          const arr = deal.arr ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(deal.arr) : '$0';
+
+          const row = node('tr', undefined, { borderBottom: '1px solid var(--hairline)', transition: 'background 0.2s', cursor: 'pointer' });
+          row.addEventListener('mouseenter', () => { row.style.background = 'var(--canvas)'; });
+          row.addEventListener('mouseleave', () => { row.style.background = 'transparent'; });
+          row.addEventListener('click', () => { window.location.href = `/dashboard.html?id=${encodeURIComponent(id)}`; });
+          const cell = styles => node('td', undefined, Object.assign({ padding: '24px 16px' }, styles));
+          const companyCell = cell(); companyCell.append(node('div', companyName, { fontWeight: '600', fontSize: '16px', color: 'var(--ink)' }));
+          const statusCell = cell(); const badge = node('div', status); badge.className = `pill-badge${status === 'CLOSED_WON' ? '' : ' dark'}`; const dot = node('div'); dot.className = 'dot'; if (status === 'CLOSED_WON') dot.style.background = 'var(--green)'; badge.prepend(dot); statusCell.append(badge);
+          const stageCell = cell({ fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--mute)' }); stageCell.textContent = stage;
+          const arrCell = cell({ fontFamily: 'var(--font-mono)', fontSize: '16px', fontWeight: '700' }); arrCell.textContent = arr;
+          const actionCell = cell(); const button = node('button', 'View Intel'); button.className = 'btn-secondary'; Object.assign(button.style, { padding: '6px 12px', fontSize: '11px' }); actionCell.append(button);
+          row.append(companyCell, statusCell, stageCell, arrCell, actionCell);
+          tbody.append(row);
+      });
+      table.append(thead, tbody);
+      dealsList.replaceChildren(table);
+    }
+
+    async function loadDeals() {
+      const dealsList = document.getElementById('deals-list');
+      try {
+        // Sorting in the browser keeps this manager-facing page usable before any composite index is built.
+        const snapshot = await db.collection('deals').where('organizationId', '==', window.managerOrganizationId).get();
+        allDeals = snapshot.docs
+          .map(doc => ({ id: doc.id, data: doc.data() }))
+          .sort((left, right) => timestampValue(right.data.updatedAt) - timestampValue(left.data.updatedAt));
+        renderDeals();
+      } catch (err) {
+        console.error('Error loading deals:', err);
+        document.getElementById('deal-count').textContent = 'UNAVAILABLE';
+        dealsList.replaceChildren(emptyState('Deals could not be loaded', 'Refresh this workspace. If the problem continues, verify the manager account has access to this organization.', true));
+      }
+    }
+
+    document.getElementById('deal-search').addEventListener('input', renderDeals);
+  </script>
+</body>
+</html>

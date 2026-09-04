@@ -1,0 +1,11 @@
+# Keep Cloud Build uploads small and prevent local credentials/artifacts entering the build context.
+node_modules/
+.env
+.env.*
+!.env.example
+firestore-debug.log
+test-results/
+playwright-report/
+e2e/
+test/
+npm-debug.log

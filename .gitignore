@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+!server/.env.example
+server/.env
+.firebase/
+tasks/
+*.log
+Implementation-pan.md
+replace-logos.js
+frontend/public/js/firebaseConfig.local.js
+server/test-results/
+server/playwright-report/
+server/blob-report/
+node_modules/
+frontend/public/node_modules/

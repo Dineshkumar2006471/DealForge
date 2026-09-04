@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Integrations — DealForge</title>
+  <link rel="icon" href="/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="layout-app">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo"><a href="/"><img src="/DealForge-logo.png" alt="DealForge"></a></div>
+    <nav class="nav-links-sidebar">
+      <a href="/overview.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>Dashboard</a>
+      <a href="/deals.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>Active Deals</a>
+      <a href="/recordings.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>Call Activity</a>
+      <a href="/agents.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"></circle><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"></path></svg>AI Agents</a>
+      <a href="/analytics.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>Analytics</a>
+      <a href="/integrations.html" class="active"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>Integrations</a>
+      <a href="/settings.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>Settings</a>
+    </nav>
+    <div class="sidebar-footer" style="justify-content: center;">
+      <button class="btn-secondary" onclick="signOut()" style="padding: 12px; width: 100%; justify-content: center;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+        Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-left"><div class="topbar-title">Integrations</div></div>
+      <div class="topbar-right">
+        <div class="user-profile" style="flex-direction: row-reverse;">
+          <div class="user-info" style="align-items: flex-start; margin-right: 12px;">
+            <span class="user-name" id="user-display-name">Loading...</span>
+            <span class="user-role">Sales Manager</span>
+          </div>
+          <div class="user-avatar" id="user-email" style="width: 36px; height: 36px;">...</div>
+        </div>
+      </div>
+    </header>
+
+    <main class="container" style="padding: 24px 32px 48px;">
+      <div class="integration-grid">
+
+        <!-- Agora -->
+        <div class="bento-card">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+            <div aria-label="Agora" title="Agora" style="width: 48px; height: 48px; border-radius: 12px; background: #16133b; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="none" stroke="#fff" stroke-width="2.5"/><circle cx="16" cy="16" r="5" fill="#fff"/><circle cx="7.5" cy="9" r="2.5" fill="#ff3d81"/><circle cx="24.5" cy="9" r="2.5" fill="#8b5cf6"/></svg>
+            </div>
+            <div>
+              <h3 style="font-size: 16px;">Agora RTC</h3>
+              <div id="status-agora" class="pill-badge" style="font-size: 10px; padding: 2px 8px; margin-top: 4px;">NOT CONFIGURED</div>
+            </div>
+          </div>
+          <p style="font-size: 13px; color: var(--mute); line-height: 1.6;">Real-time voice communication via WebRTC. Powers the conversational AI agent with ASR (Deepgram) + TTS (MiniMax).</p>
+        </div>
+
+        <!-- Gemini -->
+        <div class="bento-card">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+            <div aria-label="Google Gemini" title="Google Gemini" style="width: 48px; height: 48px; border-radius: 12px; background: #f4f7ff; border: 1px solid #d9e2ff; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="gemini-gradient" x1="2" y1="2" x2="30" y2="30"><stop stop-color="#4285f4"/><stop offset="1" stop-color="#9b72cb"/></linearGradient></defs><path fill="url(#gemini-gradient)" d="M16 2c1.7 9.1 4.9 12.3 14 14-9.1 1.7-12.3 4.9-14 14-1.7-9.1-4.9-12.3-14-14 9.1-1.7 12.3-4.9 14-14Z"/></svg>
+            </div>
+            <div>
+              <h3 style="font-size: 16px;">Gemini 2.5 Flash</h3>
+              <div id="status-gemini" class="pill-badge" style="font-size: 10px; padding: 2px 8px; margin-top: 4px;">NOT CONFIGURED</div>
+            </div>
+          </div>
+          <p style="font-size: 13px; color: var(--mute); line-height: 1.6;">Vertex AI LLM powering agent reasoning, evidence extraction, and negotiation strategy via SSE streaming.</p>
+        </div>
+
+        <!-- Firestore -->
+        <div class="bento-card">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+            <div aria-label="Google Cloud Firestore" title="Google Cloud Firestore" style="width: 48px; height: 48px; border-radius: 12px; background: #fff4e5; border: 1px solid #ffe0b2; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 6 9l2 16h16l2-16L16 3Z" fill="#ffca28"/><path d="m6 9 10 6 10-6-10-6L6 9Z" fill="#ff8f00"/><path d="m8 25 8-10 8 10H8Z" fill="#039be5"/></svg>
+            </div>
+            <div>
+              <h3 style="font-size: 16px;">Cloud Firestore</h3>
+              <div id="status-firestore" class="pill-badge" style="font-size: 10px; padding: 2px 8px; margin-top: 4px;">NOT CONFIGURED</div>
+            </div>
+          </div>
+          <p style="font-size: 13px; color: var(--mute); line-height: 1.6;">Real-time state store. Deal State, Evidence, Audit Events, and Approvals all live-sync to the dashboard via onSnapshot.</p>
+        </div>
+
+        <!-- HubSpot -->
+        <div class="bento-card" style="opacity: 0.5;">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+            <div aria-label="HubSpot" title="HubSpot" style="width: 48px; height: 48px; border-radius: 12px; background: #fff2eb; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke="#ff7a59" stroke-width="3" stroke-linecap="round"><circle cx="16" cy="16" r="4" fill="#ff7a59" stroke="none"/><path d="M16 12V5m0 0 5-2m-5 2 5 3M12.5 18.5 7 22m0 0v5m0-5 4 2M19.5 13.5 25 10m0 0v-5m0 5 3 2"/><circle cx="21" cy="3" r="2" fill="#ff7a59" stroke="none"/><circle cx="7" cy="27" r="2" fill="#ff7a59" stroke="none"/><circle cx="28" cy="7" r="2" fill="#ff7a59" stroke="none"/></svg>
+            </div>
+            <div>
+              <h3 style="font-size: 16px;">HubSpot CRM</h3>
+              <div class="pill-badge" style="font-size: 10px; padding: 2px 8px; margin-top: 4px;">NOT CONFIGURED</div>
+            </div>
+          </div>
+          <p style="font-size: 13px; color: var(--mute); line-height: 1.6;">Not part of the secure core launch. No CRM data is connected or transmitted.</p>
+          <button class="btn-secondary" style="margin-top: 12px; width: 100%; text-align: center;" disabled>Not configured</button>
+        </div>
+
+        <!-- Salesforce -->
+        <div class="bento-card" style="opacity: 0.5;">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+            <div style="width: 48px; height: 48px; border-radius: 12px; background: #00A1E0; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 10px;"><svg fill="#fff" width="24" height="24" role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>Salesforce</title><path d="M16.634 8.791A4.693 4.693 0 0 0 12.59 5.86c-2.464 0-4.464 1.83-4.664 4.14-2.483.33-4.321 2.458-4.321 4.966 0 2.766 2.24 5.006 5.006 5.006h9.167c2.616 0 4.735-2.122 4.735-4.735 0-2.316-1.637-4.238-3.879-4.646z"/></svg></div>
+            <div>
+              <h3 style="font-size: 16px;">Salesforce</h3>
+              <div class="pill-badge" style="font-size: 10px; padding: 2px 8px; margin-top: 4px;">NOT CONFIGURED</div>
+            </div>
+          </div>
+          <p style="font-size: 13px; color: var(--mute); line-height: 1.6;">Not part of the secure core launch. No Salesforce data is connected or transmitted.</p>
+          <button class="btn-secondary" style="margin-top: 12px; width: 100%; text-align: center;" disabled>Not configured</button>
+        </div>
+
+        <!-- Slack -->
+        <div class="bento-card" style="opacity: 0.5;">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+            <div style="width: 48px; height: 48px; border-radius: 12px; background: #4A154B; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 10px;"><svg fill="#fff" width="24" height="24" role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>Slack</title><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522v-2.521zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"/></svg></div>
+            <div>
+              <h3 style="font-size: 16px;">Slack</h3>
+              <div class="pill-badge" style="font-size: 10px; padding: 2px 8px; margin-top: 4px;">NOT CONFIGURED</div>
+            </div>
+          </div>
+          <p style="font-size: 13px; color: var(--mute); line-height: 1.6;">Not part of the secure core launch. Approval activity remains in the DealForge dashboard.</p>
+          <button class="btn-secondary" style="margin-top: 12px; width: 100%; text-align: center;" disabled>Not configured</button>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="/__/firebase/init.js"></script>
+  <script src="/js/firebaseConfig.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/runtimeConfig.js"></script>
+  <script src="/js/backendClient.js"></script>
+  <script>
+    firebase.auth().onAuthStateChanged(async (user) => {
+      if (user) {
+        if (!await window.managerReady) return;
+        renderProfileIcon('user-email');
+        document.getElementById('user-display-name').innerText = user.displayName || user.email || 'User';
+        const setStatus = (name, value) => { const element = document.getElementById(`status-${name}`); if (!element) return; element.textContent = value; element.style.color = value === 'CONNECTED' ? 'var(--green)' : value === 'ERROR' ? 'var(--red)' : 'var(--amber)'; };
+        getIntegrationStatus().then(statuses => Object.entries(statuses).forEach(([name, value]) => setStatus(name, value))).catch(() => ['agora', 'gemini', 'firestore'].forEach(name => setStatus(name, 'ERROR')));
+      } else { window.location.href = '/login.html'; }
+    });
+  </script>
+</body>
+</html>

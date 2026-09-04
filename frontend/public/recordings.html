@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Call Activity — DealForge</title>
+  <link rel="icon" href="/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="layout-app">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo"><a href="/"><img src="/DealForge-logo.png" alt="DealForge"></a></div>
+    <nav class="nav-links-sidebar">
+      <a href="/overview.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>Dashboard</a>
+      <a href="/deals.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>Active Deals</a>
+      <a href="/recordings.html" class="active"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>Call Activity</a>
+      <a href="/agents.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"></circle><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"></path></svg>AI Agents</a>
+      <a href="/analytics.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>Analytics</a>
+      <a href="/integrations.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>Integrations</a>
+      <a href="/settings.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>Settings</a>
+    </nav>
+    <div class="sidebar-footer" style="justify-content: center;">
+      <button class="btn-secondary" onclick="signOut()" style="padding: 12px; width: 100%; justify-content: center;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+        Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-left"><div class="topbar-title">Call Activity</div></div>
+      <div class="topbar-right">
+        <div class="search-bar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input id="activity-search" type="search" placeholder="Search call activity..." aria-label="Search call activity">
+        </div>
+        <div class="user-profile" style="flex-direction: row-reverse;">
+          <div class="user-info" style="align-items: flex-start; margin-right: 12px;">
+            <span class="user-name" id="user-display-name">Loading...</span>
+            <span class="user-role">Sales Manager</span>
+          </div>
+          <div class="user-avatar" id="user-email" style="width: 36px; height: 36px;">...</div>
+        </div>
+      </div>
+    </header>
+
+    <main class="container" style="padding: 24px 32px 48px;">
+      <div id="recordings-list" style="display: flex; flex-direction: column; gap: 16px;">
+        <div style="color: var(--mute); font-size: 14px;">Loading call activity…</div>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="/__/firebase/init.js"></script>
+  <script src="/js/firebaseConfig.js"></script>
+  <script src="/js/auth.js"></script>
+
+  <script>
+    const db = getFirestore();
+
+    firebase.auth().onAuthStateChanged(async (user) => {
+      if (user) {
+        if (!await window.managerReady) return;
+        renderProfileIcon('user-email');
+        document.getElementById('user-display-name').innerText = user.displayName || user.email || 'User';
+        loadRecordings();
+      } else {
+        window.location.href = '/login.html';
+      }
+    });
+
+    function timestampValue(value) {
+      if (value && typeof value.toMillis === 'function') return value.toMillis();
+      const parsed = Date.parse(value || '');
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+
+    function displayTime(value) {
+      const millis = timestampValue(value);
+      return millis ? new Date(millis).toLocaleString() : 'Time unavailable';
+    }
+
+    let activityEvents = [];
+    function createNode(tag, options = {}) {
+      const node = document.createElement(tag);
+      if (options.className) node.className = options.className;
+      if (options.text !== undefined) node.textContent = options.text;
+      if (options.style) Object.assign(node.style, options.style);
+      if (options.attributes) Object.entries(options.attributes).forEach(([key, value]) => node.setAttribute(key, value));
+      return node;
+    }
+    function setActivityMessage(list, message) {
+      const card = createNode('div', { className: 'bento-card', style: { padding: '32px', textAlign: 'center' } });
+      card.append(createNode('p', { text: message, style: { color: 'var(--mute)', margin: '0' } }));
+      list.replaceChildren(card);
+    }
+    function createActivityCard(event) {
+      const iconColor = event.eventType === 'CALL_STARTED' ? 'var(--green)' : event.eventType === 'CALL_ENDED' ? 'var(--red)' : 'var(--amber)';
+      const card = createNode('button', { className: 'bento-card', attributes: { type: 'button', 'aria-label': `Open deal ${String(event.dealId || '')}` }, style: { display: 'flex', width: '100%', border: '0', flexDirection: 'row', alignItems: 'center', gap: '16px', cursor: 'pointer', textAlign: 'left' } });
+      const icon = createNode('span', { style: { width: '40px', height: '40px', borderRadius: '50%', background: iconColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: '0', color: 'white', fontSize: '18px' }, text: '◉' });
+      const details = createNode('span', { style: { flex: '1' } });
+      details.append(createNode('span', { text: String(event.eventType || 'CALL_ACTIVITY').replace(/_/g, ' '), style: { display: 'block', fontWeight: '600', color: 'var(--ink)' } }));
+      details.append(createNode('span', { text: String(event.trigger || 'No description available'), style: { display: 'block', fontSize: '13px', color: 'var(--mute)', marginTop: '2px' } }));
+      const meta = createNode('span', { style: { textAlign: 'right' } });
+      meta.append(createNode('span', { text: displayTime(event.timestamp), style: { display: 'block', fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--mute)' } }));
+      meta.append(createNode('span', { text: String(event.dealId || 'Unknown deal'), style: { display: 'block', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--amber)', marginTop: '2px' } }));
+      card.append(icon, details, meta);
+      card.addEventListener('click', () => { if (event.dealId) window.location.href = `/dashboard.html?id=${encodeURIComponent(event.dealId)}`; });
+      return card;
+    }
+    function renderActivity() {
+      const list = document.getElementById('recordings-list');
+      const needle = document.getElementById('activity-search').value.trim().toLowerCase();
+      const visibleEvents = activityEvents.filter(event => `${event.eventType || ''} ${event.trigger || ''} ${event.dealId || ''}`.toLowerCase().includes(needle));
+      if (!visibleEvents.length) { setActivityMessage(list, activityEvents.length ? 'No matching call activity.' : 'No call activity yet. Text transcript retained for 30 days.'); return; }
+      list.replaceChildren(...visibleEvents.map(createActivityCard));
+    }
+    async function loadRecordings() {
+      const list = document.getElementById('recordings-list');
+      // This is activity, not audio recording: it is built from durable audit events.
+      try {
+        const snapshot = await db.collection('auditEvents')
+          .where('organizationId', '==', window.managerOrganizationId)
+          .get();
+
+        const validTypes = ['CALL_STARTED', 'CALL_ENDED', 'CALL_FAILED', 'AGENT_STARTED', 'TOOL_EXECUTED', 'APPROVAL_REQUESTED', 'APPROVAL_RESOLVED'];
+        activityEvents = snapshot.docs
+          .map(doc => doc.data())
+          .filter(event => validTypes.includes(event.eventType))
+          .sort((left, right) => timestampValue(right.timestamp) - timestampValue(left.timestamp))
+          .slice(0, 50);
+        renderActivity();
+      } catch (err) {
+        console.error('Error loading call activity:', err);
+        const card = createNode('div', { className: 'bento-card', style: { padding: '40px 32px', textAlign: 'center' } });
+        card.append(createNode('div', { text: 'Call activity is temporarily unavailable', style: { fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--red)', textTransform: 'uppercase', marginBottom: '10px' } }));
+        card.append(createNode('p', { text: 'Refresh the workspace. If this continues, verify that this manager belongs to the active organization.', style: { margin: '0', color: 'var(--mute)' } }));
+        const retry = createNode('button', { className: 'btn-secondary', text: 'Retry', attributes: { type: 'button' }, style: { marginTop: '18px' } });
+        retry.addEventListener('click', loadRecordings); card.append(retry); list.replaceChildren(card);
+      }
+    }
+    document.getElementById('activity-search').addEventListener('input', renderActivity);
+  </script>
+</body>
+</html>

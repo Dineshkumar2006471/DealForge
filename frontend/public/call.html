@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="referrer" content="no-referrer"><title>Live AI Call — DealForge</title><link rel="icon" href="/favicon.png"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/css/style.css"></head>
+<body class="page-call">
+  <main class="call-container"><div class="call-header"><h1 class="call-title">Live AI Negotiation</h1><div class="call-status" id="status-text" role="status">Ready to connect</div><p style="color:var(--mute);font-size:13px;max-width:420px;margin:12px auto 0;line-height:1.5">When you start, your browser will request microphone access. This link is single-use and may expire. Text transcript retained for 30 days; audio is not recorded.</p></div>
+    <div class="orb-container"><div class="wave"></div><div class="wave"></div><div class="wave"></div><div class="orb-inner"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.8)" stroke-width="1.5"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg></div></div>
+    <div class="call-controls"><button class="btn-control" id="btn-mute" aria-label="Mute Microphone" disabled>Mute</button><button class="btn-primary btn-start-call" id="btn-call">Start AI Sales Call</button></div>
+    <p id="call-error" style="color:var(--red);min-height:1.5em;text-align:center" aria-live="polite"></p>
+  </main>
+  <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.20.2.js"></script><script src="/js/runtimeConfig.js"></script><script src="/js/backendClient.js"></script><script src="/js/agoraClient.js"></script>
+  <script>
+    const linkToken = new URLSearchParams(location.search).get('link');
+    const callButton = document.getElementById('btn-call'), muteButton = document.getElementById('btn-mute'), status = document.getElementById('status-text'), errorText = document.getElementById('call-error');
+    const waves = document.querySelectorAll('.wave'); let call = null; let active = false;
+    function setStatus(text, color) { status.textContent = text; status.style.color = color || 'var(--gray-400)'; }
+    function setButton(text, primary) { callButton.textContent = text; callButton.classList.toggle('btn-primary', primary); callButton.classList.toggle('btn-secondary', !primary); }
+    let renewalTimer = null;
+    async function cleanup() { if (renewalTimer) clearTimeout(renewalTimer); renewalTimer = null; try { await leaveCall(); } finally { muteButton.disabled = true; active = false; call = null; waves.forEach(w => w.style.animationPlayState = 'paused'); } }
+    function scheduleRenewal(expiresAt) {
+      const wait = new Date(expiresAt).getTime() - Date.now() - 120000;
+      if (!active || !Number.isFinite(wait) || wait <= 0) return;
+      renewalTimer = setTimeout(async () => {
+        try {
+          const renewal = await api(`/public/calls/${encodeURIComponent(linkToken)}/token`, { method: 'POST', body: JSON.stringify({ sessionCredential: call.sessionCredential }) });
+          await renewToken(renewal.token); scheduleRenewal(renewal.expiresAt);
+        } catch (error) { if (active) { errorText.textContent = 'Your secure call session has expired. Ask your manager for a new link.'; setStatus('Call expired', 'var(--red)'); await cleanup(); setButton('Call expired', false); callButton.disabled = true; } }
+      }, wait);
+    }
+    async function start() {
+      if (!linkToken) { errorText.textContent = 'This call link is missing or invalid.'; setStatus('Call unavailable', 'var(--red)'); return; }
+      let startupFailed = false;
+      callButton.disabled = true; errorText.textContent = ''; setStatus('Connecting…');
+      try {
+        const credentials = await joinCustomerCall(linkToken);
+        call = credentials;
+        await joinCall(credentials.appId, credentials.channel, credentials.token, credentials.uid);
+        active = true; muteButton.disabled = false; setButton('End Call', false); setStatus('Agent connected', 'var(--green)'); scheduleRenewal(credentials.expiresAt);
+      } catch (error) { startupFailed = true; if (call?.sessionCredential) await api(`/public/calls/${encodeURIComponent(linkToken)}/fail`, { method: 'POST', body: JSON.stringify({ sessionCredential: call.sessionCredential }) }).catch(() => {}); await cleanup(); errorText.textContent = error.message || 'Unable to start the call. Ask your manager for a new link.'; setStatus('Connection failed', 'var(--red)'); setButton('Request a new link', false); callButton.disabled = true; }
+      finally { if (!startupFailed) callButton.disabled = false; }
+    }
+    async function end() { callButton.disabled = true; setStatus('Disconnecting…'); try { const result = await api(`/public/calls/${encodeURIComponent(linkToken)}/stop`, { method: 'POST', body: JSON.stringify({ sessionCredential: call.sessionCredential }) }); await cleanup(); setButton('Call ended', false); callButton.disabled = true; setStatus(result.agentStopped ? 'Call ended' : 'Disconnected — agent cleanup pending', result.agentStopped ? undefined : 'var(--amber)'); } catch (error) { errorText.textContent = error.message || 'Unable to confirm call termination.'; setStatus('Termination needs attention', 'var(--red)'); callButton.disabled = false; } }
+    callButton.addEventListener('click', () => active ? end() : start());
+    muteButton.addEventListener('click', () => { const muted = toggleMute(); muteButton.textContent = muted ? 'Unmute' : 'Mute'; });
+    window.addEventListener('agora:agent-speaking', () => waves.forEach(w => w.style.animationPlayState = 'running'));
+    window.addEventListener('agora:agent-stopped-speaking', () => waves.forEach(w => w.style.animationPlayState = 'paused'));
+  </script>
+</body></html>

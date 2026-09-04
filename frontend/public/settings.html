@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings — DealForge</title>
+  <link rel="icon" href="/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="layout-app">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo"><a href="/"><img src="/DealForge-logo.png" alt="DealForge"></a></div>
+    <nav class="nav-links-sidebar">
+      <a href="/overview.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>Dashboard</a>
+      <a href="/deals.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>Active Deals</a>
+      <a href="/recordings.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>Call Activity</a>
+      <a href="/agents.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"></circle><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"></path></svg>AI Agents</a>
+      <a href="/analytics.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>Analytics</a>
+      <a href="/integrations.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>Integrations</a>
+      <a href="/settings.html" class="active"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>Settings</a>
+    </nav>
+    <div class="sidebar-footer" style="justify-content: center;">
+      <button class="btn-secondary" onclick="signOut()" style="padding: 12px; width: 100%; justify-content: center;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+        Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-left"><div class="topbar-title">Settings</div></div>
+      <div class="topbar-right">
+        <div class="user-profile" style="flex-direction: row-reverse;">
+          <div class="user-info" style="align-items: flex-start; margin-right: 12px;">
+            <span class="user-name" id="user-display-name">Loading...</span>
+            <span class="user-role">Sales Manager</span>
+          </div>
+          <div class="user-avatar" id="user-email" style="width: 36px; height: 36px;">...</div>
+        </div>
+      </div>
+    </header>
+
+    <main class="container" style="padding: 24px 32px 48px; max-width: 800px;">
+
+      <!-- Profile -->
+      <div class="bento-card" style="margin-bottom: 24px;">
+        <div class="bento-header"><h3>Profile</h3></div>
+        <div style="display: flex; align-items: center; gap: 24px; margin-top: 8px;">
+          <div class="user-avatar" id="settings-avatar" style="width: 64px; height: 64px; font-size: 24px;">...</div>
+          <div>
+            <div style="font-size: 18px; font-weight: 600;" id="settings-name">Loading...</div>
+            <div style="font-size: 14px; color: var(--mute);" id="settings-email">Loading...</div>
+            <div style="font-family: var(--font-mono); font-size: 11px; color: var(--amber); margin-top: 4px;">Manager workspace</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Policy Configuration -->
+      <div class="bento-card" style="margin-bottom: 24px;">
+        <div class="bento-header"><h3>Server Policy Summary</h3><span class="pill-badge">SERVER-ENFORCED</span></div>
+        <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--canvas); border-radius: 8px;">
+            <div><div style="font-weight: 600;">Max Autonomous Discount</div><div style="font-size: 13px; color: var(--mute);">Server-enforced. Requests above this threshold require manager approval.</div></div>
+            <div style="font-family: var(--font-mono); font-size: 18px; font-weight: 700; color: var(--amber);">18%</div>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--canvas); border-radius: 8px;">
+            <div><div style="font-weight: 600;">Evidence Confidence Threshold</div><div style="font-size: 13px; color: var(--mute);">Minimum confidence to accept customer claims as Deal State updates.</div></div>
+            <div style="font-family: var(--font-mono); font-size: 18px; font-weight: 700; color: var(--green);">0.85</div>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--canvas); border-radius: 8px;">
+            <div><div style="font-weight: 600;">Clarification Range</div><div style="font-size: 13px; color: var(--mute);">Agent asks clarifying questions for claims in this confidence range.</div></div>
+            <div style="font-family: var(--font-mono); font-size: 18px; font-weight: 700; color: var(--amber);">0.60 – 0.84</div>
+          </div>
+        </div>
+      </div>
+
+
+    </main>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="/__/firebase/init.js"></script>
+  <script src="/js/firebaseConfig.js"></script>
+  <script src="/js/auth.js"></script>
+  <script>
+    firebase.auth().onAuthStateChanged(async (user) => {
+      if (user) {
+        if (!await window.managerReady) return;
+        renderProfileIcon('user-email');
+        renderProfileIcon('settings-avatar', 32);
+        document.getElementById('user-display-name').innerText = user.displayName || user.email || 'User';
+        document.getElementById('settings-name').innerText = user.displayName || 'No display name';
+        document.getElementById('settings-email').innerText = user.email || 'No email';
+      } else { window.location.href = '/login.html'; }
+    });
+  </script>
+</body>
+</html>
