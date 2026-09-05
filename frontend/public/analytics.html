@@ -130,7 +130,21 @@
       document.getElementById('stat-pipeline').innerText = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(totalArr);
       document.getElementById('stat-active').innerText = activeCount;
       document.getElementById('stat-won').innerText = wonCount;
-      document.getElementById('stat-confidence').innerText = '—';
+      const evidenceSnap = await db.collection('evidence').where('organizationId', '==', window.managerOrganizationId).get();
+      let totalConf = 0;
+      let confCount = 0;
+      evidenceSnap.forEach(doc => {
+         const conf = doc.data().confidence;
+         if (typeof conf === 'number') {
+            totalConf += conf;
+            confCount++;
+         }
+      });
+      if (confCount > 0) {
+         document.getElementById('stat-confidence').innerText = Math.round((totalConf / confCount) * 100) + '%';
+      } else {
+         document.getElementById('stat-confidence').innerText = '—';
+      }
 
       // Load without an ordered remote query so the dashboard has a graceful path while
       // the optional analytics index is building; the rendered set is still bounded.

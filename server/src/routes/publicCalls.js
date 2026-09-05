@@ -9,8 +9,7 @@ const { createRateLimit } = require('../lib/security/rateLimit');
 const { runPostCallAutopilot } = require('../lib/agent/postCallAutopilot');
 const router = express.Router();
 const joinRateLimit = createRateLimit({ scope: 'public-call-join', limit: 8, windowMs: 60_000 });
-const { db } = require('../lib/firebase/admin');
-const admin = require('firebase-admin');
+const { db, admin } = require('../lib/firebase/admin');
 
 router.post('/calls/:linkToken/join', joinRateLimit, async (req, res, next) => {
   try {

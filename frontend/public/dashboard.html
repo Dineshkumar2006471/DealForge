@@ -63,11 +63,6 @@
     <header class="topbar">
       <div class="topbar-left">
         <div class="topbar-title">Deal Profile: <span id="deal-company">Loading...</span></div>
-        <button id="btn-resume-call" class="btn-primary" style="margin-left: 16px; padding: 8px 16px; font-size: 13px; display: flex; align-items: center; gap: 8px; cursor: pointer;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
-          Generate Customer Call Link
-        </button>
-        <span id="call-link-status" style="font-family: var(--font-mono); font-size: 11px; color: var(--mute); margin-left: 12px;" role="status"></span>
       </div>
       <div class="topbar-right">
         <div class="search-bar">
@@ -80,25 +75,6 @@
             <span class="user-role">Sales Manager</span>
           </div>
           <div class="user-avatar" id="user-email" style="width: 36px; height: 36px;">...</div>
-        </div>
-      </div>
-    </header>
-
-    <main class="dashboard-grid container" style="margin-top: 24px; padding-bottom: 48px;">
-
-      <!-- HERO TERMINAL -->
-      <div class="hero-terminal-card" style="grid-column: 1 / -1;">
-        <div class="hero-terminal-header">
-          <div class="hero-terminal-title">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-            Deal Intelligence
-          </div>
-          <div class="pill-badge" style="background: rgba(247, 165, 1, 0.1); color: var(--amber); border: 1px solid var(--amber);" id="deal-stage">Loading...</div>
-        </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; margin-top: 8px;">
-          <div>
-            <div style="font-family: var(--font-mono); color: var(--mute); font-size: 11px; text-transform: uppercase; margin-bottom: 4px;">Expected ARR</div>
-            <div class="viz-value-xl" id="deal-arr">$0</div>
           </div>
           <div>
             <div style="font-family: var(--font-mono); color: var(--mute); font-size: 11px; text-transform: uppercase; margin-bottom: 4px;">Close Confidence</div>

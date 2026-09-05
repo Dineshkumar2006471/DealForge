@@ -11,6 +11,11 @@
   <a href="#verification">Verification</a>
 </p>
 
+## Live Deployment
+
+- **Manager Dashboard (Frontend):** [https://dealforge-507515.web.app](https://dealforge-507515.web.app)
+- **API & LLM Runtime (Backend):** [https://dealforge-core-442569512705.us-central1.run.app](https://dealforge-core-442569512705.us-central1.run.app)
+
 ## Table of contents
 
 - [What DealForge is](#what-dealforge-is)
