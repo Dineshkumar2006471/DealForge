@@ -48,3 +48,12 @@ test('customer call links are not sent as referrers', () => {
   const callPage = fs.readFileSync(path.resolve(__dirname, '../../frontend/public/call.html'), 'utf8');
   assert.match(callPage, /<meta name="referrer" content="no-referrer">/);
 });
+
+test('customer call controls remain reachable on desktop and narrow screens', () => {
+  const callPage = fs.readFileSync(path.resolve(__dirname, '../../frontend/public/call.html'), 'utf8');
+  const styles = fs.readFileSync(path.join(publicRoot, 'css', 'style.css'), 'utf8');
+  assert.match(callPage, /id="btn-call"/);
+  assert.match(callPage, /id="call-hint"/);
+  assert.match(styles, /\.page-call \{ display: flex; flex-direction: column; min-height: 100vh;/);
+  assert.doesNotMatch(styles, /\.page-call \{ display: flex; flex-direction: column; height: 100vh; overflow: hidden;/);
+});

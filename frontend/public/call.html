@@ -4,12 +4,13 @@
   <main class="call-container"><div class="call-header"><h1 class="call-title">Live AI Negotiation</h1><div class="call-status" id="status-text" role="status">Ready to connect</div><p style="color:var(--mute);font-size:13px;max-width:420px;margin:12px auto 0;line-height:1.5">When you start, your browser will request microphone access. This link is single-use and may expire. Text transcript retained for 30 days; audio is not recorded.</p></div>
     <div class="orb-container"><div class="wave"></div><div class="wave"></div><div class="wave"></div><div class="orb-inner"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.8)" stroke-width="1.5"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg></div></div>
     <div class="call-controls"><button class="btn-control" id="btn-mute" aria-label="Mute Microphone" disabled>Mute</button><button class="btn-primary btn-start-call" id="btn-call">Start AI Sales Call</button></div>
+    <p id="call-hint" style="color:var(--mute);min-height:1.5em;text-align:center;font-size:13px" aria-live="polite">After the agent connects, start with: “We have 300 users.”</p>
     <p id="call-error" style="color:var(--red);min-height:1.5em;text-align:center" aria-live="polite"></p>
   </main>
   <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.20.2.js"></script><script src="/js/runtimeConfig.js"></script><script src="/js/backendClient.js"></script><script src="/js/agoraClient.js"></script>
   <script>
     const linkToken = new URLSearchParams(location.search).get('link');
-    const callButton = document.getElementById('btn-call'), muteButton = document.getElementById('btn-mute'), status = document.getElementById('status-text'), errorText = document.getElementById('call-error');
+    const callButton = document.getElementById('btn-call'), muteButton = document.getElementById('btn-mute'), status = document.getElementById('status-text'), errorText = document.getElementById('call-error'), hintText = document.getElementById('call-hint');
     const waves = document.querySelectorAll('.wave'); let call = null; let active = false;
     function setStatus(text, color) { status.textContent = text; status.style.color = color || 'var(--gray-400)'; }
     function setButton(text, primary) { callButton.textContent = text; callButton.classList.toggle('btn-primary', primary); callButton.classList.toggle('btn-secondary', !primary); }
@@ -33,7 +34,7 @@
         const credentials = await joinCustomerCall(linkToken);
         call = credentials;
         await joinCall(credentials.appId, credentials.channel, credentials.token, credentials.uid);
-        active = true; muteButton.disabled = false; setButton('End Call', false); setStatus('Agent connected', 'var(--green)'); scheduleRenewal(credentials.expiresAt);
+        active = true; muteButton.disabled = false; setButton('End Call', false); setStatus('Agent connected', 'var(--green)'); hintText.textContent = 'You are live. Tell the agent about your team, timeline, or pricing needs.'; scheduleRenewal(credentials.expiresAt);
       } catch (error) { startupFailed = true; if (call?.sessionCredential) await api(`/public/calls/${encodeURIComponent(linkToken)}/fail`, { method: 'POST', body: JSON.stringify({ sessionCredential: call.sessionCredential }) }).catch(() => {}); await cleanup(); errorText.textContent = error.message || 'Unable to start the call. Ask your manager for a new link.'; setStatus('Connection failed', 'var(--red)'); setButton('Request a new link', false); callButton.disabled = true; }
       finally { if (!startupFailed) callButton.disabled = false; }
     }

@@ -451,14 +451,14 @@ h1, h2, h3, h4, .headline-xl, .headline-lg, .headline-md {
 /* ═══════════════════════════════════════════════════
    CALL PAGE (ORB & CONTROLS)
 ═══════════════════════════════════════════════════ */
-.page-call { display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: var(--canvas); }
-.call-container { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-top: 80px; }
-.call-header { text-align: center; margin-bottom: var(--sp-10); }
+.page-call { display: flex; flex-direction: column; min-height: 100vh; min-height: 100svh; overflow-x: hidden; overflow-y: auto; background: var(--canvas); }
+.call-container { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: clamp(32px, 6vh, 72px) 20px 36px; }
+.call-header { text-align: center; margin-bottom: clamp(24px, 5vh, 56px); }
 .call-title { font-size: 32px; font-weight: 700; margin-bottom: 8px; }
 .call-status { font-family: var(--font-mono); color: var(--mute); text-transform: uppercase; letter-spacing: 0.1em; }
 
 /* Orb Animation (Abstract, no mic) */
-.orb-container { position: relative; width: 300px; height: 300px; display: flex; align-items: center; justify-content: center; margin-bottom: var(--sp-10); }
+.orb-container { position: relative; width: min(300px, 72vw); height: min(300px, 72vw); display: flex; align-items: center; justify-content: center; margin-bottom: clamp(28px, 5vh, 56px); }
 .orb-inner { width: 160px; height: 160px; background: linear-gradient(135deg, var(--ink), #333); border-radius: 50%; box-shadow: 0 24px 64px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 10; position: relative; }
 .wave { position: absolute; width: 160px; height: 160px; border: 2px solid rgba(247, 165, 1, 0.5); border-radius: 50%; animation: pulse-ring 2.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite; box-sizing: border-box; }
 .wave:nth-child(2) { animation-delay: 0.8s; border-color: rgba(247, 165, 1, 0.3); }
@@ -503,7 +503,7 @@ h1, h2, h3, h4, .headline-xl, .headline-lg, .headline-md {
   .integration-grid { grid-template-columns:1fr; }.dashboard-grid { width:100%; min-width:0; gap:16px; }.dashboard-grid > *, .dashboard-col, .bento-card { min-width:0; }.meddic-grid { grid-template-columns:1fr; }
   .hero-terminal-header { align-items:flex-start; flex-direction:column; gap:10px; }.hero-terminal-title { font-size:19px; line-height:1.35; }.audit-entry { align-items:flex-start; flex-direction:column; gap:4px; }
   #deals-list { overflow-x:auto; }
-  .page-call { height:auto; min-height:100vh; overflow:auto; }.call-container { padding:100px 20px 36px; justify-content:flex-start; }.call-header { margin-bottom:40px; }.orb-container { width:230px; height:230px; margin-bottom:40px; }.orb-inner,.wave { width:130px; height:130px; }
+  .page-call { height:auto; min-height:100vh; overflow:auto; }.call-container { padding:48px 20px 36px; justify-content:flex-start; }.call-header { margin-bottom:32px; }.orb-container { width:230px; height:230px; margin-bottom:32px; }.orb-inner,.wave { width:130px; height:130px; }
 }
 
 /* ═══════════════════════════════════════════════════
