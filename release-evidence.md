@@ -8,14 +8,16 @@ This document records observed evidence, not intended capability. It is updated 
 
 | Item | Status | Evidence |
 | --- | --- | --- |
-| Secure-core local tests | VERIFIED | 2026-09-05: 25 pass, 0 fail; Firestore emulator organization-isolation test also passed. |
-| Docker release image | VERIFIED | 2026-09-05: Docker Desktop Linux engine 28.3.2; image `dealforge-core:55c36f6` built locally and `/health` returned HTTP 200 from host and container. |
-| Immutable staging release candidate | VERIFIED | 2026-09-05: Cloud Build `6f5b90b0-efd9-437e-b489-86b478b6f546` built commit `1ee8494bc550796f17f94a6725a70263615444b0`; Cloud Run revision `dealforge-core-00008-9hd` is serving image digest `sha256:b5402871c0b2e4f1fb488242c68833e03388f57d9a3b9cdfe1328f51d9e75bf9`. |
-| Staging infrastructure | VERIFIED | 2026-09-05: Cloud Run `/health` returned HTTP 200; Firebase Hosting, Firestore rules, and nine composite indexes were deployed to `dealforge-507515`. |
+| Secure-core local tests | VERIFIED | 2026-09-05: 36 passed, 0 failed; 1 emulator-only test is intentionally skipped outside the emulator. |
+| Firestore organization isolation | VERIFIED | 2026-09-05: Firebase Emulator ran the anonymous-denial, cross-organization denial, and browser-write-denial assertions. |
+| Docker release image | VERIFIED | 2026-09-05: Docker Desktop Linux engine 28.3.2; `dealforge-core:voice-rc` built locally and its `/health` returned HTTP 200. |
+| Immutable staging release candidate | VERIFIED | 2026-09-05: Cloud Build `140a36bd-937b-41f6-912e-a827ee4eab36` built commit `94561b01dfe613759aea4485065c7213f1ecbe39`; Cloud Run revision `dealforge-core-00023-8wz` serves image digest `sha256:9f3c11db794cd20e65488c7d0be43ba6eb3987a20458da297fff12ce9cf8b6a5`. |
+| Staging infrastructure | VERIFIED | 2026-09-05: Cloud Run `/health` returned HTTP 200; Firebase Hosting serves the corrected call page; Firestore rules and indexes were deployed to `dealforge-507515`. |
+| Voice startup contract | IMPLEMENTED BUT UNVERIFIED | Cloud Run has a mounted ElevenLabs secret and complete Agora TTS runtime settings; code fails closed if any setting is absent. A customer has not yet heard a fresh-link greeting and reply. |
 | Staging security smoke checks | VERIFIED | 2026-09-05: manager route without ID token returned 401; invalid public call link returned 404; unauthenticated Agora webhook returned 401; an unapproved Origin received no CORS allow-origin header. |
 | Real Agora → Gemini call | BLOCKED | Requires attended manager sign-in and a customer browser microphone test against the deployed revision. |
-| HubSpot | NOT CONFIGURED | No OAuth client/credential/action verification recorded. |
-| Cal.com | NOT CONFIGURED | No server credential/event type/action verification recorded. |
+| HubSpot | IMPLEMENTED BUT UNVERIFIED | A server-only private-token probe and manager-approved, allowlisted linked-deal update with read-back verification are deployed. No real linked staging update has been authorized or recorded. |
+| Cal.com | IMPLEMENTED BUT UNVERIFIED | V2 availability, idempotent booking, and read-back verification are deployed. No real test booking has been performed. |
 | PSTN | NOT IMPLEMENTED | Browser Agora remains the only voice target. |
 
 ## Required evidence before demo approval
