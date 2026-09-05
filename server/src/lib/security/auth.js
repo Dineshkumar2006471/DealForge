@@ -27,6 +27,15 @@ async function requireManager(req, _res, next) {
     req.manager = { uid: decoded.uid, organizationId: member.organizationId, email: decoded.email || null };
     next();
   } catch (error) {
+    // Preserve a generic 401 response so callers never learn token-verification
+    // internals. Log only the Firebase error classification—never the bearer token,
+    // decoded claims, or request body—so staging failures can be diagnosed safely.
+    if (!(error instanceof HttpError)) {
+      console.warn('Firebase ID token verification failed', {
+        code: error.code || 'unknown',
+        message: error.message || 'No error message available',
+      });
+    }
     next(error instanceof HttpError ? error : new HttpError(401, 'Invalid Firebase ID token'));
   }
 }

@@ -10,7 +10,19 @@ async function api(path, options = {}, manager = false) {
     if (!user) throw new Error('Manager sign-in is required');
     headers.Authorization = `Bearer ${await user.getIdToken()}`;
   }
-  const response = await fetch(`${BACKEND_URL}${path}`, { ...options, headers });
+  const request = () => fetch(`${BACKEND_URL}${path}`, { ...options, headers });
+  let response = await request();
+
+  // Firebase SDKs cache ID tokens. A manager's role or session may have changed
+  // since this tab was opened, so retry a rejected privileged request once with a
+  // freshly minted token. The server remains the sole authorization decision-maker.
+  if (manager && response.status === 401) {
+    const user = firebase.auth().currentUser;
+    if (user) {
+      headers.Authorization = `Bearer ${await user.getIdToken(true)}`;
+      response = await request();
+    }
+  }
   if (!response.ok) { const body = await response.json().catch(() => ({})); throw new Error(body.error || `Request failed (${response.status})`); }
   return response.json();
 }

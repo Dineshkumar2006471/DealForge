@@ -13,6 +13,12 @@ test('frontend has no direct Firestore sensitive mutation or localhost API endpo
   assert.match(runtimeConfig, /https:\/\//);
   assert.doesNotMatch(runtimeConfig, /localhost:8080/);
 });
+
+test('privileged requests retry once with a freshly minted Firebase ID token', () => {
+  const client = fs.readFileSync(path.join(publicRoot, 'js/backendClient.js'), 'utf8');
+  assert.match(client, /response\.status === 401/);
+  assert.match(client, /user\.getIdToken\(true\)/);
+});
 test('user-derived landing-page label is not inserted through innerHTML', () => {
   const source = fs.readFileSync(path.join(publicRoot, 'index.html'), 'utf8');
   assert.match(source, /navCta\.textContent/);
