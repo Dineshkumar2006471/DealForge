@@ -137,7 +137,7 @@ firebase.json      Hosting rewrite and emulator configuration
 
 ## Quick start
 
-Requirements: Node.js 20+, Firebase CLI, Google Cloud CLI, Docker Desktop, a Firebase project, Agora credentials, and Vertex AI access.
+Requirements: Node.js 22+, Firebase CLI, Google Cloud CLI, Docker Desktop with its Linux engine running, a Firebase project, Agora credentials, and Vertex AI access.
 
 ```powershell
 cd server
@@ -185,6 +185,9 @@ Run the real staging scenario in three windows: manager dashboard, customer call
 | Docker image build and health check | Pending local Docker recovery |
 | Authenticated staging Playwright | Pending dedicated test manager |
 | Real Agora → Gemini → policy call | Pending staging scenario |
+| Deterministic Deal Health / Next Best Action | Implemented locally; pending staging call evidence |
+| Negotiation memory / trade-off proposal | Implemented locally; pending staging call evidence |
+| HubSpot and Cal.com actions | Not configured; no external action is claimed |
 | Production launch | Not claimed |
 
 ## License

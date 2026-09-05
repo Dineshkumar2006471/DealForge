@@ -113,16 +113,16 @@ async function* generateResponse(messages, tools = [], options = {}) {
   const geminiTools = openaiToGeminiTools(tools);
   const chatId = `chatcmpl-${uuidv4()}`;
 
-  try {
-    const request = {
+  const request = {
       contents,
       tools: geminiTools,
     };
 
-    if (systemInstruction.length > 0) {
-      request.systemInstruction = { parts: systemInstruction };
-    }
+  if (systemInstruction.length > 0) {
+    request.systemInstruction = { parts: systemInstruction };
+  }
 
+  try {
     const streamingResult = await model.generateContentStream(request);
 
     let isFirst = true;
@@ -183,20 +183,8 @@ async function* generateResponse(messages, tools = [], options = {}) {
       }],
     };
   } catch (err) {
-    console.error('Gemini streaming error:', err.message);
-    // Yield a graceful error response
-    yield {
-      id: chatId,
-      choices: [{
-        index: 0,
-        delta: { role: 'assistant', content: "I'm having a moment — could you repeat that?" },
-        finish_reason: null,
-      }],
-    };
-    yield {
-      id: chatId,
-      choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
-    };
+    // The caller records this as a real runtime failure before returning a safe spoken apology.
+    throw new Error(`Gemini streaming error: ${err.message}`);
   }
 }
 

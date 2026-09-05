@@ -162,6 +162,11 @@
           </div>
         </div>
 
+        <div class="bento-card">
+          <div class="bento-header"><h3>Autonomous Action Plan</h3><span id="action-authority" class="pill-badge">OBSERVE</span></div>
+          <div id="autonomy-plan" style="font-size: 13px; color: var(--mute); line-height: 1.6;">Awaiting verified deal state.</div>
+        </div>
+
         <!-- Sentiment Indicator -->
         <div class="bento-card">
           <div class="bento-header">
@@ -321,6 +326,12 @@
       probability.innerText = Number.isFinite(confidence) && confidence >= 0 && confidence <= 1 ? `${Math.round(confidence * 100)}%` : '—';
       probability.style.color = Number.isFinite(confidence) ? 'var(--green)' : 'var(--mute)';
       document.getElementById('deal-action').innerText = data.nextBestAction?.reason || 'No recommendations.';
+      const plan = document.getElementById('autonomy-plan');
+      const action = data.nextBestAction || {};
+      const authority = document.getElementById('action-authority');
+      authority.textContent = action.authority || 'OBSERVE';
+      authority.style.color = action.authority === 'ACT' ? 'var(--green)' : action.authority === 'APPROVAL' ? 'var(--amber)' : 'var(--mute)';
+      plan.replaceChildren(node('strong', action.action ? action.action.replace(/_/g, ' ') : 'No action proposed'), document.createElement('br'), node('span', action.expectedOutcome || action.reason || 'Awaiting verified deal state.'));
 
       // --- MEDDIC ---
       if (data.meddic) {
@@ -382,7 +393,10 @@
 
       // --- Risk Analysis ---
       const riskList = document.getElementById('risk-list');
-      if (data.riskFactors && data.riskFactors.length > 0) {
+      if (data.dealHealth?.topRisks?.length) {
+        const riskNodes = data.dealHealth.topRisks.map(risk => node('div', risk, { padding: '10px 12px', background: 'rgba(247, 165, 1, 0.08)', borderRadius: '8px', color: 'var(--ink)' }));
+        riskList.replaceChildren(...riskNodes);
+      } else if (data.riskFactors && data.riskFactors.length > 0) {
         const riskNodes = [];
         data.riskFactors.forEach(r => {
           const sevColor = r.severity === 'high' ? 'var(--red)' : r.severity === 'medium' ? 'var(--amber)' : 'var(--green)';

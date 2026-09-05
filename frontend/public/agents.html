@@ -59,13 +59,12 @@
               <div class="pill-badge" style="font-size: 10px; padding: 2px 8px; margin-top: 4px;"><div class="dot"></div>SERVER-MANAGED</div>
             </div>
           </div>
-          <p style="font-size: 14px; color: var(--mute); line-height: 1.6; margin-bottom: 16px;">Primary voice negotiation agent. Handles MEDDIC qualification, discount negotiations, product lookups, and meeting bookings via Agora RTC + Gemini 2.5 Flash.</p>
+          <p style="font-size: 14px; color: var(--mute); line-height: 1.6; margin-bottom: 16px;">Server-managed voice workflow. Status is reported from the authenticated backend; a configured service is not treated as an active customer call.</p>
           <div style="display: flex; flex-direction: column; gap: 8px; font-family: var(--font-mono); font-size: 12px;">
-            <div style="display: flex; justify-content: space-between;"><span style="color: var(--mute);">MODEL</span><span>Gemini 2.5 Flash</span></div>
-            <div style="display: flex; justify-content: space-between;"><span style="color: var(--mute);">VOICE</span><span>Agora TTS (MiniMax)</span></div>
-            <div style="display: flex; justify-content: space-between;"><span style="color: var(--mute);">ASR</span><span>Deepgram</span></div>
-            <div style="display: flex; justify-content: space-between;"><span style="color: var(--mute);">TOOLS</span><span>5 Core Tools</span></div>
-            <div style="display: flex; justify-content: space-between;"><span style="color: var(--mute);">POLICY</span><span>3-Tier Engine</span></div>
+            <div style="display: flex; justify-content: space-between;"><span style="color: var(--mute);">VOICE</span><span id="agent-voice">LOADING</span></div>
+            <div style="display: flex; justify-content: space-between;"><span style="color: var(--mute);">REASONING</span><span id="agent-reasoning">LOADING</span></div>
+            <div style="display: flex; justify-content: space-between;"><span style="color: var(--mute);">MEMORY</span><span id="agent-memory">LOADING</span></div>
+            <div style="display: flex; justify-content: space-between;"><span style="color: var(--mute);">POLICY</span><span id="agent-policy">LOADING</span></div>
           </div>
           <a href="/deals.html" class="btn-primary" style="margin-top: 16px; text-align: center;">Create call link from a deal</a>
         </div>
@@ -78,7 +77,7 @@
             </div>
             <div>
               <h3 style="font-size: 16px;">Evidence Extraction</h3>
-              <div class="pill-badge" style="font-size: 10px; padding: 2px 8px; margin-top: 4px;"><div class="dot" style="background: var(--green);"></div>INLINE CAPABILITY</div>
+              <div class="pill-badge" style="font-size: 10px; padding: 2px 8px; margin-top: 4px;"><div class="dot" style="background: var(--green);"></div>SERVER-ENFORCED</div>
             </div>
           </div>
           <p style="font-size: 14px; color: var(--mute); line-height: 1.6; margin-bottom: 16px;">Runs inline during conversations. Extracts claims from customer statements, scores confidence, and writes evidence-backed updates to Deal State when confidence >= 0.85.</p>
@@ -107,6 +106,12 @@
             <div style="display: flex; justify-content: space-between;"><span style="color: var(--mute);">TIER 3</span><span style="color: var(--amber);">COMMIT — Approval</span></div>
           </div>
         </div>
+
+        <div class="bento-card" style="grid-column: 1 / -1;">
+          <div class="bento-header"><h3>Autonomous Control Plane</h3><span id="agent-autonomy" class="pill-badge">OBSERVE / ACT / APPROVAL / REJECT</span></div>
+          <p style="font-size: 13px; color: var(--mute); margin: 0 0 12px;">Recommendations are persisted after verified state changes. Policy remains the sole execution authority.</p>
+          <div id="recent-actions" class="audit-log"><div class="audit-entry"><div class="audit-event">Loading recent verified activity…</div></div></div>
+        </div>
       </div>
     </main>
   </div>
@@ -117,12 +122,24 @@
   <script src="/__/firebase/init.js"></script>
   <script src="/js/firebaseConfig.js"></script>
   <script src="/js/auth.js"></script>
+  <script src="/js/runtimeConfig.js"></script>
+  <script src="/js/backendClient.js"></script>
   <script>
     firebase.auth().onAuthStateChanged(async (user) => {
       if (user) {
         if (!await window.managerReady) return;
         renderProfileIcon('user-email');
         document.getElementById('user-display-name').innerText = user.displayName || user.email || 'User';
+        try {
+          const status = await getAgentStatus();
+          const set = (id, value) => { const element = document.getElementById(id); if (element) { element.textContent = value; element.style.color = value === 'CONNECTED' || value === 'ENFORCING' ? 'var(--green)' : value === 'ERROR' ? 'var(--red)' : 'var(--amber)'; } };
+          set('agent-voice', status.voice); set('agent-reasoning', status.reasoning); set('agent-memory', status.memory); set('agent-policy', status.policy);
+          const log = document.getElementById('recent-actions');
+          const entries = (status.recentActions || []).map(action => { const entry = document.createElement('div'); entry.className = 'audit-entry'; const time = document.createElement('div'); time.className = 'audit-time'; time.textContent = action.timestamp ? new Date(action.timestamp).toLocaleTimeString() : '—'; const detail = document.createElement('div'); detail.className = 'audit-event'; detail.textContent = `[${action.eventType || 'EVENT'}] ${action.trigger || 'Recorded activity'}`; entry.append(time, detail); return entry; });
+          log.replaceChildren(...(entries.length ? entries : [Object.assign(document.createElement('div'), { className: 'audit-entry', textContent: 'No recorded activity yet.' })]));
+        } catch (_) {
+          ['agent-voice', 'agent-reasoning', 'agent-memory', 'agent-policy'].forEach(id => { const element = document.getElementById(id); if (element) { element.textContent = 'ERROR'; element.style.color = 'var(--red)'; } });
+        }
       } else { window.location.href = '/login.html'; }
     });
   </script>

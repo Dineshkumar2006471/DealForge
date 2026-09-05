@@ -20,3 +20,4 @@ function stopCall(sessionId) { return api(`/manager/calls/${encodeURIComponent(s
 function revokeCall(sessionId) { return api(`/manager/calls/${encodeURIComponent(sessionId)}/revoke`, { method: 'POST', body: '{}' }, true); }
 function joinCustomerCall(linkToken) { return api(`/public/calls/${encodeURIComponent(linkToken)}/join`, { method: 'POST', body: '{}' }); }
 function getIntegrationStatus() { return api('/manager/integrations/status', {}, true); }
+function getAgentStatus() { return api('/manager/agent-status', {}, true); }

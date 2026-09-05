@@ -59,7 +59,7 @@
               <div id="status-agora" class="pill-badge" style="font-size: 10px; padding: 2px 8px; margin-top: 4px;">NOT CONFIGURED</div>
             </div>
           </div>
-          <p style="font-size: 13px; color: var(--mute); line-height: 1.6;">Real-time voice communication via WebRTC. Powers the conversational AI agent with ASR (Deepgram) + TTS (MiniMax).</p>
+          <p style="font-size: 13px; color: var(--mute); line-height: 1.6;">Real-time voice transport for the configured conversational agent. Availability is confirmed by backend configuration; a real call is verified separately.</p>
         </div>
 
         <!-- Gemini -->
@@ -98,10 +98,22 @@
             </div>
             <div>
               <h3 style="font-size: 16px;">HubSpot CRM</h3>
-              <div class="pill-badge" style="font-size: 10px; padding: 2px 8px; margin-top: 4px;">NOT CONFIGURED</div>
+              <div id="status-hubspot" class="pill-badge" style="font-size: 10px; padding: 2px 8px; margin-top: 4px;">NOT CONFIGURED</div>
             </div>
           </div>
-          <p style="font-size: 13px; color: var(--mute); line-height: 1.6;">Not part of the secure core launch. No CRM data is connected or transmitted.</p>
+          <p style="font-size: 13px; color: var(--mute); line-height: 1.6;">CRM credentials are checked by the backend. A configured integration is not shown as connected until a verified action succeeds.</p>
+          <button class="btn-secondary" style="margin-top: 12px; width: 100%; text-align: center;" disabled>Server-side configuration required</button>
+        </div>
+
+        <!-- Cal.com -->
+        <div class="bento-card" style="opacity: 0.5;">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+            <div aria-label="Cal.com" title="Cal.com" style="width: 48px; height: 48px; border-radius: 12px; background: #111; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01"/></svg>
+            </div>
+            <div><h3 style="font-size: 16px;">Cal.com Scheduling</h3><div id="status-calcom" class="pill-badge" style="font-size: 10px; padding: 2px 8px; margin-top: 4px;">NOT CONFIGURED</div></div>
+          </div>
+          <p style="font-size: 13px; color: var(--mute); line-height: 1.6;">Availability and bookings are unavailable until a staging event type and server-side credential are configured and verified.</p>
           <button class="btn-secondary" style="margin-top: 12px; width: 100%; text-align: center;" disabled>Not configured</button>
         </div>
 
@@ -111,7 +123,7 @@
             <div style="width: 48px; height: 48px; border-radius: 12px; background: #00A1E0; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 10px;"><svg fill="#fff" width="24" height="24" role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>Salesforce</title><path d="M16.634 8.791A4.693 4.693 0 0 0 12.59 5.86c-2.464 0-4.464 1.83-4.664 4.14-2.483.33-4.321 2.458-4.321 4.966 0 2.766 2.24 5.006 5.006 5.006h9.167c2.616 0 4.735-2.122 4.735-4.735 0-2.316-1.637-4.238-3.879-4.646z"/></svg></div>
             <div>
               <h3 style="font-size: 16px;">Salesforce</h3>
-              <div class="pill-badge" style="font-size: 10px; padding: 2px 8px; margin-top: 4px;">NOT CONFIGURED</div>
+              <div id="status-slack" class="pill-badge" style="font-size: 10px; padding: 2px 8px; margin-top: 4px;">NOT CONFIGURED</div>
             </div>
           </div>
           <p style="font-size: 13px; color: var(--mute); line-height: 1.6;">Not part of the secure core launch. No Salesforce data is connected or transmitted.</p>
@@ -150,7 +162,7 @@
         renderProfileIcon('user-email');
         document.getElementById('user-display-name').innerText = user.displayName || user.email || 'User';
         const setStatus = (name, value) => { const element = document.getElementById(`status-${name}`); if (!element) return; element.textContent = value; element.style.color = value === 'CONNECTED' ? 'var(--green)' : value === 'ERROR' ? 'var(--red)' : 'var(--amber)'; };
-        getIntegrationStatus().then(statuses => Object.entries(statuses).forEach(([name, value]) => setStatus(name, value))).catch(() => ['agora', 'gemini', 'firestore'].forEach(name => setStatus(name, 'ERROR')));
+        getIntegrationStatus().then(statuses => Object.entries(statuses).forEach(([name, value]) => setStatus(name, value))).catch(() => ['agora', 'gemini', 'firestore', 'hubspot', 'calcom', 'slack'].forEach(name => setStatus(name, 'ERROR')));
       } else { window.location.href = '/login.html'; }
     });
   </script>

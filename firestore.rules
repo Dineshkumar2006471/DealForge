@@ -21,6 +21,9 @@ service cloud.firestore {
     match /evidence/{evidenceId} { allow read: if sameOrganization(resource.data.organizationId); allow write: if false; }
     match /meetings/{meetingId} { allow read: if sameOrganization(resource.data.organizationId); allow write: if false; }
     match /operations/{operationId} { allow read: if sameOrganization(resource.data.organizationId); allow write: if false; }
+    match /autonomyPlans/{planId} { allow read: if sameOrganization(resource.data.organizationId); allow write: if false; }
+    match /negotiationEvents/{eventId} { allow read: if sameOrganization(resource.data.organizationId); allow write: if false; }
+    match /externalOperations/{operationId} { allow read: if sameOrganization(resource.data.organizationId); allow write: if false; }
     match /{document=**} { allow read, write: if false; }
   }
 }

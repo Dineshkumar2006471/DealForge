@@ -6,6 +6,7 @@ const { writeAuditEvent } = require('../lib/audit/eventStore');
 const { EVENT_TYPES } = require('../lib/audit/eventTypes');
 const { HttpError } = require('../lib/security/auth');
 const { createRateLimit } = require('../lib/security/rateLimit');
+const { runPostCallAutopilot } = require('../lib/agent/postCallAutopilot');
 const router = express.Router();
 const joinRateLimit = createRateLimit({ scope: 'public-call-join', limit: 8, windowMs: 60_000 });
 router.post('/calls/:linkToken/join', joinRateLimit, async (req, res, next) => {
@@ -40,6 +41,7 @@ router.post('/calls/:linkToken/stop', async (req, res, next) => {
     try { await require('../lib/calls/agoraAgentService').stopAgent(session); } catch (_) { agentStopped = false; }
     await endSession(session.sessionId);
     await writeAuditEvent({ organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, eventType: EVENT_TYPES.CALL_ENDED, trigger: agentStopped ? 'Customer left call' : 'Customer left; Agora cleanup pending', actionResult: { agentStopped } });
+    try { await runPostCallAutopilot(session); } catch (autopilotError) { console.error('Post-call autopilot failed:', autopilotError.message); }
     res.status(agentStopped ? 200 : 202).json({ sessionId: session.sessionId, status: agentStopped ? 'ENDED' : 'ENDED_WITH_AGENT_CLEANUP_ERROR', agentStopped });
   } catch (error) { next(error); }
 });

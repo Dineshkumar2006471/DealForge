@@ -5,6 +5,8 @@ const { getToolDefinitions, executeTool } = require('../tools/registry');
 const { getHistory, addMessage, getTurnNumber } = require('./conversationHistory');
 const { claimApprovedApprovals, completeApproval, releaseApproval } = require('../policy/approvalQueue');
 const { getDeal } = require('../firebase/dealState');
+const { writeAuditEvent } = require('../audit/eventStore');
+const { EVENT_TYPES } = require('../audit/eventTypes');
 require('../tools/calculateDiscount'); require('../tools/updateDealState'); require('../tools/checkProductAvailability'); require('../tools/bookMeeting'); require('../tools/escalateToHuman');
 
 async function handleChatCompletion(requestBody, res, session) {
@@ -46,6 +48,7 @@ async function handleChatCompletion(requestBody, res, session) {
     res.write('data: [DONE]\n\n'); res.end();
   } catch (error) {
     console.error('Agent runtime error:', error.message);
+    await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_RESPONSE_FAILED, trigger: 'Gemini/runtime response failed', actionResult: { verified: false, error: String(error.message).slice(0, 200) } }).catch(() => {});
     if (!res.writableEnded) { res.write(`data: ${JSON.stringify({ id: chatId, choices: [{ index: 0, delta: { content: "I'm having a technical issue. Could you repeat that?" }, finish_reason: null }] })}\n\n`); res.write('data: [DONE]\n\n'); res.end(); }
   }
 }

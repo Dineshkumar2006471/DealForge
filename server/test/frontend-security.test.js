@@ -31,6 +31,13 @@ test('dashboard surfaces do not render untrusted data through HTML parsing', () 
   assert.doesNotMatch(source, /(?:innerHTML|insertAdjacentHTML)/);
 });
 
+test('agent and integration screens do not advertise static runtime vendors or fake bookings', () => {
+  const agents = fs.readFileSync(path.join(publicRoot, 'agents.html'), 'utf8');
+  const integrations = fs.readFileSync(path.join(publicRoot, 'integrations.html'), 'utf8');
+  assert.doesNotMatch(agents, /MiniMax|Deepgram|\d+ Core Tools/);
+  assert.doesNotMatch(integrations, /ASR \(Deepgram\)|TTS \(MiniMax\)|meeting booked successfully/i);
+});
+
 test('customer call links are not sent as referrers', () => {
   const callPage = fs.readFileSync(path.resolve(__dirname, '../../frontend/public/call.html'), 'utf8');
   assert.match(callPage, /<meta name="referrer" content="no-referrer">/);

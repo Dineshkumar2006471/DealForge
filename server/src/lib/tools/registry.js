@@ -104,10 +104,15 @@ async function executeTool(toolName, args, context) {
     await operationRef.set({ operationId, organizationId, dealId, sessionId, toolName, args: validatedArgs, status: 'RUNNING', updatedAt: new Date().toISOString() }, { merge: true });
     const result = await handler.handler(validatedArgs, context);
 
-    // 4. VERIFY (basic — check that result is not null/undefined)
+    // 4. VERIFY. A handler may explicitly report an unverified external result;
+    // that must never be stored or announced as a successful action.
     if (result === null || result === undefined) {
       recordFailure(dealId, toolName);
       throw new Error(`Tool ${toolName} returned null/undefined`);
+    }
+    if (result.verified === false) {
+      recordFailure(dealId, toolName);
+      throw new Error(result.error || result.message || `Tool ${toolName} could not be verified`);
     }
 
     // 5. Record success
@@ -128,6 +133,10 @@ async function executeTool(toolName, args, context) {
         verified: true,
       },
     });
+
+    // A planner may recommend work, but it never bypasses this completed tool path.
+    // Refreshing assessment after verified state keeps autonomy deterministic and auditable.
+    await require('../agent/autonomyService').refreshAutonomy({ organizationId, dealId, sessionId, turnNumber });
 
     return { result, policyResult, approved: true };
   } catch (err) {

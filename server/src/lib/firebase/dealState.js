@@ -107,11 +107,15 @@ async function appendDiscountLedger(dealId, entry, organizationId) {
 /**
  * Update next best action.
  */
-async function updateNextBestAction(dealId, action, reason, organizationId) {
+async function updateNextBestAction(dealId, nextBestAction, organizationId) {
   const ref = db.collection('deals').doc(dealId); await db.runTransaction(async tx => { const deal = await tx.get(ref); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found'); tx.update(ref, {
-    nextBestAction: { action, reason, timestamp: new Date().toISOString() },
+    nextBestAction: { ...nextBestAction, generatedAt: nextBestAction.generatedAt || new Date().toISOString() },
     updatedAt: new Date().toISOString(),
   }); });
+}
+
+async function updateDealHealth(dealId, dealHealth, organizationId) {
+  const ref = db.collection('deals').doc(dealId); await db.runTransaction(async tx => { const deal = await tx.get(ref); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found'); tx.update(ref, { dealHealth, updatedAt: new Date().toISOString() }); });
 }
 
 /**
@@ -128,9 +132,10 @@ async function setEscalation(dealId, reason, urgency, organizationId) {
  * Append to negotiation memory.
  */
 async function appendNegotiationMemory(dealId, memoryEntry, organizationId) {
-  const admin = require('firebase-admin');
+  const { FieldValue } = require('./admin').admin.firestore;
   const ref = db.collection('deals').doc(dealId); await db.runTransaction(async tx => { const deal = await tx.get(ref); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found'); tx.update(ref, {
-    negotiationMemory: admin.firestore.FieldValue.arrayUnion(memoryEntry),
+    negotiationMemory: FieldValue.arrayUnion(memoryEntry),
+    negotiationSummary: { lastEvent: memoryEntry.type || memoryEntry.preference || 'NEGOTIATION_SIGNAL', requestedPct: memoryEntry.requestedPct ?? null, offeredPct: memoryEntry.offeredPct ?? null, urgency: memoryEntry.urgency ?? null, status: memoryEntry.status ?? null, updatedAt: new Date().toISOString() },
     updatedAt: new Date().toISOString(),
   }); });
 }
@@ -144,6 +149,7 @@ module.exports = {
   updateConversationStage,
   appendDiscountLedger,
   updateNextBestAction,
+  updateDealHealth,
   setEscalation,
   appendNegotiationMemory,
 };
