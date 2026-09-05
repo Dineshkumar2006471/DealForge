@@ -5,14 +5,16 @@ const { getToolDefinitions, executeTool } = require('../tools/registry');
 const { getHistory, addMessage, getTurnNumber } = require('./conversationHistory');
 const { claimApprovedApprovals, completeApproval, releaseApproval } = require('../policy/approvalQueue');
 const { getDeal } = require('../firebase/dealState');
+const { db } = require('../firebase/admin');
 const { writeAuditEvent } = require('../audit/eventStore');
 const { EVENT_TYPES } = require('../audit/eventTypes');
 require('../tools/calculateDiscount'); require('../tools/updateDealState'); require('../tools/checkProductAvailability'); require('../tools/bookMeeting'); require('../tools/escalateToHuman');
+require('../integrations/hubspot');
 
 async function handleChatCompletion(requestBody, res, session) {
   const context = { organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, turnNumber: (await getTurnNumber(session.sessionId)) + 1 };
   let history = await getHistory(session.sessionId);
-  if (history.length === 0) { const deal = await getDeal(context.dealId, context.organizationId); if (!deal) throw new Error('Bound deal not found'); await addMessage(session.sessionId, { role: 'system', content: buildSystemPrompt({ deal }) }); }
+  if (!await getDeal(context.dealId, context.organizationId)) throw new Error('Bound deal not found');
   const chatId = `chatcmpl-${uuidv4()}`;
   const userText = currentUserText(requestBody.messages);
 
@@ -42,7 +44,7 @@ async function handleChatCompletion(requestBody, res, session) {
   const tools = getToolDefinitions(); history = await getHistory(session.sessionId);
   let content = ''; let calls = []; let finishReason;
   try {
-    for await (const chunk of generateResponse(history, tools, context)) {
+    for await (const chunk of generateResponse(await currentModelMessages(context), tools, context)) {
       const choice = chunk.choices?.[0]; if (!choice) continue;
       if (choice.delta?.content) content += choice.delta.content;
       if (choice.delta?.tool_calls) calls.push(...choice.delta.tool_calls.map(item => ({ id: item.id, type: item.type, function: { name: item.function.name, arguments: item.function.arguments || '{}' } })));
@@ -56,9 +58,10 @@ async function handleChatCompletion(requestBody, res, session) {
         const { result } = await executeTool(call.function.name, args, context);
         await addMessage(session.sessionId, { role: 'tool', tool_call_id: call.id, name: call.function.name, content: JSON.stringify(result) });
       }
-      for await (const chunk of generateResponse(await getHistory(session.sessionId), tools, context)) { res.write(`data: ${JSON.stringify(chunk)}\n\n`); if (chunk.choices?.[0]?.delta?.content) content += chunk.choices[0].delta.content; }
+      for await (const chunk of generateResponse(await currentModelMessages(context), tools, context)) { res.write(`data: ${JSON.stringify(chunk)}\n\n`); if (chunk.choices?.[0]?.delta?.content) content += chunk.choices[0].delta.content; }
     }
     if (content) await addMessage(session.sessionId, { role: 'assistant', content });
+    await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_RESPONSE_COMPLETED, trigger: 'Gemini response streamed to Agora', actionResult: { verified: true, hasContent: Boolean(content) } });
     res.write('data: [DONE]\n\n'); res.end();
   } catch (error) {
     console.error('Agent runtime error:', error.message);
@@ -69,7 +72,27 @@ async function handleChatCompletion(requestBody, res, session) {
 
 function currentUserText(messages) {
   const lastUser = Array.isArray(messages) ? messages.filter(message => message?.role === 'user').pop() : null;
-  return typeof lastUser?.content === 'string' ? lastUser.content.trim() : '';
+  return extractTextContent(lastUser?.content);
+}
+
+function extractTextContent(content) {
+  if (typeof content === 'string') return content.trim();
+  if (!Array.isArray(content)) return '';
+  return content.filter(part => part && typeof part.text === 'string').map(part => part.text.trim()).filter(Boolean).join('\n').trim();
+}
+
+async function currentModelMessages(context) {
+  const [deal, history, approvalSnapshot] = await Promise.all([
+    getDeal(context.dealId, context.organizationId),
+    getHistory(context.sessionId),
+    db.collection('approvals').where('organizationId', '==', context.organizationId).where('dealId', '==', context.dealId).limit(20).get(),
+  ]);
+  if (!deal) throw new Error('Bound deal not found');
+  const resolvedApprovals = approvalSnapshot.docs.map(doc => doc.data()).filter(approval => ['APPROVED', 'REJECTED', 'EXPIRED'].includes(approval.status));
+  return [
+    { role: 'system', content: buildSystemPrompt({ deal, negotiationMemory: (deal.negotiationMemory || []).slice(-10), resolvedApprovals }) },
+    ...history.filter(message => message.role !== 'system'),
+  ];
 }
 
 // Agora consumes OpenAI-compatible SSE. Error responses must carry the same
@@ -94,4 +117,4 @@ function writeSseReply(res, chatId, content) {
   res.end();
 }
 
-module.exports = { handleChatCompletion, writeSafeFallback, writeSseReply, currentUserText };
+module.exports = { handleChatCompletion, writeSafeFallback, writeSseReply, currentUserText, extractTextContent, currentModelMessages };

@@ -1,7 +1,7 @@
 const express = require('express');
 const { redeemLink, rtcCredentials, webhookTokenFor, findSessionByHash, endSession } = require('../lib/calls/callSessions');
 const { startAgent } = require('../lib/calls/agoraAgentService');
-const { parse, sessionCredentialSchema } = require('../lib/schema/validation');
+const { parse, sessionCredentialSchema, callActivitySchema } = require('../lib/schema/validation');
 const { writeAuditEvent } = require('../lib/audit/eventStore');
 const { EVENT_TYPES } = require('../lib/audit/eventTypes');
 const { HttpError } = require('../lib/security/auth');
@@ -61,6 +61,20 @@ router.post('/calls/:linkToken/fail', async (req, res, next) => {
     try { await require('../lib/calls/agoraAgentService').stopAgent(session); } finally { await markFailed(session.sessionId, 'Customer RTC startup failed'); }
     await writeAuditEvent({ organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, eventType: EVENT_TYPES.CALL_FAILED, trigger: 'Customer RTC startup failed' });
     res.json({ sessionId: session.sessionId, status: 'FAILED' });
+  } catch (error) { next(error); }
+});
+router.post('/calls/:linkToken/activity', async (req, res, next) => {
+  try {
+    const { eventType } = parse(callActivitySchema, req.body);
+    const session = await activeSessionFromCredential(req);
+    const trigger = {
+      AGENT_AUDIO_PUBLISHED: 'Agora agent published an audio track to the customer browser',
+      CUSTOMER_AUDIO_PLAYBACK_STARTED: 'Customer browser started agent audio playback',
+      AGENT_AUDIO_TIMEOUT: 'Customer browser did not receive agent audio before timeout',
+      CUSTOMER_AUDIO_PLAYBACK_FAILED: 'Customer browser could not start agent audio playback',
+    }[eventType];
+    await writeAuditEvent({ organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, eventType, trigger, actionResult: { source: 'customer_browser', verified: false } });
+    res.status(202).json({ status: 'RECORDED' });
   } catch (error) { next(error); }
 });
 module.exports = router;

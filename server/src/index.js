@@ -7,7 +7,7 @@ const { createApp } = require('./app');
 const PORT = process.env.PORT || 8080;
 
 // --- Configuration Verification ---
-const requiredEnvVars = ['GCP_PROJECT_ID', 'AGORA_APP_ID', 'AGORA_APP_CERTIFICATE', 'AGORA_LLM_WEBHOOK_SECRET', 'CALL_SESSION_WEBHOOK_SIGNING_SECRET'];
+const requiredEnvVars = ['GCP_PROJECT_ID', 'AGORA_APP_ID', 'AGORA_APP_CERTIFICATE', 'AGORA_LLM_WEBHOOK_SECRET', 'CALL_SESSION_WEBHOOK_SIGNING_SECRET', 'CLOUD_RUN_URL', 'PUBLIC_APP_URL', 'ALLOWED_ORIGIN', 'ELEVENLABS_API_KEY', 'ELEVENLABS_VOICE_ID', 'ELEVENLABS_MODEL_ID', 'ELEVENLABS_BASE_URL', 'ELEVENLABS_SAMPLE_RATE'];
 const missingVars = requiredEnvVars.filter(v => !process.env[v]);
 if (missingVars.length > 0) {
   console.error('❌ FATAL: Missing required environment variables:', missingVars.join(', '));

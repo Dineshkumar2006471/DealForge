@@ -8,8 +8,24 @@ const { resolveApproval } = require('../lib/policy/approvalQueue');
 const { writeAuditEvent } = require('../lib/audit/eventStore');
 const { EVENT_TYPES } = require('../lib/audit/eventTypes');
 const { runPostCallAutopilot } = require('../lib/agent/postCallAutopilot');
+const { probeHubspot } = require('../lib/integrations/hubspot');
+const { probeCalcom } = require('../lib/tools/bookMeeting');
 const router = express.Router();
 router.use(requireManager);
+
+async function integrationStatus(organizationId, provider, toolName, probe) {
+  const base = await probe();
+  if (base.status !== 'AVAILABLE') return base.status;
+  const operations = await db.collection('externalOperations')
+    .where('organizationId', '==', organizationId)
+    .limit(100)
+    .get();
+  const verifiedAction = operations.docs.some(doc => {
+    const value = doc.data();
+    return value.provider === provider && value.toolName === toolName && value.status === 'SUCCEEDED' && value.result?.verified === true;
+  });
+  return verifiedAction ? 'CONNECTED' : 'AVAILABLE';
+}
 
 router.post('/call-links', async (req, res, next) => {
   try {
@@ -49,15 +65,23 @@ router.post('/approvals/:approvalId/resolve', async (req, res, next) => {
   catch (error) { next(error); }
 });
 
-router.get('/integrations/status', async (_req, res) => {
+router.get('/integrations/status', async (req, res) => {
   const configured = name => Boolean(process.env[name]);
   const agora = configured('AGORA_APP_ID') && configured('AGORA_CUSTOMER_ID') && configured('AGORA_CUSTOMER_SECRET') && configured('CLOUD_RUN_URL') ? 'AVAILABLE' : 'NOT CONFIGURED';
   const gemini = configured('GCP_PROJECT_ID') && configured('GEMINI_MODEL') ? 'AVAILABLE' : 'NOT CONFIGURED';
   let firestore = 'ERROR'; try { await db.collection('organizations').limit(1).get(); firestore = 'CONNECTED'; } catch (_) {}
-  res.json({ agora, gemini, firestore, hubspot: configured('HUBSPOT_API_KEY') ? 'AVAILABLE' : 'NOT CONFIGURED', calcom: configured('CALCOM_API_KEY') ? 'AVAILABLE' : 'NOT CONFIGURED', slack: 'NOT CONFIGURED' });
+  const [hubspot, calcom] = await Promise.all([
+    integrationStatus(req.manager.organizationId, 'hubspot', 'sync_to_hubspot', probeHubspot),
+    integrationStatus(req.manager.organizationId, 'calcom', 'book_meeting', probeCalcom),
+  ]);
+  res.json({ agora, gemini, firestore, hubspot, calcom, slack: 'NOT CONFIGURED' });
 });
 router.get('/agent-status', async (req, res) => {
-  const integrations = { agora: Boolean(process.env.AGORA_APP_ID), gemini: Boolean(process.env.GCP_PROJECT_ID && process.env.GEMINI_MODEL), firestore: true, hubspot: Boolean(process.env.HUBSPOT_API_KEY), calcom: Boolean(process.env.CALCOM_API_KEY) };
+  const [hubspot, calcom] = await Promise.all([
+    integrationStatus(req.manager.organizationId, 'hubspot', 'sync_to_hubspot', probeHubspot),
+    integrationStatus(req.manager.organizationId, 'calcom', 'book_meeting', probeCalcom),
+  ]);
+  const integrations = { agora: Boolean(process.env.AGORA_APP_ID && process.env.ELEVENLABS_API_KEY), gemini: Boolean(process.env.GCP_PROJECT_ID && process.env.GEMINI_MODEL), firestore: true, hubspot: hubspot === 'CONNECTED', calcom: calcom === 'CONNECTED' };
   const events = await db.collection('auditEvents').where('organizationId', '==', req.manager.organizationId).orderBy('timestamp', 'desc').limit(8).get();
   res.json({ voice: integrations.agora ? 'AVAILABLE' : 'NOT CONFIGURED', reasoning: integrations.gemini ? 'AVAILABLE' : 'NOT CONFIGURED', memory: integrations.firestore ? 'CONNECTED' : 'ERROR', policy: 'ENFORCING', integrations, recentActions: events.docs.map(doc => ({ id: doc.id, ...doc.data() })) });
 });

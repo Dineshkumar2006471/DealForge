@@ -470,6 +470,18 @@ h1, h2, h3, h4, .headline-xl, .headline-lg, .headline-md {
 .btn-control { width: 48px; height: 48px; border-radius: 50%; background: var(--canvas); color: var(--ink); transition: background 0.2s, color 0.2s, transform 0.2s; }
 .btn-control:hover { background: var(--hairline); transform: scale(1.05); }
 
+/* Keep the primary call control in the initial desktop viewport on short laptop
+   screens. The same component sizing remains unchanged on normal-height screens. */
+@media (max-height: 700px) and (min-width: 641px) {
+  .call-container { justify-content: flex-start; padding: 18px 20px 24px; }
+  .call-header { margin-bottom: 14px; }
+  .call-header p { margin-top: 8px !important; }
+  .call-title { font-size: 26px; }
+  .orb-container { width: 180px; height: 180px; margin-bottom: 16px; }
+  .orb-inner, .wave { width: 112px; height: 112px; }
+  .call-controls { position: sticky; bottom: 12px; z-index: 2; }
+}
+
 /* ═══════════════════════════════════════════════════
    RESPONSIVE OVERRIDES
 ═══════════════════════════════════════════════════ */

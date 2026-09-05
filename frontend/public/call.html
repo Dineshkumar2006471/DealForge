@@ -27,7 +27,7 @@
     const db = getFirestore();
     const linkToken = new URLSearchParams(location.search).get('link');
     const callButton = document.getElementById('btn-call'), muteButton = document.getElementById('btn-mute'), status = document.getElementById('status-text'), errorText = document.getElementById('call-error'), hintText = document.getElementById('call-hint');
-    const waves = document.querySelectorAll('.wave'); let call = null; let active = false;
+    const waves = document.querySelectorAll('.wave'); let call = null; let active = false; let agentAudioTimer = null; let agentAudioObserved = false;
     function setStatus(text, color) { status.textContent = text; status.style.color = color || 'var(--gray-400)'; }
     function setButton(text, primary) { callButton.textContent = text; callButton.classList.toggle('btn-primary', primary); callButton.classList.toggle('btn-secondary', !primary); }
     let renewalTimer = null;
@@ -35,6 +35,7 @@
 
     async function cleanup() {
       if (renewalTimer) clearTimeout(renewalTimer); renewalTimer = null;
+      if (agentAudioTimer) clearTimeout(agentAudioTimer); agentAudioTimer = null; agentAudioObserved = false;
       if (captionsUnsubscribe) { captionsUnsubscribe(); captionsUnsubscribe = null; }
       try { await firebase.auth().signOut(); } catch (e) {}
       try { await leaveCall(); } finally { muteButton.disabled = true; active = false; call = null; waves.forEach(w => w.style.animationPlayState = 'paused'); }
@@ -48,6 +49,21 @@
           await renewToken(renewal.token); scheduleRenewal(renewal.expiresAt);
         } catch (error) { if (active) { errorText.textContent = 'Your secure call session has expired. Ask your manager for a new link.'; setStatus('Call expired', 'var(--red)'); await cleanup(); setButton('Call expired', false); callButton.disabled = true; } }
       }, wait);
+    }
+    function recordAudioActivity(eventType) {
+      if (!call?.sessionCredential) return;
+      api(`/public/calls/${encodeURIComponent(linkToken)}/activity`, { method: 'POST', body: JSON.stringify({ sessionCredential: call.sessionCredential, eventType }) }).catch(() => {});
+    }
+    function armAgentAudioTimeout() {
+      if (agentAudioTimer) clearTimeout(agentAudioTimer);
+      agentAudioTimer = setTimeout(async () => {
+        if (!active || agentAudioObserved) return;
+        recordAudioActivity('AGENT_AUDIO_TIMEOUT');
+        errorText.textContent = 'The agent did not publish audio. The call was safely stopped; ask your manager for a new link.';
+        setStatus('Agent audio unavailable', 'var(--red)');
+        try { await api(`/public/calls/${encodeURIComponent(linkToken)}/fail`, { method: 'POST', body: JSON.stringify({ sessionCredential: call.sessionCredential }) }); } catch (_) {}
+        await cleanup(); setButton('Request a new link', false); callButton.disabled = true;
+      }, 20000);
     }
     
     function renderCaptions(messages) {
@@ -101,7 +117,7 @@
           await firebase.auth().signInWithCustomToken(credentials.customerAuthToken);
           // 2. Start listening to messages
           captionsUnsubscribe = db.collection('callSessions').doc(credentials.sessionId).collection('messages')
-            .orderBy('timestamp', 'asc')
+            .orderBy('sequence', 'asc')
             .onSnapshot(snapshot => {
                renderCaptions(snapshot.docs.map(d => d.data()));
             });
@@ -109,7 +125,7 @@
         
         // 3. Connect to Agora
         await joinCall(credentials.appId, credentials.channel, credentials.token, credentials.uid);
-        active = true; muteButton.disabled = false; setButton('End Call', false); setStatus('Agent connected', 'var(--green)'); hintText.textContent = 'You are live. Tell the agent about your team, timeline, or pricing needs.'; scheduleRenewal(credentials.expiresAt);
+        active = true; muteButton.disabled = false; setButton('End Call', false); setStatus('Connected — waiting for agent audio', 'var(--amber)'); hintText.textContent = 'Wait for the spoken greeting before you begin. Then tell the agent about your team, timeline, or pricing needs.'; scheduleRenewal(credentials.expiresAt); armAgentAudioTimeout();
       } catch (error) { startupFailed = true; if (call?.sessionCredential) await api(`/public/calls/${encodeURIComponent(linkToken)}/fail`, { method: 'POST', body: JSON.stringify({ sessionCredential: call.sessionCredential }) }).catch(() => {}); await cleanup(); errorText.textContent = error.message || 'Unable to start the call. Ask your manager for a new link.'; setStatus('Connection failed', 'var(--red)'); setButton('Request a new link', false); callButton.disabled = true; }
       finally { if (!startupFailed) callButton.disabled = false; }
     }
@@ -118,5 +134,19 @@
     muteButton.addEventListener('click', () => { const muted = toggleMute(); muteButton.textContent = muted ? 'Unmute' : 'Mute'; });
     window.addEventListener('agora:agent-speaking', () => waves.forEach(w => w.style.animationPlayState = 'running'));
     window.addEventListener('agora:agent-stopped-speaking', () => waves.forEach(w => w.style.animationPlayState = 'paused'));
+    window.addEventListener('agora:agent-audio-playing', () => {
+      if (!active || agentAudioObserved) return;
+      agentAudioObserved = true; if (agentAudioTimer) clearTimeout(agentAudioTimer); agentAudioTimer = null;
+      recordAudioActivity('AGENT_AUDIO_PUBLISHED'); recordAudioActivity('CUSTOMER_AUDIO_PLAYBACK_STARTED');
+      setStatus('Agent audio live', 'var(--green)'); hintText.textContent = 'You are live. Tell the agent about your team, timeline, or pricing needs.';
+    });
+    window.addEventListener('agora:agent-audio-failed', async () => {
+      if (!active) return;
+      recordAudioActivity('CUSTOMER_AUDIO_PLAYBACK_FAILED');
+      errorText.textContent = 'The agent audio could not play in this browser. The call was safely stopped.';
+      setStatus('Audio playback failed', 'var(--red)');
+      try { await api(`/public/calls/${encodeURIComponent(linkToken)}/fail`, { method: 'POST', body: JSON.stringify({ sessionCredential: call.sessionCredential }) }); } catch (_) {}
+      await cleanup(); setButton('Request a new link', false); callButton.disabled = true;
+    });
   </script>
 </body></html>

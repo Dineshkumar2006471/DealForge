@@ -29,6 +29,9 @@ const TOOL_TIERS = {
   calculate_discount: TIERS.ACT, // escalates to APPROVAL if > 18%
   book_meeting: TIERS.ACT,
   escalate_to_human: TIERS.ACT,
+  // CRM writes are restricted even when the target is explicitly linked. A manager
+  // approves the exact allowlisted fields before DealForge performs the verified update.
+  sync_to_hubspot: TIERS.APPROVAL,
 };
 
 /**
@@ -60,7 +63,7 @@ function checkPolicy(toolName, args, context = {}) {
     return { tier: TIERS.ACT, allowed: true, reason: 'Within autonomous limits' };
   }
 
-  return { tier: baseTier, allowed: false, reason: 'Requires approval' };
+  return { tier: baseTier, allowed: false, requiresApproval: baseTier === TIERS.APPROVAL, reason: 'Requires approval' };
 }
 
 /**

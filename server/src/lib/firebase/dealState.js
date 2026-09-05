@@ -97,7 +97,7 @@ async function updateConversationStage(dealId, stage, organizationId) {
  * Append to discount ledger.
  */
 async function appendDiscountLedger(dealId, entry, organizationId) {
-  const admin = require('firebase-admin');
+  const { admin } = require('./admin');
   const ref = db.collection('deals').doc(dealId); await db.runTransaction(async tx => { const deal = await tx.get(ref); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found'); tx.update(ref, {
     discountLedger: admin.firestore.FieldValue.arrayUnion(entry),
     updatedAt: new Date().toISOString(),

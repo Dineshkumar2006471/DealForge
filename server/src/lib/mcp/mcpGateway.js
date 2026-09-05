@@ -19,7 +19,7 @@ async function executeMcpTool({ organizationId, dealId, sessionId, toolName, arg
   if (existing.exists && existing.data().status === 'SUCCEEDED') return existing.data().result;
   await ref.set({ operationId, organizationId, dealId, sessionId, toolName, args, status: 'RUNNING', createdAt: new Date().toISOString() }, { merge: true });
   try {
-    const result = await Promise.race([registered.execute(args), new Promise((_, reject) => setTimeout(() => reject(new Error('External tool timed out')), timeoutMs))]);
+    const result = await Promise.race([registered.execute(args, { organizationId, dealId, sessionId }), new Promise((_, reject) => setTimeout(() => reject(new Error('External tool timed out')), timeoutMs))]);
     if (!result?.verified) throw new Error('External tool did not return a verified result');
     await ref.set({ status: 'SUCCEEDED', result, completedAt: new Date().toISOString() }, { merge: true });
     await writeAuditEvent({ organizationId, dealId, sessionId, eventType: EVENT_TYPES.TOOL_EXECUTED, trigger: `Verified external action: ${toolName}`, actionResult: { tool: toolName, verified: true } });

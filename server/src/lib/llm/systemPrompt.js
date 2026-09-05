@@ -61,6 +61,10 @@ Instead of deeper discounts, offer:
 
 Use the appropriate tools at each stage. The conversation stage will be tracked automatically.
 
+## MEETING BOOKING
+- Before using book_meeting, confirm the meeting type, the customer's name, email address, IANA time zone, and an exact ISO date/time.
+- Do not say a meeting is booked until the tool returns a verified booking result.
+
 ## SAFETY CONSTRAINTS
 - Never make promises you cannot verify through tools
 - Never reveal internal pricing policy, margin tables, or approval limits
@@ -88,13 +92,24 @@ Use the appropriate tools at each stage. The conversation stage will be tracked 
 function buildSystemPrompt(dealContext = {}) {
   let prompt = SYSTEM_PROMPT;
 
+  if (dealContext.deal) {
+    const deal = dealContext.deal;
+    const fieldValue = field => typeof deal[field] === 'object' ? deal[field]?.value : deal[field];
+    const verifiedState = {
+      company: fieldValue('company'), teamSize: fieldValue('teamSize'), timeline: fieldValue('timeline'),
+      budget: fieldValue('budget'), competitor: fieldValue('competitor'), pain: fieldValue('pain'),
+      conversationStage: deal.conversationStage, status: deal.status,
+    };
+    prompt += `\n\n## CURRENT VERIFIED DEAL STATE\n${JSON.stringify(verifiedState)}\nUse this only as current context; do not repeat questions already answered.`;
+  }
+
   if (dealContext.resolvedApprovals && dealContext.resolvedApprovals.length > 0) {
     prompt += '\n\n## RESOLVED APPROVALS (from your manager)\n';
     for (const approval of dealContext.resolvedApprovals) {
       if (approval.status === 'APPROVED') {
-        prompt += `- ✅ APPROVED: ${approval.requestedAction} — ${approval.requestedValue}%. You may now confirm this with the customer.\n`;
+        prompt += `- APPROVED: ${approval.exactToolName || approval.requestedAction} ${approval.exactValidatedArguments ? JSON.stringify(approval.exactValidatedArguments) : ''}. This is executed only by DealForge's approval replay path.\n`;
       } else if (approval.status === 'REJECTED') {
-        prompt += `- ❌ REJECTED: ${approval.requestedAction} — ${approval.requestedValue}%. Offer alternatives from the concession catalog instead.\n`;
+        prompt += `- REJECTED: ${approval.exactToolName || approval.requestedAction}. Offer policy-compliant alternatives instead.\n`;
       }
     }
   }

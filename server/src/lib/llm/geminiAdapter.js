@@ -137,6 +137,9 @@ async function* generateResponse(messages, tools = [], options = {}) {
           // Text content chunk
           yield {
             id: chatId,
+            object: 'chat.completion.chunk',
+            created: Math.floor(Date.now() / 1000),
+            model: modelId,
             choices: [{
               index: 0,
               delta: isFirst
@@ -152,6 +155,9 @@ async function* generateResponse(messages, tools = [], options = {}) {
           const toolCallId = `tc_${uuidv4().slice(0, 8)}`;
           yield {
             id: chatId,
+            object: 'chat.completion.chunk',
+            created: Math.floor(Date.now() / 1000),
+            model: modelId,
             choices: [{
               index: 0,
               delta: {
@@ -176,6 +182,9 @@ async function* generateResponse(messages, tools = [], options = {}) {
     // Send finish chunk
     yield {
       id: chatId,
+      object: 'chat.completion.chunk',
+      created: Math.floor(Date.now() / 1000),
+      model: modelId,
       choices: [{
         index: 0,
         delta: {},

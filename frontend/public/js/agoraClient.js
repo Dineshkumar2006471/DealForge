@@ -20,12 +20,19 @@ async function joinCall(appId, channel, token, uid) {
 
   // Set up event listeners before joining
   rtcClient.on('user-published', async (user, mediaType) => {
-    console.log('User published:', user.uid);
-    await rtcClient.subscribe(user, mediaType);
-    if (mediaType === 'audio') {
-      user.audioTrack.play();
-      // Dispatch custom event for UI updates (e.g. agent is speaking)
-      window.dispatchEvent(new CustomEvent('agora:agent-speaking', { detail: { uid: user.uid } }));
+    try {
+      console.log('User published:', user.uid);
+      await rtcClient.subscribe(user, mediaType);
+      if (mediaType === 'audio') {
+        await Promise.resolve(user.audioTrack.play());
+        // These browser events are evidence of track publication/playback, not a
+        // claim that the listener heard every syllable.
+        window.dispatchEvent(new CustomEvent('agora:agent-audio-playing', { detail: { uid: user.uid } }));
+        window.dispatchEvent(new CustomEvent('agora:agent-speaking', { detail: { uid: user.uid } }));
+      }
+    } catch (error) {
+      console.error('Agent audio playback failed:', error);
+      window.dispatchEvent(new CustomEvent('agora:agent-audio-failed', { detail: { message: error.message || 'Audio playback failed' } }));
     }
   });
 

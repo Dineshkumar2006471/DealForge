@@ -167,7 +167,11 @@ Copy `.env.example` for local development only. Never commit a populated environ
 | `AGORA_APP_CERTIFICATE`, `AGORA_CUSTOMER_SECRET` | Agora server credentials | Secret Manager |
 | `AGORA_LLM_WEBHOOK_SECRET` | Agora-to-runtime authorization | Secret Manager |
 | `CALL_SESSION_WEBHOOK_SIGNING_SECRET` | Per-session webhook-token derivation | Secret Manager |
+| `ELEVENLABS_API_KEY` | Agora-hosted speech synthesis credential | Secret Manager |
+| `ELEVENLABS_VOICE_ID`, `ELEVENLABS_MODEL_ID`, `ELEVENLABS_BASE_URL`, `ELEVENLABS_SAMPLE_RATE` | Server-side ElevenLabs TTS configuration | Cloud Run configuration |
 | `GEMINI_MODEL` | Vertex AI model selection | Cloud Run configuration |
+| `HUBSPOT_ACCESS_TOKEN` | Server-only private-app token for explicitly linked staging deals | Secret Manager |
+| `CALCOM_API_KEY`, `CALCOM_EVENT_TYPE_ID`, `CALCOM_API_VERSION` | Server-only verified booking configuration | Secret Manager / Cloud Run configuration |
 
 ## Testing and staging
 
@@ -187,12 +191,12 @@ Run the real staging scenario in three windows: manager dashboard, customer call
 | --- | --- |
 | Local syntax, unit/API/security tests | Verified locally |
 | Firestore organization isolation | Verified with emulator |
-| Docker image build and health check | Pending local Docker recovery |
+| Docker image build and health check | Verified locally (no cloud credentials in the image) |
 | Authenticated staging Playwright | Pending dedicated test manager |
 | Real Agora → Gemini → policy call | Pending staging scenario |
 | Deterministic Deal Health / Next Best Action | Implemented locally; pending staging call evidence |
 | Negotiation memory / trade-off proposal | Implemented locally; pending staging call evidence |
-| HubSpot and Cal.com actions | Not configured; no external action is claimed |
+| HubSpot and Cal.com actions | Implemented with verification gates; no external action is claimed until staging evidence exists |
 | Production launch | Not claimed |
 
 ## License

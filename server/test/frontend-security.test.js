@@ -55,5 +55,6 @@ test('customer call controls remain reachable on desktop and narrow screens', ()
   assert.match(callPage, /id="btn-call"/);
   assert.match(callPage, /id="call-hint"/);
   assert.match(styles, /\.page-call \{ display: flex; flex-direction: column; min-height: 100vh;/);
+  assert.match(styles, /@media \(max-height: 700px\) and \(min-width: 641px\)/);
   assert.doesNotMatch(styles, /\.page-call \{ display: flex; flex-direction: column; height: 100vh; overflow: hidden;/);
 });

@@ -91,7 +91,7 @@
         </div>
 
         <!-- HubSpot -->
-        <div class="bento-card" style="opacity: 0.5;">
+        <div class="bento-card" id="integration-hubspot">
           <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
             <div aria-label="HubSpot" title="HubSpot" style="width: 48px; height: 48px; border-radius: 12px; background: #fff2eb; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
               <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke="#ff7a59" stroke-width="3" stroke-linecap="round"><circle cx="16" cy="16" r="4" fill="#ff7a59" stroke="none"/><path d="M16 12V5m0 0 5-2m-5 2 5 3M12.5 18.5 7 22m0 0v5m0-5 4 2M19.5 13.5 25 10m0 0v-5m0 5 3 2"/><circle cx="21" cy="3" r="2" fill="#ff7a59" stroke="none"/><circle cx="7" cy="27" r="2" fill="#ff7a59" stroke="none"/><circle cx="28" cy="7" r="2" fill="#ff7a59" stroke="none"/></svg>
@@ -106,7 +106,7 @@
         </div>
 
         <!-- Cal.com -->
-        <div class="bento-card" style="opacity: 0.5;">
+        <div class="bento-card" id="integration-calcom">
           <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
             <div aria-label="Cal.com" title="Cal.com" style="width: 48px; height: 48px; border-radius: 12px; background: #111; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01"/></svg>
@@ -162,7 +162,11 @@
         renderProfileIcon('user-email');
         document.getElementById('user-display-name').innerText = user.displayName || user.email || 'User';
         const setStatus = (name, value) => { const element = document.getElementById(`status-${name}`); if (!element) return; element.textContent = value; element.style.color = value === 'CONNECTED' ? 'var(--green)' : value === 'ERROR' ? 'var(--red)' : 'var(--amber)'; };
-        getIntegrationStatus().then(statuses => Object.entries(statuses).forEach(([name, value]) => setStatus(name, value))).catch(() => ['agora', 'gemini', 'firestore', 'hubspot', 'calcom', 'slack'].forEach(name => setStatus(name, 'ERROR')));
+        const updateCardTruthfulness = (name, value) => {
+          const card = document.getElementById(`integration-${name}`);
+          if (card) card.style.opacity = value === 'NOT CONFIGURED' ? '0.5' : '1';
+        };
+        getIntegrationStatus().then(statuses => Object.entries(statuses).forEach(([name, value]) => { setStatus(name, value); updateCardTruthfulness(name, value); })).catch(() => ['agora', 'gemini', 'firestore', 'hubspot', 'calcom', 'slack'].forEach(name => setStatus(name, 'ERROR')));
       } else { window.location.href = '/login.html'; }
     });
   </script>
