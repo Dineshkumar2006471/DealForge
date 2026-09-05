@@ -13,8 +13,22 @@ async function handleChatCompletion(requestBody, res, session) {
   const context = { organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, turnNumber: (await getTurnNumber(session.sessionId)) + 1 };
   let history = await getHistory(session.sessionId);
   if (history.length === 0) { const deal = await getDeal(context.dealId, context.organizationId); if (!deal) throw new Error('Bound deal not found'); await addMessage(session.sessionId, { role: 'system', content: buildSystemPrompt({ deal }) }); }
-  const lastUser = requestBody.messages.filter(message => message.role === 'user').pop();
-  if (lastUser) await addMessage(session.sessionId, { role: 'user', content: lastUser.content || '' });
+  const chatId = `chatcmpl-${uuidv4()}`;
+  const userText = currentUserText(requestBody.messages);
+
+  // Agora sends an empty turn when a Conversational AI agent joins. Vertex rejects
+  // empty model input, so greet through the verified SSE channel instead of making
+  // a doomed Gemini call. Approval replay remains tied to a real customer turn.
+  if (!userText) {
+    const opening = history.some(message => message.role === 'assistant')
+      ? "I'm here when you're ready. What would you like to discuss about your team, timeline, or pricing?"
+      : "Hello, I'm the DealForge sales assistant. To get started, tell me about your team size, timeline, or what you want to improve.";
+    if (!history.some(message => message.role === 'assistant')) await addMessage(session.sessionId, { role: 'assistant', content: opening });
+    writeSseReply(res, chatId, opening);
+    return;
+  }
+
+  await addMessage(session.sessionId, { role: 'user', content: userText });
   for (const approval of await claimApprovedApprovals(context)) {
     const executed = await executeTool(approval.exactToolName, approval.exactValidatedArguments, { ...context, approvedReplay: { approvalId: approval.approvalId, toolName: approval.exactToolName, args: approval.exactValidatedArguments } });
     if (executed.approved) {
@@ -26,7 +40,7 @@ async function handleChatCompletion(requestBody, res, session) {
     }
   }
   const tools = getToolDefinitions(); history = await getHistory(session.sessionId);
-  const chatId = `chatcmpl-${uuidv4()}`; let content = ''; let calls = []; let finishReason;
+  let content = ''; let calls = []; let finishReason;
   try {
     for await (const chunk of generateResponse(history, tools, context)) {
       const choice = chunk.choices?.[0]; if (!choice) continue;
@@ -53,14 +67,23 @@ async function handleChatCompletion(requestBody, res, session) {
   }
 }
 
+function currentUserText(messages) {
+  const lastUser = Array.isArray(messages) ? messages.filter(message => message?.role === 'user').pop() : null;
+  return typeof lastUser?.content === 'string' ? lastUser.content.trim() : '';
+}
+
 // Agora consumes OpenAI-compatible SSE. Error responses must carry the same
 // assistant role and terminal `stop` chunk as a successful streamed response;
 // otherwise a TTS client may wait forever and leave the customer in silence.
 function writeSafeFallback(res, chatId) {
+  writeSseReply(res, chatId, "I'm having a technical issue. Could you repeat that?");
+}
+
+function writeSseReply(res, chatId, content) {
   res.write(`data: ${JSON.stringify({
     id: chatId,
     object: 'chat.completion.chunk',
-    choices: [{ index: 0, delta: { role: 'assistant', content: "I'm having a technical issue. Could you repeat that?" }, finish_reason: null }],
+    choices: [{ index: 0, delta: { role: 'assistant', content }, finish_reason: null }],
   })}\n\n`);
   res.write(`data: ${JSON.stringify({
     id: chatId,
@@ -71,4 +94,4 @@ function writeSafeFallback(res, chatId) {
   res.end();
 }
 
-module.exports = { handleChatCompletion, writeSafeFallback };
+module.exports = { handleChatCompletion, writeSafeFallback, writeSseReply, currentUserText };
