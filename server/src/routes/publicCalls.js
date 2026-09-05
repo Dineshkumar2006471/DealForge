@@ -1,6 +1,6 @@
 const express = require('express');
-const { redeemLink, rtcCredentials, webhookTokenFor, findSessionByHash, endSession } = require('../lib/calls/callSessions');
-const { startAgent } = require('../lib/calls/agoraAgentService');
+const { redeemLink, rtcCredentials, webhookTokenFor, findSessionByHash, endSession, sessionRef } = require('../lib/calls/callSessions');
+const { startAgent, speakAgent } = require('../lib/calls/agoraAgentService');
 const { parse, sessionCredentialSchema, callActivitySchema } = require('../lib/schema/validation');
 const { writeAuditEvent } = require('../lib/audit/eventStore');
 const { EVENT_TYPES } = require('../lib/audit/eventTypes');
@@ -41,6 +41,26 @@ router.post('/calls/:linkToken/token', async (req, res, next) => {
   try {
     const session = await activeSessionFromCredential(req);
     res.json({ ...rtcCredentials(session), sessionId: session.sessionId });
+  } catch (error) { next(error); }
+});
+router.post('/calls/:linkToken/ready', async (req, res, next) => {
+  try {
+    const session = await activeSessionFromCredential(req);
+    const ref = sessionRef(session.sessionId);
+    let shouldSpeak = false;
+    await db.runTransaction(async tx => {
+      const snapshot = await tx.get(ref);
+      if (!snapshot.exists || snapshot.data().status !== 'ACTIVE') throw new HttpError(410, 'Call session is not active');
+      if (!snapshot.data().greetingRequestedAt) {
+        tx.update(ref, { greetingRequestedAt: new Date().toISOString() });
+        shouldSpeak = true;
+      }
+    });
+    if (shouldSpeak) {
+      await speakAgent(session, "Hello, I'm the DealForge sales assistant. I'm ready to help with your team, timeline, or pricing needs.");
+      await writeAuditEvent({ organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, eventType: EVENT_TYPES.AGENT_GREETING_REQUESTED, trigger: 'Customer RTC ready; Agora greeting requested', actionResult: { accepted: true } });
+    }
+    res.status(202).json({ status: shouldSpeak ? 'GREETING_REQUESTED' : 'ALREADY_READY' });
   } catch (error) { next(error); }
 });
 router.post('/calls/:linkToken/stop', async (req, res, next) => {

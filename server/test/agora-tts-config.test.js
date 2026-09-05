@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { ttsConfig, buildAgentStartPayload } = require('../src/lib/calls/agoraAgentService');
+const { ttsConfig, buildAgentStartPayload, speakAgent } = require('../src/lib/calls/agoraAgentService');
 
 const keys = [
   'AGORA_APP_ID', 'AGORA_APP_CERTIFICATE', 'AGORA_CUSTOMER_ID', 'AGORA_CUSTOMER_SECRET',
@@ -51,4 +51,17 @@ test('missing or invalid ElevenLabs TTS configuration prevents agent startup', (
   process.env.ELEVENLABS_API_KEY = 'elevenlabs-secret';
   process.env.ELEVENLABS_SAMPLE_RATE = '12345';
   assert.throws(() => ttsConfig(), /ElevenLabs TTS configuration is incomplete/);
+});
+
+test('Agora greeting uses the documented server-side Speak endpoint only after RTC readiness', async () => {
+  configure();
+  const originalFetch = global.fetch;
+  global.fetch = async (url, options) => {
+    assert.equal(url, `https://api.agora.io/api/conversational-ai-agent/v2/projects/${'a'.repeat(32)}/agents/agent-1/speak`);
+    assert.equal(options.method, 'POST');
+    assert.deepEqual(JSON.parse(options.body), { text: 'Hello', priority: 'INTERRUPT', interrupt: false });
+    return new Response(JSON.stringify({ message: 'accepted' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  try { assert.deepEqual(await speakAgent({ agentId: 'agent-1' }, 'Hello'), { accepted: true }); }
+  finally { global.fetch = originalFetch; }
 });

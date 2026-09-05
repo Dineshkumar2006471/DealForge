@@ -39,7 +39,7 @@ function buildAgentStartPayload(session, webhookToken, nowSeconds = Math.floor(D
   return { config, payload: { name: `dealforge-${session.sessionId}`, properties: {
     channel: session.opaqueAgoraChannel, token, agent_rtc_uid: String(agentUid), remote_rtc_uids: ['*'],
     asr: { language: 'en-US', vendor: 'deepgram' },
-    llm: { url: `${config.baseUrl}/chat/completions/${webhookToken}`, api_key: process.env.AGORA_LLM_WEBHOOK_SECRET, system_messages: [], greeting_message: "Hello, I'm the DealForge sales assistant. How can I help you?", params: { model: 'dealforge-sales-agent' } },
+    llm: { url: `${config.baseUrl}/chat/completions/${webhookToken}`, api_key: process.env.AGORA_LLM_WEBHOOK_SECRET, system_messages: [], params: { model: 'dealforge-sales-agent' } },
     // Agora's documented ElevenLabs REST contract requires every field below.
     // This object is sent only from Cloud Run to Agora and is never logged or returned.
     tts: { vendor: 'elevenlabs', params: { base_url: config.tts.baseUrl, key: config.tts.key, model_id: config.tts.modelId, voice_id: config.tts.voiceId, sample_rate: config.tts.sampleRate } },
@@ -75,4 +75,18 @@ async function stopAgent(session) {
   const response = await fetch(`${BASE}/${config.appId}/agents/${session.agentId}/leave`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Basic ${Buffer.from(`${config.customerId}:${config.customerSecret}`).toString('base64')}` } });
   if (!response.ok) throw new HttpError(502, 'Agora agent stop failed');
 }
-module.exports = { startAgent, stopAgent, ttsConfig, buildAgentStartPayload };
+
+async function speakAgent(session, text) {
+  if (!session.agentId) throw new HttpError(409, 'Agora agent is not active');
+  if (typeof text !== 'string' || !text.trim() || Buffer.byteLength(text, 'utf8') > 512) throw new HttpError(400, 'Agent speech text is invalid');
+  const config = credentials();
+  const response = await fetch(`${BASE}/${config.appId}/agents/${encodeURIComponent(session.agentId)}/speak`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Basic ${Buffer.from(`${config.customerId}:${config.customerSecret}`).toString('base64')}` },
+    body: JSON.stringify({ text: text.trim(), priority: 'INTERRUPT', interrupt: false }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new HttpError(502, `Agora agent speech request failed: ${String(data.message || response.status).slice(0, 180)}`);
+  return { accepted: true };
+}
+module.exports = { startAgent, stopAgent, speakAgent, ttsConfig, buildAgentStartPayload };
