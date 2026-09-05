@@ -49,7 +49,26 @@ async function handleChatCompletion(requestBody, res, session) {
   } catch (error) {
     console.error('Agent runtime error:', error.message);
     await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_RESPONSE_FAILED, trigger: 'Gemini/runtime response failed', actionResult: { verified: false, error: String(error.message).slice(0, 200) } }).catch(() => {});
-    if (!res.writableEnded) { res.write(`data: ${JSON.stringify({ id: chatId, choices: [{ index: 0, delta: { content: "I'm having a technical issue. Could you repeat that?" }, finish_reason: null }] })}\n\n`); res.write('data: [DONE]\n\n'); res.end(); }
+    if (!res.writableEnded) writeSafeFallback(res, chatId);
   }
 }
-module.exports = { handleChatCompletion };
+
+// Agora consumes OpenAI-compatible SSE. Error responses must carry the same
+// assistant role and terminal `stop` chunk as a successful streamed response;
+// otherwise a TTS client may wait forever and leave the customer in silence.
+function writeSafeFallback(res, chatId) {
+  res.write(`data: ${JSON.stringify({
+    id: chatId,
+    object: 'chat.completion.chunk',
+    choices: [{ index: 0, delta: { role: 'assistant', content: "I'm having a technical issue. Could you repeat that?" }, finish_reason: null }],
+  })}\n\n`);
+  res.write(`data: ${JSON.stringify({
+    id: chatId,
+    object: 'chat.completion.chunk',
+    choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+  })}\n\n`);
+  res.write('data: [DONE]\n\n');
+  res.end();
+}
+
+module.exports = { handleChatCompletion, writeSafeFallback };
