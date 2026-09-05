@@ -58,3 +58,9 @@ test('customer call controls remain reachable on desktop and narrow screens', ()
   assert.match(styles, /@media \(max-height: 700px\) and \(min-width: 641px\)/);
   assert.doesNotMatch(styles, /\.page-call \{ display: flex; flex-direction: column; height: 100vh; overflow: hidden;/);
 });
+
+test('customer captions consume the stored durable message payload in sequence order', () => {
+  const call = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'public', 'call.html'), 'utf8');
+  assert.match(call, /orderBy\('sequence', 'asc'\)/);
+  assert.match(call, /snapshot\.docs\.map\(d => d\.data\(\)\.message\)\.filter\(Boolean\)/);
+});

@@ -109,7 +109,10 @@ async function markFailed(sessionId, reason) {
   const ref = sessionRef(sessionId);
   await db.runTransaction(async tx => {
     const snapshot = await tx.get(ref);
-    if (!snapshot.exists || snapshot.data().status !== 'JOINING') return;
+    // A server-side agent failure happens while JOINING. A browser RTC/audio
+    // failure happens after the agent has already transitioned the session to
+    // ACTIVE. Both must revoke the session from further token renewal/use.
+    if (!snapshot.exists || !['JOINING', 'ACTIVE'].includes(snapshot.data().status)) return;
     tx.update(ref, { status: 'FAILED', endedAt: now(), failureReason: String(reason).slice(0, 500) });
   });
 }

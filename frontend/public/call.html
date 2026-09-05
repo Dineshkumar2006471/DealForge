@@ -119,7 +119,7 @@
           captionsUnsubscribe = db.collection('callSessions').doc(credentials.sessionId).collection('messages')
             .orderBy('sequence', 'asc')
             .onSnapshot(snapshot => {
-               renderCaptions(snapshot.docs.map(d => d.data()));
+               renderCaptions(snapshot.docs.map(d => d.data().message).filter(Boolean));
             });
         }
         

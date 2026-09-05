@@ -47,9 +47,12 @@ function buildAgentStartPayload(session, webhookToken, nowSeconds = Math.floor(D
 }
 
 async function startAgent(session, webhookToken) {
-  const { config, payload } = buildAgentStartPayload(session, webhookToken);
+  let config;
   let agentId;
   try {
+    const built = buildAgentStartPayload(session, webhookToken);
+    config = built.config;
+    const payload = built.payload;
     const response = await fetch(`${BASE}/${config.appId}/join`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Basic ${Buffer.from(`${config.customerId}:${config.customerSecret}`).toString('base64')}` }, body: JSON.stringify(payload) });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new HttpError(502, `Agora agent start failed: ${data.message || response.status}`);
@@ -59,7 +62,7 @@ async function startAgent(session, webhookToken) {
     await writeAuditEvent({ organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, eventType: EVENT_TYPES.AGENT_STARTED, trigger: 'Agora agent started', actionResult: { agentId, verified: true } });
     return agentId;
   } catch (error) {
-    if (agentId) await stopAgent({ ...session, agentId }).catch(() => {});
+    if (agentId && config) await stopAgent({ ...session, agentId }).catch(() => {});
     await markFailed(session.sessionId, error.message);
     await writeAuditEvent({ organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, eventType: EVENT_TYPES.CALL_FAILED, trigger: 'Agora agent startup failed', actionResult: { verified: false } });
     throw error;
