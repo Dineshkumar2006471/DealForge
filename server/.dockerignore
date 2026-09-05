@@ -1,0 +1,13 @@
+node_modules
+npm-debug.log*
+.env
+.env.*
+!.env.example
+test
+test-results
+playwright-report
+blob-report
+coverage
+firestore-debug.log
+.firebase
+*.log

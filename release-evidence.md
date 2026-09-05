@@ -9,7 +9,7 @@ This document records observed evidence, not intended capability. It is updated 
 | Item | Status | Evidence |
 | --- | --- | --- |
 | Secure-core local tests | VERIFIED | 2026-09-05: 25 pass, 0 fail; Firestore emulator organization-isolation test also passed. |
-| Docker release image | BLOCKED | Docker Desktop Linux engine returned no Server version on 2026-09-05. |
+| Docker release image | VERIFIED | 2026-09-05: Docker Desktop Linux engine 28.3.2; image `dealforge-core:55c36f6` built locally and `/health` returned HTTP 200 from host and container. |
 | Staging release candidate | IMPLEMENTED BUT UNVERIFIED | Current `main` changes have not been built/deployed as an immutable staging revision. |
 | Real Agora → Gemini call | BLOCKED | Requires a deployed revision, Agora callback configuration, and attended microphone test. |
 | HubSpot | NOT CONFIGURED | No OAuth client/credential/action verification recorded. |
