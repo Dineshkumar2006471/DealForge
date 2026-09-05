@@ -9,6 +9,9 @@ const { createRateLimit } = require('../lib/security/rateLimit');
 const { runPostCallAutopilot } = require('../lib/agent/postCallAutopilot');
 const router = express.Router();
 const joinRateLimit = createRateLimit({ scope: 'public-call-join', limit: 8, windowMs: 60_000 });
+const { db } = require('../lib/firebase/admin');
+const admin = require('firebase-admin');
+
 router.post('/calls/:linkToken/join', joinRateLimit, async (req, res, next) => {
   try {
     const { session, refreshToken } = await redeemLink(req.params.linkToken);
@@ -19,7 +22,14 @@ router.post('/calls/:linkToken/join', joinRateLimit, async (req, res, next) => {
     const activeSession = activeDoc.data();
     const credentials = rtcCredentials(activeSession);
     await writeAuditEvent({ organizationId: activeSession.organizationId, dealId: activeSession.dealId, sessionId: activeSession.sessionId, eventType: EVENT_TYPES.CALL_STARTED, trigger: 'Customer joined verified call link' });
-    res.json({ ...credentials, sessionId: activeSession.sessionId, agentId, sessionCredential: refreshToken });
+    
+    // Mint custom token for customer read-only access to their session
+    const customerAuthToken = await admin.auth().createCustomToken(String(activeSession.customerUid), { 
+      role: 'customer', 
+      sessionId: activeSession.sessionId 
+    });
+    
+    res.json({ ...credentials, sessionId: activeSession.sessionId, agentId, sessionCredential: refreshToken, customerAuthToken });
   } catch (error) { next(error); }
 });
 async function activeSessionFromCredential(req) {

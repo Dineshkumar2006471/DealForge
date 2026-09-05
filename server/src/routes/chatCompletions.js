@@ -29,8 +29,16 @@ router.post('/:sessionWebhookToken', verifyAgoraWebhook, agoraRateLimit, async (
   try {
     parse(chatSchema, req.body);
     session = await getWebhookSession(req.params.sessionWebhookToken);
-  } catch (error) { return next(error); }
+  } catch (error) { 
+    console.error(`[chatCompletions] Error parsing request or finding session: ${error.message}`);
+    return next(error); 
+  }
   const { messages, stream } = req.body;
+  
+  // Extract last user text for logging
+  const lastUserMsg = messages?.filter(m => m.role === 'user').pop();
+  const userText = lastUserMsg?.content || '';
+  console.log(`[chatCompletions] POST /chat/completions received. Session: ${session.id}, Message count: ${messages?.length || 0}, User text: "${userText.substring(0, 50)}${userText.length > 50 ? '...' : ''}"`);
 
   // Agora always sends stream: true
   if (stream !== true) {

@@ -12,9 +12,9 @@ service cloud.firestore {
 
     match /deals/{dealId} { allow read: if sameOrganization(resource.data.organizationId); allow write: if false; }
     match /callSessions/{sessionId} {
-      allow read: if sameOrganization(resource.data.organizationId);
+      allow read: if sameOrganization(resource.data.organizationId) || (signedIn() && request.auth.token.role == 'customer' && request.auth.token.sessionId == sessionId);
       allow write: if false;
-      match /messages/{messageId} { allow read: if sameOrganization(resource.data.organizationId); allow write: if false; }
+      match /messages/{messageId} { allow read: if sameOrganization(resource.data.organizationId) || (signedIn() && request.auth.token.role == 'customer' && request.auth.token.sessionId == sessionId); allow write: if false; }
     }
     match /approvals/{approvalId} { allow read: if sameOrganization(resource.data.organizationId); allow write: if false; }
     match /auditEvents/{eventId} { allow read: if sameOrganization(resource.data.organizationId); allow write: if false; }

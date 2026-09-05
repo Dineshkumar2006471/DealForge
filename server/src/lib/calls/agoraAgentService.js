@@ -25,7 +25,7 @@ async function startAgent(session, webhookToken) {
     channel: session.opaqueAgoraChannel, token, agent_rtc_uid: String(agentUid), remote_rtc_uids: ['*'],
     asr: { language: 'en-US', vendor: 'deepgram' },
     llm: { url: `${config.baseUrl}/chat/completions/${webhookToken}`, api_key: process.env.AGORA_LLM_WEBHOOK_SECRET, system_messages: [], params: { model: 'dealforge-sales-agent' } },
-    tts: { vendor: 'minimax' },
+    tts: { vendor: 'elevenlabs', params: { voice_id: '21m00Tcm4TlvDq8ikWAM' } },
   }};
   let agentId;
   try {

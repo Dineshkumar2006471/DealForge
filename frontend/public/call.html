@@ -6,16 +6,38 @@
     <div class="call-controls"><button class="btn-control" id="btn-mute" aria-label="Mute Microphone" disabled>Mute</button><button class="btn-primary btn-start-call" id="btn-call">Start AI Sales Call</button></div>
     <p id="call-hint" style="color:var(--mute);min-height:1.5em;text-align:center;font-size:13px" aria-live="polite">After the agent connects, start with: “We have 300 users.”</p>
     <p id="call-error" style="color:var(--red);min-height:1.5em;text-align:center" aria-live="polite"></p>
+    
+    <div id="live-captions" class="captions-container" style="margin-top: 32px; max-width: 600px; width: 100%; display: flex; flex-direction: column; gap: 12px; height: 300px; overflow-y: auto; padding: 16px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px solid var(--gray-800);">
+      <div id="captions-status" style="text-align: center; color: var(--mute); font-size: 13px; font-family: var(--font-mono);">Live transcript will appear here when connected.</div>
+      <div id="captions-list" style="display: flex; flex-direction: column; gap: 12px;"></div>
+    </div>
   </main>
-  <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.20.2.js"></script><script src="/js/runtimeConfig.js"></script><script src="/js/backendClient.js"></script><script src="/js/agoraClient.js"></script>
+
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="/js/firebaseConfig.js"></script>
+  
+  <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.20.2.js"></script>
+  <script src="/js/runtimeConfig.js"></script>
+  <script src="/js/backendClient.js"></script>
+  <script src="/js/agoraClient.js"></script>
   <script>
+    const db = getFirestore();
     const linkToken = new URLSearchParams(location.search).get('link');
     const callButton = document.getElementById('btn-call'), muteButton = document.getElementById('btn-mute'), status = document.getElementById('status-text'), errorText = document.getElementById('call-error'), hintText = document.getElementById('call-hint');
     const waves = document.querySelectorAll('.wave'); let call = null; let active = false;
     function setStatus(text, color) { status.textContent = text; status.style.color = color || 'var(--gray-400)'; }
     function setButton(text, primary) { callButton.textContent = text; callButton.classList.toggle('btn-primary', primary); callButton.classList.toggle('btn-secondary', !primary); }
     let renewalTimer = null;
-    async function cleanup() { if (renewalTimer) clearTimeout(renewalTimer); renewalTimer = null; try { await leaveCall(); } finally { muteButton.disabled = true; active = false; call = null; waves.forEach(w => w.style.animationPlayState = 'paused'); } }
+    let captionsUnsubscribe = null;
+
+    async function cleanup() {
+      if (renewalTimer) clearTimeout(renewalTimer); renewalTimer = null;
+      if (captionsUnsubscribe) { captionsUnsubscribe(); captionsUnsubscribe = null; }
+      try { await firebase.auth().signOut(); } catch (e) {}
+      try { await leaveCall(); } finally { muteButton.disabled = true; active = false; call = null; waves.forEach(w => w.style.animationPlayState = 'paused'); }
+    }
     function scheduleRenewal(expiresAt) {
       const wait = new Date(expiresAt).getTime() - Date.now() - 120000;
       if (!active || !Number.isFinite(wait) || wait <= 0) return;
@@ -26,6 +48,45 @@
         } catch (error) { if (active) { errorText.textContent = 'Your secure call session has expired. Ask your manager for a new link.'; setStatus('Call expired', 'var(--red)'); await cleanup(); setButton('Call expired', false); callButton.disabled = true; } }
       }, wait);
     }
+    
+    function renderCaptions(messages) {
+      const list = document.getElementById('captions-list');
+      const status = document.getElementById('captions-status');
+      if (messages.length > 0) status.style.display = 'none';
+      
+      const nodes = messages
+        .filter(m => ['customer', 'assistant'].includes(m.role))
+        .map(m => {
+          const div = document.createElement('div');
+          div.style.padding = '8px';
+          div.style.borderRadius = '8px';
+          div.style.background = m.role === 'customer' ? 'var(--surface)' : 'rgba(247, 165, 1, 0.1)';
+          div.style.border = m.role === 'assistant' ? '1px solid rgba(247, 165, 1, 0.2)' : '1px solid var(--hairline)';
+          div.style.marginLeft = m.role === 'customer' ? 'auto' : '0';
+          div.style.marginRight = m.role === 'assistant' ? 'auto' : '0';
+          div.style.maxWidth = '85%';
+          
+          const header = document.createElement('div');
+          header.style.fontSize = '11px';
+          header.style.fontFamily = 'var(--font-mono)';
+          header.style.textTransform = 'uppercase';
+          header.style.color = m.role === 'assistant' ? 'var(--amber)' : 'var(--mute)';
+          header.style.marginBottom = '4px';
+          header.textContent = m.role === 'assistant' ? 'DealForge' : 'Customer';
+          
+          const text = document.createElement('div');
+          text.style.fontSize = '14px';
+          text.style.color = 'var(--ink)';
+          text.textContent = m.content;
+          
+          div.append(header, text);
+          return div;
+      });
+      list.replaceChildren(...nodes);
+      const container = document.getElementById('live-captions');
+      container.scrollTop = container.scrollHeight;
+    }
+
     async function start() {
       if (!linkToken) { errorText.textContent = 'This call link is missing or invalid.'; setStatus('Call unavailable', 'var(--red)'); return; }
       let startupFailed = false;
@@ -33,6 +94,19 @@
       try {
         const credentials = await joinCustomerCall(linkToken);
         call = credentials;
+        
+        // 1. Authenticate with Firebase using custom token
+        if (credentials.customerAuthToken) {
+          await firebase.auth().signInWithCustomToken(credentials.customerAuthToken);
+          // 2. Start listening to messages
+          captionsUnsubscribe = db.collection('callSessions').doc(credentials.sessionId).collection('messages')
+            .orderBy('timestamp', 'asc')
+            .onSnapshot(snapshot => {
+               renderCaptions(snapshot.docs.map(d => d.data()));
+            });
+        }
+        
+        // 3. Connect to Agora
         await joinCall(credentials.appId, credentials.channel, credentials.token, credentials.uid);
         active = true; muteButton.disabled = false; setButton('End Call', false); setStatus('Agent connected', 'var(--green)'); hintText.textContent = 'You are live. Tell the agent about your team, timeline, or pricing needs.'; scheduleRenewal(credentials.expiresAt);
       } catch (error) { startupFailed = true; if (call?.sessionCredential) await api(`/public/calls/${encodeURIComponent(linkToken)}/fail`, { method: 'POST', body: JSON.stringify({ sessionCredential: call.sessionCredential }) }).catch(() => {}); await cleanup(); errorText.textContent = error.message || 'Unable to start the call. Ask your manager for a new link.'; setStatus('Connection failed', 'var(--red)'); setButton('Request a new link', false); callButton.disabled = true; }
