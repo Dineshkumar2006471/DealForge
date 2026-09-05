@@ -127,11 +127,14 @@
         
         // 3. Connect to Agora
         await joinCall(credentials.appId, credentials.channel, credentials.token, credentials.uid);
+        // Begin observing remote audio before the server is allowed to request
+        // speech; a fast first audio publication must not be discarded.
+        active = true; muteButton.disabled = false; setButton('End Call', false); setStatus('Connected — requesting agent greeting', 'var(--amber)'); hintText.textContent = 'Preparing the spoken greeting…'; scheduleRenewal(credentials.expiresAt); armAgentAudioTimeout();
         // The server starts the agent before issuing RTC credentials. Request the
         // greeting only after this browser has joined and published its microphone
         // so the greeting cannot be spoken into an empty channel.
         await api(`/public/calls/${encodeURIComponent(linkToken)}/ready`, { method: 'POST', body: JSON.stringify({ sessionCredential: call.sessionCredential }) });
-        active = true; muteButton.disabled = false; setButton('End Call', false); setStatus('Connected — waiting for agent audio', 'var(--amber)'); hintText.textContent = 'Wait for the spoken greeting before you begin. Then tell the agent about your team, timeline, or pricing needs.'; scheduleRenewal(credentials.expiresAt); armAgentAudioTimeout();
+        setStatus('Connected — waiting for agent audio', 'var(--amber)'); hintText.textContent = 'Wait for the spoken greeting before you begin. Then tell the agent about your team, timeline, or pricing needs.';
       } catch (error) { startupFailed = true; if (call?.sessionCredential) await api(`/public/calls/${encodeURIComponent(linkToken)}/fail`, { method: 'POST', body: JSON.stringify({ sessionCredential: call.sessionCredential }) }).catch(() => {}); await cleanup(); errorText.textContent = error.message || 'Unable to start the call. Ask your manager for a new link.'; setStatus('Connection failed', 'var(--red)'); setButton('Request a new link', false); callButton.disabled = true; }
       finally { if (!startupFailed) callButton.disabled = false; }
     }
