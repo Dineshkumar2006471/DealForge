@@ -32,6 +32,7 @@ function stopCall(sessionId) { return api(`/manager/calls/${encodeURIComponent(s
 function revokeCall(sessionId) { return api(`/manager/calls/${encodeURIComponent(sessionId)}/revoke`, { method: 'POST', body: '{}' }, true); }
 function joinCustomerCall(linkToken) { return api(`/public/calls/${encodeURIComponent(linkToken)}/join`, { method: 'POST', body: '{}' }); }
 function getCustomerTranscript(linkToken, sessionCredential) { return api(`/public/calls/${encodeURIComponent(linkToken)}/transcript`, { method: 'POST', body: JSON.stringify({ sessionCredential }) }); }
+function getCustomerMeetingRequest(linkToken, sessionCredential) { return api(`/public/calls/${encodeURIComponent(linkToken)}/meeting-requests/latest`, { method: 'POST', body: JSON.stringify({ sessionCredential }) }); }
 function getIntegrationStatus() { return api('/manager/integrations/status', {}, true); }
 function getAgentStatus() { return api('/manager/agent-status', {}, true); }
 function linkHubspotDeal(dealId, hubspotDealId) { return api(`/manager/deals/${encodeURIComponent(dealId)}/integrations/hubspot/link`, { method: 'POST', body: JSON.stringify({ hubspotDealId }) }, true); }

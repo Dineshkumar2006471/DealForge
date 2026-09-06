@@ -10,7 +10,7 @@ const { runPostCallAutopilot } = require('../lib/agent/postCallAutopilot');
 const router = express.Router();
 const joinRateLimit = createRateLimit({ scope: 'public-call-join', limit: 8, windowMs: 60_000 });
 const { db, admin } = require('../lib/firebase/admin');
-const { findMeetingSlots, confirmMeeting } = require('../lib/meetings/meetingRequests');
+const { getLatestMeetingRequest, findMeetingSlots, confirmMeeting } = require('../lib/meetings/meetingRequests');
 const { addMessage, getHistory } = require('../lib/agent/conversationHistory');
 
 router.post('/calls/:linkToken/join', joinRateLimit, async (req, res, next) => {
@@ -54,6 +54,13 @@ router.post('/calls/:linkToken/transcript', async (req, res, next) => {
     const session = await activeSessionFromCredential(req);
     const messages = await getHistory(session.sessionId);
     res.json({ sessionId: session.sessionId, messages: messages.filter(message => ['user', 'assistant'].includes(message?.role)) });
+  } catch (error) { next(error); }
+});
+router.post('/calls/:linkToken/meeting-requests/latest', async (req, res, next) => {
+  try {
+    const session = await activeSessionFromCredential(req);
+    const request = await getLatestMeetingRequest(session.sessionId);
+    res.json({ sessionId: session.sessionId, request });
   } catch (error) { next(error); }
 });
 router.post('/calls/:linkToken/ready', async (req, res, next) => {

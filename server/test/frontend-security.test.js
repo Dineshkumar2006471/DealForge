@@ -74,6 +74,8 @@ test('customer meeting details use the secure form and server-only booking route
   assert.match(call, /id="meeting-details-form"/);
   assert.match(call, /Use this form instead of saying your email address aloud/);
   assert.match(call, /collection\('meetingRequests'\)/);
+  assert.match(call, /startMeetingRequestFallback\(\)/);
   assert.match(client, /\/meeting-requests\/\$\{encodeURIComponent\(requestId\)\}\/slots/);
+  assert.match(client, /\/meeting-requests\/latest/);
   assert.doesNotMatch(call, /innerHTML/);
 });

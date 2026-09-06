@@ -25,6 +25,12 @@ async function requestMeetingDetails({ organizationId, dealId, sessionId, meetin
   return { verified: true, requestId, status: created ? 'DETAILS_REQUIRED' : 'ALREADY_REQUESTED', message: 'The secure meeting form is ready for the customer.' };
 }
 
+async function getLatestMeetingRequest(sessionId) {
+  const snapshot = await db.collection('callSessions').doc(sessionId).collection('meetingRequests')
+    .orderBy('createdAt', 'desc').limit(1).get();
+  return snapshot.empty ? null : snapshot.docs[0].data();
+}
+
 async function requireRequest(session, requestId, statuses) {
   const doc = await requestRef(session.sessionId, requestId).get();
   if (!doc.exists) throw new HttpError(404, 'Meeting request not found');
@@ -61,4 +67,4 @@ async function confirmMeeting(session, requestId, slotStart) {
   return { booked: true, verified: true, result: { ...result, crm } };
 }
 
-module.exports = { requestMeetingDetails, findMeetingSlots, confirmMeeting, requestIdFor };
+module.exports = { requestMeetingDetails, getLatestMeetingRequest, findMeetingSlots, confirmMeeting, requestIdFor };

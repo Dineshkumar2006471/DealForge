@@ -41,7 +41,7 @@
     const db = getFirestore();
     const linkToken = new URLSearchParams(location.search).get('link');
     const callButton = document.getElementById('btn-call'), muteButton = document.getElementById('btn-mute'), status = document.getElementById('status-text'), errorText = document.getElementById('call-error'), hintText = document.getElementById('call-hint');
-    const waves = document.querySelectorAll('.wave'); let call = null; let active = false; let agentAudioTimer = null; let agentAudioObserved = false; let meetingRequestUnsubscribe = null; let meetingRequestId = null;
+    const waves = document.querySelectorAll('.wave'); let call = null; let active = false; let agentAudioTimer = null; let agentAudioObserved = false; let meetingRequestUnsubscribe = null; let meetingRequestPollingTimer = null; let meetingRequestId = null;
     function setStatus(text, color) { status.textContent = text; status.style.color = color || 'var(--gray-400)'; }
     function setButton(text, primary) { callButton.textContent = text; callButton.classList.toggle('btn-primary', primary); callButton.classList.toggle('btn-secondary', !primary); }
     let renewalTimer = null;
@@ -54,6 +54,7 @@
       if (captionsUnsubscribe) { captionsUnsubscribe(); captionsUnsubscribe = null; }
       if (captionsPollingTimer) { clearInterval(captionsPollingTimer); captionsPollingTimer = null; }
       if (meetingRequestUnsubscribe) { meetingRequestUnsubscribe(); meetingRequestUnsubscribe = null; }
+      if (meetingRequestPollingTimer) { clearInterval(meetingRequestPollingTimer); meetingRequestPollingTimer = null; }
       try { await firebase.auth().signOut(); } catch (e) {}
       try { await leaveCall(); } finally { muteButton.disabled = true; active = false; call = null; waves.forEach(w => w.style.animationPlayState = 'paused'); }
     }
@@ -144,6 +145,24 @@
       captionsPollingTimer = setInterval(pollCaptions, 1500);
     }
 
+    async function pollMeetingRequest() {
+      if (!call?.sessionCredential || !active) return;
+      try {
+        const response = await getCustomerMeetingRequest(linkToken, call.sessionCredential);
+        if (response.request) renderMeetingRequest(response.request);
+      } catch (error) {
+        // A scheduling form is optional until the customer asks for a meeting;
+        // do not disrupt audio for a transient background refresh failure.
+        console.warn('Meeting request refresh failed:', error.message || error);
+      }
+    }
+
+    function startMeetingRequestFallback() {
+      if (meetingRequestPollingTimer) clearInterval(meetingRequestPollingTimer);
+      pollMeetingRequest();
+      meetingRequestPollingTimer = setInterval(pollMeetingRequest, 1500);
+    }
+
     function localDateTomorrow() { const value = new Date(); value.setDate(value.getDate() + 1); return value.toISOString().slice(0, 10); }
     document.getElementById('meeting-timezone').value = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
     document.getElementById('meeting-date').value = localDateTomorrow();
@@ -228,7 +247,9 @@
             });
           meetingRequestUnsubscribe = db.collection('callSessions').doc(credentials.sessionId).collection('meetingRequests')
             .orderBy('createdAt', 'desc').limit(1)
-            .onSnapshot(snapshot => renderMeetingRequest(snapshot.empty ? null : snapshot.docs[0].data()));
+            .onSnapshot(snapshot => renderMeetingRequest(snapshot.empty ? null : snapshot.docs[0].data()), error => {
+              console.warn('Firestore meeting listener failed; using secure API fallback:', error.message || error);
+            });
         }
         
         // 3. Connect to Agora
@@ -237,6 +258,7 @@
         // speech; a fast first audio publication must not be discarded.
         active = true; muteButton.disabled = false; setButton('End Call', false); setStatus('Connected — requesting agent greeting', 'var(--amber)'); hintText.textContent = 'Preparing the spoken greeting…'; scheduleRenewal(credentials.expiresAt); armAgentAudioTimeout();
         startCaptionFallback();
+        startMeetingRequestFallback();
         // The server starts the agent before issuing RTC credentials. Request the
         // greeting only after this browser has joined and published its microphone
         // so the greeting cannot be spoken into an empty channel.
