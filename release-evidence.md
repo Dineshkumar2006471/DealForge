@@ -37,6 +37,18 @@ This document records observed evidence, not intended capability. It is updated 
 | Public-link/CORS smoke test | VERIFIED | Invalid link returned 404; Hosting origin received the expected CORS header; an unapproved origin received none. |
 | Docker local build | BLOCKED | Docker Desktop Linux engine pipe was unavailable on 2026-09-06. Cloud Build succeeded, but local Docker proof is not claimed. |
 
+## Durable caption deployment — 2026-09-06
+
+| Item | Status | Evidence |
+| --- | --- | --- |
+| Source commit | VERIFIED | `bb16204442b37f67125d3b947eb6e52e6d73da9d` was pushed to GitHub. |
+| Automated suite | VERIFIED | 45 passed, 0 failed; 1 Firebase Emulator-only test remains intentionally skipped outside its emulator. |
+| Cloud Build image | VERIFIED | Build `79d0d283-c0f0-4d2d-81c8-d251ebda5dfb` succeeded; image digest `sha256:b86299fa35b3ebaa338bbc29e0cce766a3a71ffc515cae49f7cb212d4af91387`. |
+| Cloud Run deployment | VERIFIED | Revision `dealforge-core-00027-ccd` has 100% traffic; `/health` returned HTTP 200. |
+| Hosting deployment | VERIFIED | `https://dealforge-507515.web.app/call.html` contains the durable-caption fallback and meeting-form correction. |
+| Caption endpoint guard | VERIFIED | The deployed transcript endpoint rejects a request without a server-issued session credential with HTTP 400. |
+| Live captions during a real call | IMPLEMENTED BUT UNVERIFIED | Firestore realtime listening remains enabled and a server-bound polling fallback is deployed. A human must still observe captions during a fresh attended call. |
+
 ## Required evidence before demo approval
 
 1. Docker local image build and `/health` proof.
