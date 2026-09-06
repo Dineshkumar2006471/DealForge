@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const { RtcTokenBuilder, RtcRole } = require('agora-token');
 const { db } = require('../firebase/admin');
 const { HttpError } = require('../security/auth');
+const { createBlankDealState } = require('../schema/dealState');
 
 const ACTIVE = ['CREATED', 'JOINING', 'ACTIVE'];
 const now = () => new Date().toISOString();
@@ -15,8 +16,9 @@ function webhookTokenFor(sessionId) {
 }
 
 function sessionRef(id) { return db.collection('callSessions').doc(id); }
+function sessionStateRef(id) { return sessionRef(id).collection('state').doc('current'); }
 
-async function createCallSession({ organizationId, dealId, managerId, expiresInMinutes }) {
+async function createCallSession({ organizationId, dealId, managerId, customerLabel, expiresInMinutes }) {
   const deal = await db.collection('deals').doc(dealId).get();
   if (!deal.exists || deal.data().organizationId !== organizationId) throw new HttpError(404, 'Deal not found');
   const sessionId = uuidv4();
@@ -24,13 +26,31 @@ async function createCallSession({ organizationId, dealId, managerId, expiresInM
   const createdAt = now();
   const expiresAt = new Date(Date.now() + expiresInMinutes * 60000).toISOString();
   const session = {
-    sessionId, organizationId, dealId, managerId,
+    sessionId, organizationId, dealId, managerId, customerLabel,
     hashedLinkToken: hash(linkToken), hashedWebhookToken: hash(webhookTokenFor(sessionId)),
     opaqueAgoraChannel: `df_${random(18)}`, customerUid: crypto.randomInt(100000, 999999999),
     agentId: null, status: 'CREATED', expiresAt, createdAt, startedAt: null, endedAt: null,
     joinedAt: null, revokedAt: null, failureReason: null,
   };
-  await sessionRef(sessionId).set(session);
+  // Each customer link starts a clean negotiation while inheriting only safe
+  // account identity and commercial terms from the parent account.
+  const state = createBlankDealState(sessionId);
+  const parent = deal.data();
+  state.organizationId = organizationId;
+  state.dealId = dealId;
+  state.company = parent.company || state.company;
+  state.owner = parent.owner || null;
+  state.integrations = parent.integrations || {};
+  state.arr = Number(parent.arr) || (String(parent.company?.value || '').toLowerCase().includes('acme') ? 1200000 : 0);
+  state.currency = 'INR';
+  state.listPrice = state.arr;
+  state.accountDealId = dealId;
+  // Create the session and its first negotiation snapshot atomically. A link
+  // must never exist without the state document that scopes its conversation.
+  const batch = db.batch();
+  batch.set(sessionRef(sessionId), session);
+  batch.set(sessionStateRef(sessionId), state);
+  await batch.commit();
   return { session, linkToken };
 }
 
@@ -119,4 +139,4 @@ async function markFailed(sessionId, reason) {
 async function endSession(sessionId) { await sessionRef(sessionId).update({ status: 'ENDED', endedAt: now() }); }
 async function revokeSession(sessionId) { await sessionRef(sessionId).update({ status: 'REVOKED', revokedAt: now(), endedAt: now() }); }
 
-module.exports = { createCallSession, redeemLink, rtcCredentials, getWebhookSession, markActive, markFailed, endSession, revokeSession, sessionRef, findSessionByHash, assertActiveSession, hash, webhookTokenFor };
+module.exports = { createCallSession, redeemLink, rtcCredentials, getWebhookSession, markActive, markFailed, endSession, revokeSession, sessionRef, sessionStateRef, findSessionByHash, assertActiveSession, hash, webhookTokenFor };

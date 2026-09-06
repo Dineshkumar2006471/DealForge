@@ -14,7 +14,7 @@ async function updateDealState(args, context) {
 
   // Handle conversation stage update
   if (new_stage) {
-    await updateConversationStage(dealId, new_stage, organizationId);
+    await updateConversationStage(dealId, new_stage, organizationId, sessionId);
     await writeAuditEvent({
       organizationId, dealId, sessionId,
       eventType: EVENT_TYPES.CONVERSATION_STAGE_CHANGED,
@@ -25,7 +25,7 @@ async function updateDealState(args, context) {
 
   // Handle MEDDIC update
   if (meddic_pillar) {
-    await updateMEDDIC(dealId, meddic_pillar, meddic_status || 'confirmed', confidence || 0.9, turnNumber, organizationId);
+    await updateMEDDIC(dealId, meddic_pillar, meddic_status || 'confirmed', confidence || 0.9, turnNumber, organizationId, sessionId);
     return { updated: true, field: `meddic.${meddic_pillar}`, value: meddic_status || 'confirmed' };
   }
 

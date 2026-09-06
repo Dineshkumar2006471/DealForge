@@ -221,6 +221,13 @@ h1, h2, h3, h4, .headline-xl, .headline-lg, .headline-md {
 .topbar-left, .topbar-right { display: flex; align-items: center; gap: var(--sp-4); }
 .topbar-right { gap: var(--sp-6); }
 .topbar-title { font-family: var(--font-mono); font-size: 20px; font-weight: 600; color: var(--ink); text-transform: uppercase; }
+.workspace-controls { display:grid; grid-template-columns:minmax(220px,1fr) auto; gap:14px 20px; align-items:center; }
+.workspace-eyebrow, .conversation-selector label { font-family:var(--font-mono); font-size:10px; color:var(--amber); font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+.workspace-subtitle, .workspace-link-status { color:var(--mute); font-size:12px; line-height:1.45; margin-top:4px; }
+.workspace-actions { display:flex; align-items:end; gap:12px; flex-wrap:wrap; }
+.conversation-selector { display:flex; flex-direction:column; gap:5px; min-width:260px; }
+.conversation-selector .form-input { padding:8px 10px; font-size:12px; }
+.workspace-link-status { grid-column:1 / -1; margin-top:-3px; }
 
 /* ═══════════════════════════════════════════════════
    SCROLL-TRIGGERED REVEAL ANIMATION
@@ -515,6 +522,10 @@ h1, h2, h3, h4, .headline-xl, .headline-lg, .headline-md {
   .topbar-title { max-width:100%; font-size:14px; line-height:1.35; overflow-wrap:anywhere; }
   .conversation-selector { width:100%; margin-left:0 !important; flex-wrap:wrap; }
   .conversation-selector select { width:100% !important; }
+  .workspace-controls { grid-template-columns:1fr; }
+  .workspace-actions { align-items:stretch; }
+  .workspace-actions .btn-secondary { width:100%; }
+  .conversation-selector { min-width:0; }
   #btn-resume-call { margin-left:0!important; padding:8px 10px!important; font-size:10px!important; }
   #call-link-status { flex-basis:100%; max-width:100%; margin-left:0!important; overflow-wrap:anywhere; }
   .search-bar { width:auto; min-width:0; flex:1 1 180px; max-width:100%; }

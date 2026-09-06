@@ -29,7 +29,7 @@ async function recordSignal(dealId, organizationId, { sessionId = null, type = '
   };
   const eventId = uuidv4();
   await db.collection('negotiationEvents').doc(eventId).set({ eventId, organizationId, dealId, sessionId, ...entry });
-  await appendNegotiationMemory(dealId, entry, organizationId);
+  await appendNegotiationMemory(dealId, entry, organizationId, sessionId);
   await writeAuditEvent({ organizationId, dealId, sessionId, eventType: EVENT_TYPES.NEGOTIATION_MEMORY_RECORDED, trigger: `Negotiation ${type.toLowerCase().replace(/_/g, ' ')}`, actionResult: { eventId, verified: true } });
   return { eventId, ...entry };
 }
@@ -37,9 +37,9 @@ async function recordSignal(dealId, organizationId, { sessionId = null, type = '
 /**
  * Get negotiation memory for context injection.
  */
-async function getMemory(dealId, organizationId) {
+async function getMemory(dealId, organizationId, sessionId = null) {
   const { getDeal } = require('../firebase/dealState');
-  const deal = await getDeal(dealId, organizationId);
+  const deal = await getDeal(dealId, organizationId, sessionId);
   return deal?.negotiationMemory || [];
 }
 

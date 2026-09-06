@@ -91,7 +91,7 @@
         <p style="margin:0 0 16px;color:var(--mute);font-size:13px;line-height:1.5">Create a new organization-bound Deal Workspace. The customer conversation will populate its verified Deal State.</p>
         <form id="create-deal-form" style="display:grid;grid-template-columns:minmax(180px,1fr) minmax(140px,.45fr) auto;gap:10px;align-items:end;">
           <label class="form-label">Company name<input id="new-deal-company" class="form-input" maxlength="160" required placeholder="Example: Northstar Labs"></label>
-          <label class="form-label">Target ARR (USD)<input id="new-deal-arr" class="form-input" type="number" min="0" max="100000000" step="1000" value="0"></label>
+          <label class="form-label">Target annual value (INR)<input id="new-deal-arr" class="form-input" type="number" min="0" max="100000000" step="1000" value="0"></label>
           <button id="create-deal-submit" class="btn-primary" type="submit">Create workspace</button>
         </form>
         <p id="create-deal-status" style="min-height:1.5em;margin:12px 0 0;font-size:12px;color:var(--mute);" role="status"></p>
@@ -111,6 +111,8 @@
   <script src="/__/firebase/init.js"></script>
   <script src="/js/firebaseConfig.js"></script>
   <script src="/js/auth.js"></script>
+  <script src="/js/runtimeConfig.js"></script>
+  <script src="/js/backendClient.js"></script>
 
   <script>
     const db = firebase.firestore();
@@ -185,7 +187,7 @@
           const companyName = deal.company?.value || 'Unknown';
           const status = deal.status || 'ACTIVE';
           const stage = deal.conversationStage || 'N/A';
-          const arr = deal.arr ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(deal.arr) : '$0';
+          const arr = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(deal.arr) || 0);
 
           const row = node('tr', undefined, { borderBottom: '1px solid var(--hairline)', transition: 'background 0.2s', cursor: 'pointer' });
           row.addEventListener('mouseenter', () => { row.style.background = 'var(--canvas)'; });

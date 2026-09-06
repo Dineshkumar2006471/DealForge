@@ -15,7 +15,7 @@ require('../integrations/hubspot');
 async function handleChatCompletion(requestBody, res, session) {
   const context = { organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, turnNumber: (await getTurnNumber(session.sessionId)) + 1 };
   let history = await getHistory(session.sessionId);
-  if (!await getDeal(context.dealId, context.organizationId)) throw new Error('Bound deal not found');
+  if (!await getDeal(context.dealId, context.organizationId, context.sessionId)) throw new Error('Bound deal not found');
   const chatId = `chatcmpl-${uuidv4()}`;
   const userText = currentUserText(requestBody.messages);
 
@@ -36,6 +36,24 @@ async function handleChatCompletion(requestBody, res, session) {
   }
 
   await addMessage(session.sessionId, { role: 'user', content: userText });
+  // A percentage discount request is a high-value policy boundary. Route it
+  // deterministically instead of hoping the generative model elects to call a
+  // tool. This makes the manager approval demonstration reliable and preserves
+  // the same validation/policy/exact-once execution path as every other tool.
+  const requestedDiscount = explicitDiscountRequest(userText);
+  if (requestedDiscount !== null) {
+    const executed = await executeTool('calculate_discount', { requested_pct: requestedDiscount }, context);
+    const result = executed.result || {};
+    const spoken = result.pending_approval
+      ? 'I can take that request to my manager for review. I will update you as soon as I have their decision.'
+      : result.rejected
+        ? 'I cannot approve that request, but I can explore a more suitable commercial package with you.'
+        : `I can confirm a ${requestedDiscount}% discount for this negotiation.`;
+    await addMessage(session.sessionId, { role: 'assistant', content: spoken });
+    await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_RESPONSE_COMPLETED, trigger: 'Deterministic discount-policy response streamed to Agora', actionResult: { verified: true, requestedDiscount } });
+    writeSseReply(res, chatId, spoken);
+    return;
+  }
   for (const approval of await claimApprovedApprovals(context)) {
     const executed = await executeTool(approval.exactToolName, approval.exactValidatedArguments, { ...context, approvedReplay: { approvalId: approval.approvalId, toolName: approval.exactToolName, args: approval.exactValidatedArguments } });
     if (executed.approved) {
@@ -115,11 +133,18 @@ function extractTextContent(content) {
   return content.filter(part => part && typeof part.text === 'string').map(part => part.text.trim()).filter(Boolean).join('\n').trim();
 }
 
+function explicitDiscountRequest(text) {
+  const match = String(text || '').match(/\b(\d{1,2}(?:\.\d+)?)\s*%\s*(?:off|discount)\b/i);
+  if (!match) return null;
+  const value = Number(match[1]);
+  return Number.isFinite(value) && value >= 0 && value <= 100 ? value : null;
+}
+
 async function currentModelMessages(context) {
   const [deal, history, approvalSnapshot] = await Promise.all([
-    getDeal(context.dealId, context.organizationId),
+    getDeal(context.dealId, context.organizationId, context.sessionId),
     getHistory(context.sessionId),
-    db.collection('approvals').where('organizationId', '==', context.organizationId).where('dealId', '==', context.dealId).limit(20).get(),
+    db.collection('approvals').where('organizationId', '==', context.organizationId).where('dealId', '==', context.dealId).where('sessionId', '==', context.sessionId).limit(20).get(),
   ]);
   if (!deal) throw new Error('Bound deal not found');
   const resolvedApprovals = approvalSnapshot.docs.map(doc => doc.data()).filter(approval => ['APPROVED', 'REJECTED', 'EXPIRED'].includes(approval.status));
@@ -174,4 +199,4 @@ function writeInterruptableMetadata(res, chatId, interruptable) {
   })}\n\n`);
 }
 
-module.exports = { handleChatCompletion, writeSafeFallback, writeSseReply, writeNoopSseReply, writeInterruptableMetadata, currentUserText, extractTextContent, currentModelMessages };
+module.exports = { handleChatCompletion, writeSafeFallback, writeSseReply, writeNoopSseReply, writeInterruptableMetadata, currentUserText, extractTextContent, explicitDiscountRequest, currentModelMessages };

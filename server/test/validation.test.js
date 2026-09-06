@@ -2,10 +2,11 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { parseTool, parse, callLinkSchema, createDealSchema, meetingDetailsSchema, meetingBookingSchema } = require('../src/lib/schema/validation');
 const { checkPolicy, TIERS } = require('../src/lib/policy/policyEngine');
-test('discount validation rejects negative and over-limit values', () => {
+test('discount validation bounds malformed values while policy rejects over-limit concessions', () => {
   assert.throws(() => parseTool('calculate_discount', { requested_pct: -1 }));
-  assert.throws(() => parseTool('calculate_discount', { requested_pct: 25.01 }));
+  assert.throws(() => parseTool('calculate_discount', { requested_pct: 100.01 }));
   assert.deepEqual(parseTool('calculate_discount', { requested_pct: 25 }), { requested_pct: 25 });
+  assert.equal(checkPolicy('calculate_discount', { requested_pct: 30 }).tier, TIERS.REJECT);
 });
 test('deal state validation rejects arbitrary model fields and invalid stages', () => {
   assert.throws(() => parseTool('update_deal_state', { field: 'organizationId', value: 'attacker' }));
@@ -13,9 +14,19 @@ test('deal state validation rejects arbitrary model fields and invalid stages', 
   assert.deepEqual(parseTool('update_deal_state', { new_stage: 'NEGOTIATE' }), { new_stage: 'NEGOTIATE' });
 });
 test('call links have a bounded expiry', () => {
-  assert.throws(() => parse(callLinkSchema, { dealId: 'd', expiresInMinutes: 1 }));
-  assert.throws(() => parse(callLinkSchema, { dealId: 'd', expiresInMinutes: 61 }));
-  assert.equal(parse(callLinkSchema, { dealId: 'd', expiresInMinutes: 60 }).expiresInMinutes, 60);
+  const base = { dealId: 'd', customerLabel: 'Acme procurement' };
+  assert.throws(() => parse(callLinkSchema, { ...base, expiresInMinutes: 1 }));
+  assert.throws(() => parse(callLinkSchema, { ...base, expiresInMinutes: 61 }));
+  assert.equal(parse(callLinkSchema, { ...base, expiresInMinutes: 60 }).expiresInMinutes, 60);
+  assert.throws(() => parse(callLinkSchema, { dealId: 'd', customerLabel: 'x', expiresInMinutes: 60 }));
+});
+test('Acme demo commercial policy routes a 25 percent request to approval', () => {
+  const listPriceInr = 1200000;
+  const requestPct = 25;
+  assert.equal(listPriceInr * requestPct / 100, 300000);
+  assert.equal(checkPolicy('calculate_discount', { requested_pct: requestPct }).tier, TIERS.APPROVAL);
+  assert.equal(checkPolicy('calculate_discount', { requested_pct: 18 }).tier, TIERS.ACT);
+  assert.equal(checkPolicy('calculate_discount', { requested_pct: 26 }).tier, TIERS.REJECT);
 });
 test('manager-created deals validate company and target ARR before a server write', () => {
   assert.deepEqual(parse(createDealSchema, { company: 'Northstar Labs', targetArr: 120000 }), { company: 'Northstar Labs', targetArr: 120000 });

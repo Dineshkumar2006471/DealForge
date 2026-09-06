@@ -53,7 +53,7 @@
           <div class="viz-value-xl" id="stat-pipeline">$0</div>
         </div>
         <div class="bento-card" style="align-items: center; text-align: center;">
-          <div style="font-family: var(--font-mono); font-size: 11px; color: var(--mute); text-transform: uppercase; margin-bottom: 8px;">Active Deals</div>
+          <div style="font-family: var(--font-mono); font-size: 11px; color: var(--mute); text-transform: uppercase; margin-bottom: 8px;">Active Negotiations</div>
           <div class="viz-value-xl" id="stat-active">0</div>
         </div>
         <div class="bento-card" style="align-items: center; text-align: center;">
@@ -118,16 +118,21 @@
       const toolEl = document.getElementById('tool-stats');
       const policyEl = document.getElementById('policy-stats');
       try {
-      // Pipeline stats from deals
-      const dealsSnap = await db.collection('deals').where('organizationId', '==', window.managerOrganizationId).get();
+      // Pipeline belongs to customer negotiations, not their shared parent
+      // accounts. Fetching each server-created snapshot preserves isolation.
+      const sessionsSnap = await db.collection('callSessions').where('organizationId', '==', window.managerOrganizationId).get();
+      const negotiations = await Promise.all(sessionsSnap.docs.map(async doc => {
+        const session = doc.data();
+        const stateDoc = await db.collection('callSessions').doc(session.sessionId).collection('state').doc('current').get();
+        return { session, state: stateDoc.exists ? stateDoc.data() : {} };
+      }));
       let totalArr = 0, activeCount = 0, wonCount = 0;
-      dealsSnap.forEach(doc => {
-        const d = doc.data();
-        totalArr += d.arr || 0;
-        if (d.status === 'ACTIVE' || d.status === 'QUALIFIED') activeCount++;
-        if (d.status === 'CLOSED_WON') wonCount++;
+      negotiations.forEach(({ session, state }) => {
+        if (!['ENDED', 'FAILED', 'REVOKED'].includes(session.status)) totalArr += Number(state.listPrice || state.arr) || 0;
+        if (!['ENDED', 'FAILED', 'REVOKED', 'CLOSED_WON', 'CLOSED_LOST'].includes(session.status) && !['CLOSED_WON', 'CLOSED_LOST'].includes(state.status)) activeCount++;
+        if (state.status === 'CLOSED_WON') wonCount++;
       });
-      document.getElementById('stat-pipeline').innerText = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(totalArr);
+      document.getElementById('stat-pipeline').innerText = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(totalArr);
       document.getElementById('stat-active').innerText = activeCount;
       document.getElementById('stat-won').innerText = wonCount;
       const evidenceSnap = await db.collection('evidence').where('organizationId', '==', window.managerOrganizationId).get();

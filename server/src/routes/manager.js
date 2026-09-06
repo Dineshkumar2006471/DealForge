@@ -32,6 +32,22 @@ async function integrationStatus(organizationId, provider, toolName, probe) {
 router.post('/call-links', async (req, res, next) => {
   try {
     const input = parse(callLinkSchema, req.body);
+    const deal = await ownedDeal(input.dealId, req.manager.organizationId);
+    // The Acme demo account alone has a pre-approved, explicit HubSpot record.
+    // Never reuse it for a different account or block a customer call when a
+    // CRM provider is temporarily unavailable.
+    if (/^acme\b/i.test(String(deal.data.company?.value || '')) && !deal.data.integrations?.hubspot?.dealId) {
+      try {
+        const verified = await verifyHubspotDeal('346165296872');
+        await deal.ref.update({
+          'integrations.hubspot.dealId': verified.hubspotDealId,
+          'integrations.hubspot.linkedAt': new Date().toISOString(),
+          'integrations.hubspot.linkedBy': 'dealforge_acme_bootstrap',
+          'integrations.hubspot.bookingSyncEnabled': true,
+        });
+        await writeAuditEvent({ organizationId: req.manager.organizationId, dealId: input.dealId, sessionId: null, eventType: EVENT_TYPES.HUBSPOT_DEAL_LINKED, trigger: 'DealForge verified and linked the Acme demo HubSpot deal', actionResult: { hubspotDealId: verified.hubspotDealId, verified: true } });
+      } catch (error) { console.warn('Acme HubSpot bootstrap verification failed:', error.message); }
+    }
     const { session, linkToken } = await createCallSession({ ...input, organizationId: req.manager.organizationId, managerId: req.manager.uid });
     const publicAppUrl = process.env.PUBLIC_APP_URL?.replace(/\/$/, '');
     if (!publicAppUrl) throw new HttpError(503, 'Public application URL is not configured');
@@ -91,6 +107,7 @@ router.get('/deals/:dealId/call-sessions', async (req, res, next) => {
         const session = doc.data();
         return {
           sessionId: session.sessionId,
+          customerLabel: session.customerLabel || 'Customer negotiation',
           status: session.status,
           createdAt: session.createdAt,
           startedAt: session.startedAt || null,

@@ -6,7 +6,7 @@ const SOURCES = ['customer_statement', 'inferred', 'tool_result'];
 const MEDDIC = ['metrics', 'economicBuyer', 'decisionCriteria', 'decisionProcess', 'identifyPain', 'champion'];
 const FIELD_NAMES = ['company', 'teamSize', 'timeline', 'budget', 'competitor', 'pain', 'sentiment'];
 
-const callLinkSchema = z.object({ dealId: z.string().min(1).max(128), expiresInMinutes: z.number().int().min(5).max(60).default(60) }).strict();
+const callLinkSchema = z.object({ dealId: z.string().min(1).max(128), customerLabel: z.string().trim().min(2).max(120), expiresInMinutes: z.number().int().min(5).max(60).default(60) }).strict();
 const createDealSchema = z.object({ company: z.string().trim().min(2).max(160), targetArr: z.number().finite().min(0).max(100000000).default(0) }).strict();
 const sessionCredentialSchema = z.object({ sessionCredential: z.string().min(32).max(256) }).strict();
 const callActivitySchema = z.object({ sessionCredential: z.string().min(32).max(256), eventType: z.enum(['AGENT_AUDIO_PUBLISHED', 'CUSTOMER_AUDIO_PLAYBACK_STARTED', 'AGENT_AUDIO_TIMEOUT', 'CUSTOMER_AUDIO_PLAYBACK_FAILED']) }).strict();
@@ -22,7 +22,9 @@ const chatContentPartSchema = z.object({ type: z.string().min(1).max(64), text: 
 const chatContentSchema = z.union([z.string().max(12000), z.array(chatContentPartSchema).max(50)]).nullable().optional();
 const chatSchema = z.object({ stream: z.literal(true), messages: z.array(z.object({ role: z.enum(['system', 'user', 'assistant', 'tool']), content: chatContentSchema, name: z.string().max(128).optional(), tool_call_id: z.string().max(256).optional(), tool_calls: z.array(z.any()).optional() }).passthrough()).max(20) }).passthrough();
 const toolSchemas = {
-  calculate_discount: z.object({ requested_pct: z.number().min(0).max(25) }).strict(),
+  // Accept a bounded requested percentage so policy can explicitly reject
+  // requests above 25% instead of reporting a vague validation failure.
+  calculate_discount: z.object({ requested_pct: z.number().min(0).max(100) }).strict(),
   update_deal_state: z.object({ field: z.enum(FIELD_NAMES).optional(), value: z.string().min(1).max(1000).optional(), confidence: z.number().min(0).max(1).optional(), source: z.enum(SOURCES).optional(), meddic_pillar: z.enum(MEDDIC).optional(), meddic_status: z.enum(['confirmed', 'unknown', 'not_asked']).optional(), new_stage: z.enum(STAGES).optional() }).strict().refine(v => Boolean(v.new_stage || v.meddic_pillar || (v.field && v.value !== undefined)), 'field/value, meddic_pillar, or new_stage is required'),
   check_product_availability: z.object({ plan: z.enum(['starter', 'pro', 'enterprise']).optional(), seats: z.number().int().min(1).max(100000).optional() }).strict(),
   book_meeting: z.object({

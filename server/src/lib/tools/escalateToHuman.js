@@ -13,7 +13,7 @@ async function escalateToHuman(args, context) {
   const { reason, urgency } = args;
   const { dealId, sessionId, organizationId } = context;
 
-  await setEscalation(dealId, reason, urgency || 'medium', organizationId);
+  await setEscalation(dealId, reason, urgency || 'medium', organizationId, sessionId);
 
   await writeAuditEvent({
     organizationId, dealId,

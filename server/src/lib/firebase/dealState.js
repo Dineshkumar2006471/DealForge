@@ -8,11 +8,17 @@ const { db } = require('./admin');
 const { CONFIDENCE_THRESHOLDS } = require('../evidence/confidenceConfig');
 const { v4: uuidv4 } = require('uuid');
 
+function stateRef(dealId, sessionId) {
+  return sessionId
+    ? db.collection('callSessions').doc(sessionId).collection('state').doc('current')
+    : db.collection('deals').doc(dealId);
+}
+
 /**
  * Get a deal document.
  */
-async function getDeal(dealId, organizationId) {
-  const doc = await db.collection('deals').doc(dealId).get();
+async function getDeal(dealId, organizationId, sessionId = null) {
+  const doc = await stateRef(dealId, sessionId).get();
   if (!doc.exists) return null;
   const data = doc.data();
   if (organizationId && data.organizationId !== organizationId) return null;
@@ -32,7 +38,7 @@ async function createDeal(dealId, dealState) {
  *
  * Returns: { updated: boolean, reason: string }
  */
-async function updateDealField(dealId, field, value, confidence, source, evidenceTurn, organizationId) {
+async function updateDealField(dealId, field, value, confidence, source, evidenceTurn, organizationId, sessionId = null) {
   // Confidence gate
   if (confidence < CONFIDENCE_THRESHOLDS.REJECT) {
     return { updated: false, reason: `Confidence ${confidence} below reject threshold ${CONFIDENCE_THRESHOLDS.REJECT}` };
@@ -52,7 +58,7 @@ async function updateDealField(dealId, field, value, confidence, source, evidenc
     updatedAt: now,
   };
 
-  const ref = db.collection('deals').doc(dealId);
+  const ref = stateRef(dealId, sessionId);
   await db.runTransaction(async tx => { const deal = await tx.get(ref); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found'); tx.update(ref, update); });
   return { updated: true, reason: `Field ${field} updated with confidence ${confidence}` };
 }
@@ -60,7 +66,7 @@ async function updateDealField(dealId, field, value, confidence, source, evidenc
 async function updateDealWithEvidence({ organizationId, dealId, sessionId, field, value, confidence, source, evidenceTurn }) {
   if (confidence < CONFIDENCE_THRESHOLDS.REJECT) return { updated: false, reason: `Confidence ${confidence} below reject threshold ${CONFIDENCE_THRESHOLDS.REJECT}` };
   if (confidence < CONFIDENCE_THRESHOLDS.ACCEPT) return { updated: false, reason: `Confidence ${confidence} in clarify range — ask clarifying question`, needsClarification: true };
-  const timestamp = new Date().toISOString(); const evidenceId = uuidv4(); const auditId = uuidv4(); const dealRef = db.collection('deals').doc(dealId);
+  const timestamp = new Date().toISOString(); const evidenceId = uuidv4(); const auditId = uuidv4(); const dealRef = stateRef(dealId, sessionId);
   await db.runTransaction(async tx => {
     const deal = await tx.get(dealRef); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found');
     tx.update(dealRef, { [`${field}.value`]: value, [`${field}.confidence`]: confidence, [`${field}.source`]: source, [`${field}.evidence_turn`]: evidenceTurn, [`${field}.last_updated`]: timestamp, updatedAt: timestamp });
@@ -73,9 +79,9 @@ async function updateDealWithEvidence({ organizationId, dealId, sessionId, field
 /**
  * Update MEDDIC status for a specific pillar.
  */
-async function updateMEDDIC(dealId, pillar, status, confidence, evidenceTurn, organizationId) {
+async function updateMEDDIC(dealId, pillar, status, confidence, evidenceTurn, organizationId, sessionId = null) {
   const now = new Date().toISOString();
-  const ref = db.collection('deals').doc(dealId); await db.runTransaction(async tx => { const deal = await tx.get(ref); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found'); tx.update(ref, {
+  const ref = stateRef(dealId, sessionId); await db.runTransaction(async tx => { const deal = await tx.get(ref); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found'); tx.update(ref, {
     [`meddic.${pillar}.status`]: status,
     [`meddic.${pillar}.confidence`]: confidence,
     [`meddic.${pillar}.evidence_turn`]: evidenceTurn,
@@ -86,8 +92,8 @@ async function updateMEDDIC(dealId, pillar, status, confidence, evidenceTurn, or
 /**
  * Update conversation stage.
  */
-async function updateConversationStage(dealId, stage, organizationId) {
-  const ref = db.collection('deals').doc(dealId); await db.runTransaction(async tx => { const deal = await tx.get(ref); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found'); tx.update(ref, {
+async function updateConversationStage(dealId, stage, organizationId, sessionId = null) {
+  const ref = stateRef(dealId, sessionId); await db.runTransaction(async tx => { const deal = await tx.get(ref); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found'); tx.update(ref, {
     conversationStage: stage,
     updatedAt: new Date().toISOString(),
   }); });
@@ -96,9 +102,9 @@ async function updateConversationStage(dealId, stage, organizationId) {
 /**
  * Append to discount ledger.
  */
-async function appendDiscountLedger(dealId, entry, organizationId) {
+async function appendDiscountLedger(dealId, entry, organizationId, sessionId = null) {
   const { admin } = require('./admin');
-  const ref = db.collection('deals').doc(dealId); await db.runTransaction(async tx => { const deal = await tx.get(ref); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found'); tx.update(ref, {
+  const ref = stateRef(dealId, sessionId); await db.runTransaction(async tx => { const deal = await tx.get(ref); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found'); tx.update(ref, {
     discountLedger: admin.firestore.FieldValue.arrayUnion(entry),
     updatedAt: new Date().toISOString(),
   }); });
@@ -107,22 +113,22 @@ async function appendDiscountLedger(dealId, entry, organizationId) {
 /**
  * Update next best action.
  */
-async function updateNextBestAction(dealId, nextBestAction, organizationId) {
-  const ref = db.collection('deals').doc(dealId); await db.runTransaction(async tx => { const deal = await tx.get(ref); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found'); tx.update(ref, {
+async function updateNextBestAction(dealId, nextBestAction, organizationId, sessionId = null) {
+  const ref = stateRef(dealId, sessionId); await db.runTransaction(async tx => { const deal = await tx.get(ref); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found'); tx.update(ref, {
     nextBestAction: { ...nextBestAction, generatedAt: nextBestAction.generatedAt || new Date().toISOString() },
     updatedAt: new Date().toISOString(),
   }); });
 }
 
-async function updateDealHealth(dealId, dealHealth, organizationId) {
-  const ref = db.collection('deals').doc(dealId); await db.runTransaction(async tx => { const deal = await tx.get(ref); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found'); tx.update(ref, { dealHealth, updatedAt: new Date().toISOString() }); });
+async function updateDealHealth(dealId, dealHealth, organizationId, sessionId = null) {
+  const ref = stateRef(dealId, sessionId); await db.runTransaction(async tx => { const deal = await tx.get(ref); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found'); tx.update(ref, { dealHealth, updatedAt: new Date().toISOString() }); });
 }
 
 /**
  * Set escalation flag.
  */
-async function setEscalation(dealId, reason, urgency, organizationId) {
-  const ref = db.collection('deals').doc(dealId); await db.runTransaction(async tx => { const deal = await tx.get(ref); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found'); tx.update(ref, {
+async function setEscalation(dealId, reason, urgency, organizationId, sessionId = null) {
+  const ref = stateRef(dealId, sessionId); await db.runTransaction(async tx => { const deal = await tx.get(ref); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found'); tx.update(ref, {
     escalation: { flagged: true, reason, urgency, timestamp: new Date().toISOString() },
     updatedAt: new Date().toISOString(),
   }); });
@@ -131,9 +137,9 @@ async function setEscalation(dealId, reason, urgency, organizationId) {
 /**
  * Append to negotiation memory.
  */
-async function appendNegotiationMemory(dealId, memoryEntry, organizationId) {
+async function appendNegotiationMemory(dealId, memoryEntry, organizationId, sessionId = null) {
   const { FieldValue } = require('./admin').admin.firestore;
-  const ref = db.collection('deals').doc(dealId); await db.runTransaction(async tx => { const deal = await tx.get(ref); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found'); tx.update(ref, {
+  const ref = stateRef(dealId, sessionId); await db.runTransaction(async tx => { const deal = await tx.get(ref); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found'); tx.update(ref, {
     negotiationMemory: FieldValue.arrayUnion(memoryEntry),
     negotiationSummary: { lastEvent: memoryEntry.type || memoryEntry.preference || 'NEGOTIATION_SIGNAL', requestedPct: memoryEntry.requestedPct ?? null, offeredPct: memoryEntry.offeredPct ?? null, urgency: memoryEntry.urgency ?? null, status: memoryEntry.status ?? null, updatedAt: new Date().toISOString() },
     updatedAt: new Date().toISOString(),
@@ -152,4 +158,5 @@ module.exports = {
   updateDealHealth,
   setEscalation,
   appendNegotiationMemory,
+  stateRef,
 };

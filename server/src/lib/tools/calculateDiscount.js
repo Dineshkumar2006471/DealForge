@@ -25,7 +25,7 @@ async function calculateDiscount(args, context) {
       timestamp: new Date().toISOString(),
       turn: context.turnNumber || 0,
     };
-    await appendDiscountLedger(dealId, entry, organizationId);
+    await appendDiscountLedger(dealId, entry, organizationId, context.sessionId);
     await recordSignal(dealId, organizationId, { sessionId: context.sessionId, type: 'DISCOUNT_ACCEPTED', requestedPct, offeredPct: requestedPct, status: 'APPROVED', turn_stated: context.turnNumber, context: 'Discount within autonomous limit' });
 
     return {
@@ -45,7 +45,7 @@ async function calculateDiscount(args, context) {
       timestamp: new Date().toISOString(),
       turn: context.turnNumber || 0,
     };
-    await appendDiscountLedger(dealId, entry, organizationId);
+    await appendDiscountLedger(dealId, entry, organizationId, context.sessionId);
     await recordSignal(dealId, organizationId, { sessionId: context.sessionId, type: context.approvedReplay ? 'DISCOUNT_ACCEPTED' : 'DISCOUNT_REQUESTED', requestedPct, offeredPct: context.approvedReplay ? requestedPct : 18, tradeOffs: proposal?.tradeOffs || [], status: context.approvedReplay ? 'APPROVED' : 'PENDING_APPROVAL', urgency: 'unknown', turn_stated: context.turnNumber, context: context.approvedReplay ? 'Exact manager-approved discount executed' : 'Manager approval required' });
 
     return {
@@ -69,7 +69,7 @@ async function calculateDiscount(args, context) {
     timestamp: new Date().toISOString(),
     turn: context.turnNumber || 0,
   };
-  await appendDiscountLedger(dealId, entry, organizationId);
+  await appendDiscountLedger(dealId, entry, organizationId, context.sessionId);
   await recordSignal(dealId, organizationId, { sessionId: context.sessionId, type: 'DISCOUNT_REJECTED', requestedPct, offeredPct: 18, tradeOffs: proposal?.tradeOffs || [], status: 'REJECTED', turn_stated: context.turnNumber, context: 'Discount exceeds policy maximum' });
 
   return {

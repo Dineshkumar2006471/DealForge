@@ -26,7 +26,7 @@ async function api(path, options = {}, manager = false) {
   if (!response.ok) { const body = await response.json().catch(() => ({})); throw new Error(body.error || `Request failed (${response.status})`); }
   return response.json();
 }
-function createCallLink(dealId, expiresInMinutes = 60) { return api('/manager/call-links', { method: 'POST', body: JSON.stringify({ dealId, expiresInMinutes }) }, true); }
+function createCallLink(dealId, customerLabel, expiresInMinutes = 60) { return api('/manager/call-links', { method: 'POST', body: JSON.stringify({ dealId, customerLabel, expiresInMinutes }) }, true); }
 function createDeal(company, targetArr = 0) { return api('/manager/deals', { method: 'POST', body: JSON.stringify({ company, targetArr }) }, true); }
 function getDealCallSessions(dealId) { return api(`/manager/deals/${encodeURIComponent(dealId)}/call-sessions`, {}, true); }
 function resolveApproval(approvalId, decision) { return api(`/manager/approvals/${encodeURIComponent(approvalId)}/resolve`, { method: 'POST', body: JSON.stringify({ decision }) }, true); }

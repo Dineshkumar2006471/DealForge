@@ -73,6 +73,12 @@ async function executeTool(toolName, args, context) {
   if (policyResult.requiresApproval) {
     // Create approval request — do NOT execute
     const approval = await createApproval({ organizationId, dealId, sessionId, toolName, validatedArgs, requestedBy: 'agent', policyReason: policyResult.reason });
+    // A pending discount is not an executed concession, but it is commercial
+    // state. Persist its ledger entry so the manager sees the exact INR impact
+    // before deciding; the approved replay remains the only execution path.
+    if (toolName === 'calculate_discount') {
+      await toolHandlers[toolName].handler(validatedArgs, context);
+    }
 
     return {
       result: {

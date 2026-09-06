@@ -64,13 +64,6 @@
       <div class="topbar-left">
         <div>
           <div class="topbar-title">Deal Workspace: <span id="deal-company">Loading...</span></div>
-          <span style="font-family: var(--font-mono); font-size: 10px; color: var(--mute); text-transform: uppercase;">Account-level commercial state</span>
-        </div>
-        <a id="btn-resume-call" href="#" class="btn-secondary" style="margin-left: 16px; padding: 6px 12px; font-size: 11px;">Create customer call link</a>
-        <span id="call-link-status" style="font-family: var(--font-mono); font-size: 11px; color: var(--mute); margin-left: 12px;" role="status"></span>
-        <div class="conversation-selector" style="margin-left: 12px; display: flex; align-items: center; gap: 6px;">
-          <label for="conversation-session" style="font-family: var(--font-mono); font-size: 10px; color: var(--mute); text-transform: uppercase;">Customer conversation</label>
-          <select id="conversation-session" class="form-input" style="width: 220px; padding: 6px 9px; font-size: 11px;" aria-describedby="conversation-scope"><option>Loading conversations…</option></select>
         </div>
       </div>
       <div class="topbar-right">
@@ -90,6 +83,12 @@
 
     <main class="dashboard-grid container" style="margin-top: 24px; padding-bottom: 48px;">
 
+      <section class="workspace-controls bento-card" style="grid-column: 1 / -1; margin-bottom: 0; padding: 16px 18px;">
+        <div><div class="workspace-eyebrow">Account: <span id="workspace-account-label">Loading…</span></div><div class="workspace-subtitle">Each customer link starts a separate negotiation. Account data is not merged into customer conversations.</div></div>
+        <div class="workspace-actions"><a id="btn-resume-call" href="#" class="btn-secondary">Create customer call link</a><div class="conversation-selector"><label for="conversation-session">Customer conversation</label><select id="conversation-session" class="form-input" aria-describedby="conversation-scope"><option>Loading conversations…</option></select></div></div>
+        <span id="call-link-status" class="workspace-link-status" role="status"></span>
+      </section>
+
       <div id="conversation-scope" class="bento-card" style="grid-column: 1 / -1; margin-bottom: 0; padding: 13px 18px; font-size: 13px; color: var(--mute);" role="status">Loading customer conversations…</div>
 
       <!-- HERO TERMINAL -->
@@ -103,7 +102,7 @@
         </div>
         <div class="deal-summary-grid" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; margin-top: 8px;">
           <div>
-            <div style="font-family: var(--font-mono); color: var(--mute); font-size: 11px; text-transform: uppercase; margin-bottom: 4px;">Expected ARR</div>
+            <div style="font-family: var(--font-mono); color: var(--mute); font-size: 11px; text-transform: uppercase; margin-bottom: 4px;">Annual commercial value (INR)</div>
             <div class="viz-value-xl" id="deal-arr">$0</div>
           </div>
           <div>
@@ -213,7 +212,7 @@
         <div class="bento-card" id="hubspot-sync-card">
           <div class="bento-header"><h3>HubSpot Booking Sync</h3><span id="hubspot-sync-status" class="pill-badge">NOT LINKED</span></div>
           <p id="hubspot-sync-copy" style="font-size:13px;color:var(--mute);line-height:1.55;margin:0 0 12px;">Link one explicit staging deal. DealForge will verify it before it can receive a booking reference.</p>
-          <label class="form-label" for="hubspot-deal-id">HubSpot staging deal ID</label>
+          <label id="hubspot-deal-id-label" class="form-label" for="hubspot-deal-id">HubSpot staging deal ID</label>
           <div class="hubspot-link-form" style="display:flex;gap:8px;margin-top:6px;"><input id="hubspot-deal-id" class="form-input" inputmode="numeric" maxlength="32" placeholder="Numeric deal ID"><button id="hubspot-link-button" class="btn-secondary" type="button" style="white-space:nowrap;">Verify & link</button></div>
           <label id="hubspot-sync-toggle-wrap" style="display:flex;gap:9px;align-items:center;margin-top:14px;color:var(--mute);font-size:13px;"><input id="hubspot-sync-toggle" type="checkbox" disabled> Sync verified Cal.com bookings to <code>dealforge_last_booking</code></label>
           <p id="hubspot-sync-message" style="min-height:1.5em;font-size:12px;margin:10px 0 0;color:var(--mute);" role="status"></p>
@@ -278,7 +277,9 @@
     document.getElementById('btn-resume-call').addEventListener('click', async event => {
       event.preventDefault();
       try {
-        const link = await createCallLink(dealId);
+        const customerLabel = window.prompt('Name this customer negotiation (for example: Acme procurement):', 'New customer negotiation');
+        if (!customerLabel || customerLabel.trim().length < 2) throw new Error('Enter a customer negotiation name before creating the link.');
+        const link = await createCallLink(dealId, customerLabel.trim());
         await selectConversation(link.sessionId);
         showCallLink(link);
       }
@@ -327,7 +328,7 @@
     function sessionLabel(session, index) {
       const time = session.startedAt || session.createdAt;
       const stamp = time ? new Date(time).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'time unavailable';
-      return `Conversation ${callSessions.length - index} · ${session.status || 'CREATED'} · ${stamp}`;
+      return `${session.customerLabel || `Conversation ${callSessions.length - index}`} · ${session.status || 'CREATED'} · ${stamp}`;
     }
 
     function renderConversationPicker() {
@@ -346,6 +347,8 @@
     function clearConversationListeners() {
       [evidenceUnsubscribe, auditUnsubscribe, approvalsUnsubscribe].forEach(unsubscribe => { if (typeof unsubscribe === 'function') unsubscribe(); });
       evidenceUnsubscribe = null; auditUnsubscribe = null; approvalsUnsubscribe = null;
+      if (typeof window.__dealforgeSessionStateUnsubscribe === 'function') window.__dealforgeSessionStateUnsubscribe();
+      window.__dealforgeSessionStateUnsubscribe = null;
     }
 
     function renderEmptyConversation() {
@@ -364,6 +367,15 @@
       const status = session?.status || 'CREATED';
       const time = session?.startedAt || session?.createdAt;
       scope.textContent = `Showing only Conversation ${callSessions.findIndex(value => value.sessionId === selectedSessionId) + 1} (${status})${time ? ` · started ${new Date(time).toLocaleString()}` : ''}. Evidence, approvals, and audit activity below belong only to this customer session.`;
+
+      // Session-owned Deal State is the source of truth for this selected
+      // customer. The parent account listener remains available for account
+      // identity, but never supplies conversation values.
+      const sessionStateUnsubscribe = db.collection('callSessions').doc(selectedSessionId).collection('state').doc('current')
+        .onSnapshot(snapshot => { if (snapshot.exists) renderDealState(snapshot.data()); });
+      const previousStateUnsubscribe = window.__dealforgeSessionStateUnsubscribe;
+      if (typeof previousStateUnsubscribe === 'function') previousStateUnsubscribe();
+      window.__dealforgeSessionStateUnsubscribe = sessionStateUnsubscribe;
 
       evidenceUnsubscribe = db.collection('evidence')
         .where('organizationId', '==', window.managerOrganizationId)
@@ -406,7 +418,9 @@
       dealUnsubscribe = db.collection('deals').doc(dealId)
         .onSnapshot(doc => {
           if (doc.exists) {
-            renderDealState(doc.data());
+            const company = doc.data().company?.value || 'Unknown';
+            document.getElementById('deal-company').textContent = company;
+            document.getElementById('workspace-account-label').textContent = company;
           }
         });
       await selectConversation(selectedSessionId);
@@ -415,13 +429,14 @@
     function renderDealState(data) {
       document.getElementById('deal-company').innerText = data.company?.value || 'Unknown';
       document.getElementById('deal-stage').innerText = data.conversationStage || 'UNKNOWN';
-      document.getElementById('deal-arr').innerText = data.arr ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(data.arr) : '$0';
+      const formatInr = value => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(value) || 0);
+      document.getElementById('deal-arr').innerText = formatInr(data.listPrice || data.arr);
       const confidence = Number(data.closeConfidence);
       const probability = document.getElementById('deal-probability');
       probability.innerText = Number.isFinite(confidence) && confidence >= 0 && confidence <= 1 ? `${Math.round(confidence * 100)}%` : '—';
       probability.style.color = Number.isFinite(confidence) ? 'var(--green)' : 'var(--mute)';
       document.getElementById('deal-action').innerText = data.nextBestAction?.reason || 'No recommendations.';
-      renderHubspotControls(data.integrations?.hubspot || null);
+      renderHubspotControls(data.integrations?.hubspot || null, data);
       const plan = document.getElementById('autonomy-plan');
       const action = data.nextBestAction || {};
       const authority = document.getElementById('action-authority');
@@ -523,7 +538,9 @@
         data.discountLedger.forEach(d => {
           const resultColor = d.result === 'APPROVED' ? 'var(--green)' : d.result === 'REJECTED' ? 'var(--red)' : 'var(--amber)';
           const row = node('div', undefined, { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px', background: 'var(--canvas)', borderRadius: '8px' });
-          const request = node('div'); request.append(node('span', `${Number(d.requested_pct) || 0}%`, { fontFamily: 'var(--font-mono)', fontSize: '14px', fontWeight: '700' }), node('span', 'requested', { fontSize: '12px', color: 'var(--mute)', marginLeft: '8px' }));
+          const requestedPct = Number(d.requested_pct) || 0;
+          const listPrice = Number(data.listPrice || data.arr) || 0;
+          const request = node('div'); request.append(node('span', `${requestedPct}%`, { fontFamily: 'var(--font-mono)', fontSize: '14px', fontWeight: '700' }), node('span', `requested · ${formatInr(listPrice * requestedPct / 100)}`, { fontSize: '12px', color: 'var(--mute)', marginLeft: '8px' }));
           const result = node('div', undefined, { display: 'flex', alignItems: 'center', gap: '8px' });
           if (d.counter_pct !== undefined && d.counter_pct !== null) result.append(node('span', `→ ${Number(d.counter_pct) || 0}%`, { fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--mute)' }));
           const badge = node('span', d.result || 'PENDING', { fontSize: '10px', padding: '4px 8px', color: resultColor, borderColor: resultColor }); badge.className = 'pill-badge'; result.append(badge);
@@ -534,13 +551,18 @@
       }
     }
 
-    function renderHubspotControls(integration) {
+    function renderHubspotControls(integration, dealState) {
       const status = document.getElementById('hubspot-sync-status'); const copy = document.getElementById('hubspot-sync-copy'); const input = document.getElementById('hubspot-deal-id'); const toggle = document.getElementById('hubspot-sync-toggle');
+      const form = document.querySelector('.hubspot-link-form'); const label = document.getElementById('hubspot-deal-id-label');
+      const isAcme = /^acme\b/i.test(String(dealState?.company?.value || ''));
       const linked = Boolean(integration?.dealId); input.value = integration?.dealId || '';
       toggle.disabled = !linked; toggle.checked = integration?.bookingSyncEnabled === true;
       status.textContent = linked ? (toggle.checked ? 'SYNC ENABLED' : 'LINKED') : 'NOT LINKED';
       status.style.color = toggle.checked ? 'var(--green)' : linked ? 'var(--amber)' : 'var(--mute)';
-      copy.textContent = linked ? 'This exact HubSpot deal was verified. Only a verified Cal.com booking may update dealforge_last_booking.' : 'Link one explicit staging deal. DealForge will verify it before it can receive a booking reference.';
+      form.hidden = isAcme; label.hidden = isAcme;
+      copy.textContent = linked
+        ? (isAcme ? 'Acme is automatically mapped to its verified HubSpot staging deal. Only a verified Cal.com booking may update dealforge_last_booking.' : 'This exact HubSpot deal was verified. Only a verified Cal.com booking may update dealforge_last_booking.')
+        : 'Link one explicit staging deal. DealForge will verify it before it can receive a booking reference.';
     }
 
     function renderEvidence(records) {

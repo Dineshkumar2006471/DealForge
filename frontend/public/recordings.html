@@ -88,7 +88,7 @@
       return millis ? new Date(millis).toLocaleString() : 'Time unavailable';
     }
 
-    let activityEvents = [];
+    let callSessions = [];
     function createNode(tag, options = {}) {
       const node = document.createElement(tag);
       if (options.className) node.className = options.className;
@@ -102,40 +102,43 @@
       card.append(createNode('p', { text: message, style: { color: 'var(--mute)', margin: '0' } }));
       list.replaceChildren(card);
     }
-    function createActivityCard(event) {
-      const iconColor = event.eventType === 'CALL_STARTED' ? 'var(--green)' : event.eventType === 'CALL_ENDED' ? 'var(--red)' : 'var(--amber)';
-      const card = createNode('button', { className: 'bento-card', attributes: { type: 'button', 'aria-label': `Open deal ${String(event.dealId || '')}` }, style: { display: 'flex', width: '100%', border: '0', flexDirection: 'row', alignItems: 'center', gap: '16px', cursor: 'pointer', textAlign: 'left' } });
+    function sessionDuration(session) {
+      const start = timestampValue(session.startedAt || session.joinedAt); const end = timestampValue(session.endedAt);
+      if (!start) return 'Not started'; if (!end) return 'In progress';
+      const seconds = Math.max(0, Math.round((end - start) / 1000)); return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+    }
+    function createActivityCard(session) {
+      const iconColor = session.status === 'ACTIVE' ? 'var(--green)' : session.status === 'FAILED' ? 'var(--red)' : 'var(--amber)';
+      const card = createNode('button', { className: 'bento-card', attributes: { type: 'button', 'aria-label': `Open customer negotiation ${String(session.customerLabel || '')}` }, style: { display: 'flex', width: '100%', border: '0', flexDirection: 'row', alignItems: 'center', gap: '16px', cursor: 'pointer', textAlign: 'left' } });
       const icon = createNode('span', { style: { width: '40px', height: '40px', borderRadius: '50%', background: iconColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: '0', color: 'white', fontSize: '18px' }, text: '◉' });
       const details = createNode('span', { style: { flex: '1' } });
-      details.append(createNode('span', { text: String(event.eventType || 'CALL_ACTIVITY').replace(/_/g, ' '), style: { display: 'block', fontWeight: '600', color: 'var(--ink)' } }));
-      details.append(createNode('span', { text: String(event.trigger || 'No description available'), style: { display: 'block', fontSize: '13px', color: 'var(--mute)', marginTop: '2px' } }));
+      details.append(createNode('span', { text: String(session.customerLabel || 'Customer negotiation'), style: { display: 'block', fontWeight: '600', color: 'var(--ink)' } }));
+      details.append(createNode('span', { text: `${String(session.status || 'CREATED').replace(/_/g, ' ')} · ${sessionDuration(session)}${session.failureReason ? ` · ${session.failureReason}` : ''}`, style: { display: 'block', fontSize: '13px', color: 'var(--mute)', marginTop: '2px' } }));
       const meta = createNode('span', { style: { textAlign: 'right' } });
-      meta.append(createNode('span', { text: displayTime(event.timestamp), style: { display: 'block', fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--mute)' } }));
-      meta.append(createNode('span', { text: String(event.dealId || 'Unknown deal'), style: { display: 'block', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--amber)', marginTop: '2px' } }));
+      meta.append(createNode('span', { text: displayTime(session.startedAt || session.createdAt), style: { display: 'block', fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--mute)' } }));
+      meta.append(createNode('span', { text: 'Open negotiation', style: { display: 'block', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--amber)', marginTop: '2px' } }));
       card.append(icon, details, meta);
-      card.addEventListener('click', () => { if (event.dealId) window.location.href = `/dashboard.html?id=${encodeURIComponent(event.dealId)}`; });
+      card.addEventListener('click', () => { if (session.dealId && session.sessionId) window.location.href = `/dashboard.html?id=${encodeURIComponent(session.dealId)}&session=${encodeURIComponent(session.sessionId)}`; });
       return card;
     }
     function renderActivity() {
       const list = document.getElementById('recordings-list');
       const needle = document.getElementById('activity-search').value.trim().toLowerCase();
-      const visibleEvents = activityEvents.filter(event => `${event.eventType || ''} ${event.trigger || ''} ${event.dealId || ''}`.toLowerCase().includes(needle));
-      if (!visibleEvents.length) { setActivityMessage(list, activityEvents.length ? 'No matching call activity.' : 'No call activity yet. Text transcript retained for 30 days.'); return; }
-      list.replaceChildren(...visibleEvents.map(createActivityCard));
+      const visibleSessions = callSessions.filter(session => `${session.customerLabel || ''} ${session.status || ''} ${session.dealId || ''}`.toLowerCase().includes(needle));
+      if (!visibleSessions.length) { setActivityMessage(list, callSessions.length ? 'No matching call activity.' : 'No customer calls yet. Text transcript retained for 30 days.'); return; }
+      list.replaceChildren(...visibleSessions.map(createActivityCard));
     }
     async function loadRecordings() {
       const list = document.getElementById('recordings-list');
-      // This is activity, not audio recording: it is built from durable audit events.
+      // This is a call list, not audio recording: each card is one durable
+      // call session, intentionally excluding noisy tool-level audit events.
       try {
-        const snapshot = await db.collection('auditEvents')
+        const snapshot = await db.collection('callSessions')
           .where('organizationId', '==', window.managerOrganizationId)
           .get();
-
-        const validTypes = ['CALL_STARTED', 'CALL_ENDED', 'CALL_FAILED', 'AGENT_STARTED', 'TOOL_EXECUTED', 'APPROVAL_REQUESTED', 'APPROVAL_RESOLVED'];
-        activityEvents = snapshot.docs
+        callSessions = snapshot.docs
           .map(doc => doc.data())
-          .filter(event => validTypes.includes(event.eventType))
-          .sort((left, right) => timestampValue(right.timestamp) - timestampValue(left.timestamp))
+          .sort((left, right) => timestampValue(right.createdAt) - timestampValue(left.createdAt))
           .slice(0, 50);
         renderActivity();
       } catch (err) {
