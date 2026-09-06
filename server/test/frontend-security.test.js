@@ -61,8 +61,11 @@ test('customer call controls remain reachable on desktop and narrow screens', ()
 
 test('customer captions consume the stored durable message payload in sequence order', () => {
   const call = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'public', 'call.html'), 'utf8');
+  const client = fs.readFileSync(path.join(publicRoot, 'js', 'backendClient.js'), 'utf8');
   assert.match(call, /orderBy\('sequence', 'asc'\)/);
   assert.match(call, /snapshot\.docs\.map\(d => d\.data\(\)\.message\)\.filter\(Boolean\)/);
+  assert.match(call, /startCaptionFallback\(\)/);
+  assert.match(client, /\/public\/calls\/\$\{encodeURIComponent\(linkToken\)\}\/transcript/);
 });
 
 test('customer meeting details use the secure form and server-only booking routes', () => {

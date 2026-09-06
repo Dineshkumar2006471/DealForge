@@ -13,7 +13,7 @@
         <label>Full name<input id="meeting-name" class="form-input" name="name" autocomplete="name" maxlength="120" required></label>
         <label>Email address<input id="meeting-email" class="form-input" name="email" type="email" autocomplete="email" maxlength="254" required></label>
         <label>Timezone<input id="meeting-timezone" class="form-input" name="timezone" maxlength="80" required></label>
-        <label>Meeting type<select id="meeting-type" class="form-input" name="meetingType"><option value="enterprise_demo">Enterprise demo</option><option value="technical_review">Technical review</option><option value="executive_briefing">Executive briefing</option></select></label>
+        <label>Requested meeting type<select id="meeting-type" class="form-input" name="meetingType" disabled aria-label="Meeting type requested by the agent"><option value="enterprise_demo">Enterprise demo</option><option value="technical_review">Technical review</option><option value="executive_briefing">Executive briefing</option></select></label>
         <label>Preferred date<input id="meeting-date" class="form-input" name="preferredDate" type="date" required></label>
         <button id="meeting-slots-button" class="btn-primary" type="submit">Find available times</button>
       </form>
@@ -46,11 +46,13 @@
     function setButton(text, primary) { callButton.textContent = text; callButton.classList.toggle('btn-primary', primary); callButton.classList.toggle('btn-secondary', !primary); }
     let renewalTimer = null;
     let captionsUnsubscribe = null;
+    let captionsPollingTimer = null;
 
     async function cleanup() {
       if (renewalTimer) clearTimeout(renewalTimer); renewalTimer = null;
       if (agentAudioTimer) clearTimeout(agentAudioTimer); agentAudioTimer = null; agentAudioObserved = false;
       if (captionsUnsubscribe) { captionsUnsubscribe(); captionsUnsubscribe = null; }
+      if (captionsPollingTimer) { clearInterval(captionsPollingTimer); captionsPollingTimer = null; }
       if (meetingRequestUnsubscribe) { meetingRequestUnsubscribe(); meetingRequestUnsubscribe = null; }
       try { await firebase.auth().signOut(); } catch (e) {}
       try { await leaveCall(); } finally { muteButton.disabled = true; active = false; call = null; waves.forEach(w => w.style.animationPlayState = 'paused'); }
@@ -119,6 +121,27 @@
       list.replaceChildren(...nodes);
       const container = document.getElementById('live-captions');
       container.scrollTop = container.scrollHeight;
+    }
+
+    async function pollCaptions() {
+      if (!call?.sessionCredential || !active) return;
+      try {
+        const response = await getCustomerTranscript(linkToken, call.sessionCredential);
+        renderCaptions(response.messages || []);
+      } catch (error) {
+        // Do not interrupt an otherwise healthy call for a caption refresh
+        // failure. Make the condition visible rather than leaving a blank panel.
+        const captionStatus = document.getElementById('captions-status');
+        captionStatus.style.display = 'block';
+        captionStatus.textContent = 'Live transcript is reconnecting…';
+        console.warn('Caption refresh failed:', error.message || error);
+      }
+    }
+
+    function startCaptionFallback() {
+      if (captionsPollingTimer) clearInterval(captionsPollingTimer);
+      pollCaptions();
+      captionsPollingTimer = setInterval(pollCaptions, 1500);
     }
 
     function localDateTomorrow() { const value = new Date(); value.setDate(value.getDate() + 1); return value.toISOString().slice(0, 10); }
@@ -197,6 +220,11 @@
             .orderBy('sequence', 'asc')
             .onSnapshot(snapshot => {
                renderCaptions(snapshot.docs.map(d => d.data().message).filter(Boolean));
+            }, error => {
+              console.warn('Firestore caption listener failed; using secure API fallback:', error.message || error);
+              const captionStatus = document.getElementById('captions-status');
+              captionStatus.style.display = 'block';
+              captionStatus.textContent = 'Live transcript is reconnecting…';
             });
           meetingRequestUnsubscribe = db.collection('callSessions').doc(credentials.sessionId).collection('meetingRequests')
             .orderBy('createdAt', 'desc').limit(1)
@@ -208,6 +236,7 @@
         // Begin observing remote audio before the server is allowed to request
         // speech; a fast first audio publication must not be discarded.
         active = true; muteButton.disabled = false; setButton('End Call', false); setStatus('Connected — requesting agent greeting', 'var(--amber)'); hintText.textContent = 'Preparing the spoken greeting…'; scheduleRenewal(credentials.expiresAt); armAgentAudioTimeout();
+        startCaptionFallback();
         // The server starts the agent before issuing RTC credentials. Request the
         // greeting only after this browser has joined and published its microphone
         // so the greeting cannot be spoken into an empty channel.

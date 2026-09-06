@@ -11,7 +11,7 @@ const router = express.Router();
 const joinRateLimit = createRateLimit({ scope: 'public-call-join', limit: 8, windowMs: 60_000 });
 const { db, admin } = require('../lib/firebase/admin');
 const { findMeetingSlots, confirmMeeting } = require('../lib/meetings/meetingRequests');
-const { addMessage } = require('../lib/agent/conversationHistory');
+const { addMessage, getHistory } = require('../lib/agent/conversationHistory');
 
 router.post('/calls/:linkToken/join', joinRateLimit, async (req, res, next) => {
   try {
@@ -43,6 +43,17 @@ router.post('/calls/:linkToken/token', async (req, res, next) => {
   try {
     const session = await activeSessionFromCredential(req);
     res.json({ ...rtcCredentials(session), sessionId: session.sessionId });
+  } catch (error) { next(error); }
+});
+// Customer transcript reads are authenticated with the same opaque, server-issued
+// session credential as the RTC flow. This fallback keeps captions available if a
+// browser cannot maintain its Firestore listener; it never accepts a customer
+// supplied session ID or deal ID.
+router.post('/calls/:linkToken/transcript', async (req, res, next) => {
+  try {
+    const session = await activeSessionFromCredential(req);
+    const messages = await getHistory(session.sessionId);
+    res.json({ sessionId: session.sessionId, messages: messages.filter(message => ['user', 'assistant'].includes(message?.role)) });
   } catch (error) { next(error); }
 });
 router.post('/calls/:linkToken/ready', async (req, res, next) => {
