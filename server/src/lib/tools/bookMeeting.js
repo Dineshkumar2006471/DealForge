@@ -11,24 +11,43 @@ const { writeAuditEvent } = require('../audit/eventStore');
 const { EVENT_TYPES } = require('../audit/eventTypes');
 
 const CALCOM_API = 'https://api.cal.com/v2';
+// Cal.com versions are endpoint-specific. Keep known-working availability
+// routes on their documented contracts and pin booking creation to the current
+// contract which accepts POST /bookings.
+const CALCOM_EVENT_TYPES_API_VERSION = '2024-06-14';
+const CALCOM_SLOTS_API_VERSION = '2024-09-04';
+const CALCOM_BOOKINGS_CREATE_API_VERSION = '2026-02-25';
+const CALCOM_BOOKING_READ_API_VERSION = '2024-08-13';
 
 function calcomConfig() {
-  const { CALCOM_API_KEY: apiKey, CALCOM_EVENT_TYPE_ID: eventTypeId, CALCOM_API_VERSION: apiVersion = '2024-09-04' } = process.env;
+  const { CALCOM_API_KEY: apiKey, CALCOM_EVENT_TYPE_ID: eventTypeId } = process.env;
   if (!apiKey || !eventTypeId) return null;
   if (!/^\d+$/.test(String(eventTypeId))) return null;
-  return { apiKey, eventTypeId: Number(eventTypeId), apiVersion };
+  return { apiKey, eventTypeId: Number(eventTypeId) };
 }
 
-async function calcomRequest(path, { method = 'GET', body, apiVersion = '2024-09-04' } = {}) {
+function calcomErrorMessage(payload) {
+  const candidate = payload?.message || payload?.error || payload?.data?.message;
+  if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+  if (candidate && typeof candidate === 'object') {
+    const nested = candidate.message || candidate.detail || candidate.code;
+    if (typeof nested === 'string' && nested.trim()) return nested.trim();
+    try { return JSON.stringify(candidate); } catch (_) { /* use safe fallback below */ }
+  }
+  return 'provider error';
+}
+
+async function calcomRequest(path, { method = 'GET', body, apiVersion } = {}) {
   const config = calcomConfig();
   if (!config) throw new Error('Cal.com is not configured');
+  if (!apiVersion) throw new Error('Cal.com API version is required for this endpoint');
   const response = await fetch(`${CALCOM_API}${path}`, {
     method,
     headers: { Authorization: `Bearer ${config.apiKey}`, 'Content-Type': 'application/json', 'cal-api-version': apiVersion },
     body: body ? JSON.stringify(body) : undefined,
   });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(`Cal.com ${method} ${path} failed (${response.status}): ${String(payload.message || payload.error || 'provider error').slice(0, 180)}`);
+  if (!response.ok) throw new Error(`Cal.com ${method} ${path} failed (${response.status}): ${calcomErrorMessage(payload).slice(0, 180)}`);
   return payload;
 }
 
@@ -37,7 +56,7 @@ async function configuredEventType() {
   if (!config) throw new Error('Cal.com is not configured');
   // Cal.com's supported v2 event-type probe is the collection endpoint. The
   // single-record route is not available for this API surface.
-  const response = await calcomRequest('/event-types', { apiVersion: '2024-06-14' });
+  const response = await calcomRequest('/event-types', { apiVersion: CALCOM_EVENT_TYPES_API_VERSION });
   const eventType = Array.isArray(response.data) ? response.data.find(item => Number(item.id) === config.eventTypeId) : null;
   if (!eventType) throw new Error('Configured Cal.com event type was not found');
   // Cal.com's v2 collection response can omit `active` for an enabled personal
@@ -95,7 +114,7 @@ async function getAvailableSlots({ preferredDate, timeZone }) {
   await configuredEventType();
   const range = dayRange(`${preferredDate}T12:00:00.000Z`);
   const query = new URLSearchParams({ eventTypeId: String(config.eventTypeId), start: range.day, end: range.end, timeZone, format: 'range' });
-  const slots = await calcomRequest(`/slots?${query.toString()}`, { apiVersion: '2024-09-04' });
+  const slots = await calcomRequest(`/slots?${query.toString()}`, { apiVersion: CALCOM_SLOTS_API_VERSION });
   return flattenSlots(slots.data);
 }
 
@@ -122,14 +141,14 @@ async function bookMeeting(args, context) {
     const slots = await getAvailableSlots({ preferredDate: new Date(args.preferred_date).toISOString().slice(0, 10), timeZone: args.attendee.timeZone });
     if (!availableAt({ slots }, args.preferred_date)) throw new Error('The requested Cal.com slot is not available');
 
-    const created = await calcomRequest('/bookings', { method: 'POST', apiVersion: config.apiVersion, body: {
+    const created = await calcomRequest('/bookings', { method: 'POST', apiVersion: CALCOM_BOOKINGS_CREATE_API_VERSION, body: {
       start: args.preferred_date, eventTypeId: config.eventTypeId,
       attendee: { name: args.attendee.name, email: args.attendee.email, timeZone: args.attendee.timeZone },
       metadata: { dealforgeOperationId: operationId, meetingType: args.meeting_type },
     } });
     const bookingId = created.data?.uid || created.data?.id;
     if (!bookingId) throw new Error('Cal.com did not return a booking identifier');
-    const verifiedBooking = await calcomRequest(`/bookings/${encodeURIComponent(bookingId)}`, { apiVersion: '2024-08-13' });
+    const verifiedBooking = await calcomRequest(`/bookings/${encodeURIComponent(bookingId)}`, { apiVersion: CALCOM_BOOKING_READ_API_VERSION });
     if (!verifiedBooking.data) throw new Error('Cal.com booking verification returned no booking');
     const result = { booked: true, verified: true, externalStatus: 'BOOKED', bookingId: String(bookingId), meetingUrl: verifiedBooking.data.location || created.data?.location || null };
     await operationRef.set({ status: 'SUCCEEDED', result, completedAt: new Date().toISOString() }, { merge: true });
@@ -171,3 +190,8 @@ module.exports.getAvailableSlots = getAvailableSlots;
 module.exports.configuredEventType = configuredEventType;
 module.exports.assertIanaTimeZone = assertIanaTimeZone;
 module.exports.calcomRequest = calcomRequest;
+module.exports.CALCOM_EVENT_TYPES_API_VERSION = CALCOM_EVENT_TYPES_API_VERSION;
+module.exports.CALCOM_SLOTS_API_VERSION = CALCOM_SLOTS_API_VERSION;
+module.exports.CALCOM_BOOKINGS_CREATE_API_VERSION = CALCOM_BOOKINGS_CREATE_API_VERSION;
+module.exports.CALCOM_BOOKING_READ_API_VERSION = CALCOM_BOOKING_READ_API_VERSION;
+module.exports.calcomErrorMessage = calcomErrorMessage;
