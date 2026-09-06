@@ -40,7 +40,10 @@ async function configuredEventType() {
   const response = await calcomRequest('/event-types', { apiVersion: '2024-06-14' });
   const eventType = Array.isArray(response.data) ? response.data.find(item => Number(item.id) === config.eventTypeId) : null;
   if (!eventType) throw new Error('Configured Cal.com event type was not found');
-  if (!eventType.active) throw new Error('Configured Cal.com event type is inactive');
+  // Cal.com's v2 collection response can omit `active` for an enabled personal
+  // event type. Only an explicit false is a safe inactive signal; treating an
+  // omitted field as false incorrectly disabled real scheduling.
+  if (eventType.active === false) throw new Error('Configured Cal.com event type is inactive');
   const unsupported = (eventType.bookingFields || []).filter(field => field?.required && !['name', 'email'].includes(field.type));
   if (unsupported.length) throw new Error('Configured Cal.com event type has unsupported required booking fields');
   return eventType;

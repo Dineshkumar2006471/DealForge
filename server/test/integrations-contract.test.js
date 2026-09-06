@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { normalizeProperties, probeHubspot } = require('../src/lib/integrations/hubspot');
-const { calcomRequest, availableAt } = require('../src/lib/tools/bookMeeting');
+const { calcomRequest, availableAt, configuredEventType } = require('../src/lib/tools/bookMeeting');
 
 const savedEnvironment = Object.fromEntries(['HUBSPOT_ACCESS_TOKEN', 'CALCOM_API_KEY', 'CALCOM_EVENT_TYPE_ID', 'CALCOM_API_VERSION'].map(key => [key, process.env[key]]));
 const originalFetch = global.fetch;
@@ -28,14 +28,15 @@ test('HubSpot field normalization rejects arbitrary CRM writes', () => {
   assert.throws(() => normalizeProperties({ owner_id: 'someone-else' }), /not allowlisted/);
 });
 
-test('Cal.com client uses supported v2 event-type collection endpoint, bearer authentication, and endpoint-specific version', async () => {
+test('Cal.com client accepts an enabled event type whose v2 collection response omits active, uses bearer authentication, and endpoint-specific version', async () => {
   Object.assign(process.env, { CALCOM_API_KEY: 'cal_test', CALCOM_EVENT_TYPE_ID: '123', CALCOM_API_VERSION: '2024-09-04' });
   global.fetch = async (url, options) => {
     assert.equal(url, 'https://api.cal.com/v2/event-types');
     assert.equal(options.headers.Authorization, 'Bearer cal_test');
     assert.equal(options.headers['cal-api-version'], '2024-06-14');
-    return new Response(JSON.stringify({ status: 'success', data: [{ id: 123, active: true, bookingFields: [] }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ status: 'success', data: [{ id: 123, bookingFields: [] }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   };
-  assert.deepEqual(await calcomRequest('/event-types', { apiVersion: '2024-06-14' }), { status: 'success', data: [{ id: 123, active: true, bookingFields: [] }] });
+  assert.deepEqual(await calcomRequest('/event-types', { apiVersion: '2024-06-14' }), { status: 'success', data: [{ id: 123, bookingFields: [] }] });
+  assert.equal((await configuredEventType()).id, 123);
   assert.equal(availableAt({ '2026-09-06': [{ start: '2026-09-06T10:00:00.000Z' }] }, '2026-09-06T10:00:00Z'), true);
 });
