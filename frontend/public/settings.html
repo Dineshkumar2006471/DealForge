@@ -50,7 +50,7 @@
       <!-- Profile -->
       <div class="bento-card" style="margin-bottom: 24px;">
         <div class="bento-header"><h3>Profile</h3></div>
-        <div style="display: flex; align-items: center; gap: 24px; margin-top: 8px;">
+        <div class="settings-profile-row" style="display: flex; align-items: center; gap: 24px; margin-top: 8px;">
           <div class="user-avatar" id="settings-avatar" style="width: 64px; height: 64px; font-size: 24px;">...</div>
           <div>
             <div style="font-size: 18px; font-weight: 600;" id="settings-name">Loading...</div>
@@ -64,15 +64,15 @@
       <div class="bento-card" style="margin-bottom: 24px;">
         <div class="bento-header"><h3>Server Policy Summary</h3><span class="pill-badge">SERVER-ENFORCED</span></div>
         <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 8px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--canvas); border-radius: 8px;">
+          <div class="settings-status-row" style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--canvas); border-radius: 8px;">
             <div><div style="font-weight: 600;">Max Autonomous Discount</div><div style="font-size: 13px; color: var(--mute);">Server-enforced. Requests above this threshold require manager approval.</div></div>
             <div style="font-family: var(--font-mono); font-size: 18px; font-weight: 700; color: var(--amber);">18%</div>
           </div>
-          <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--canvas); border-radius: 8px;">
+          <div class="settings-status-row" style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--canvas); border-radius: 8px;">
             <div><div style="font-weight: 600;">Evidence Confidence Threshold</div><div style="font-size: 13px; color: var(--mute);">Minimum confidence to accept customer claims as Deal State updates.</div></div>
             <div style="font-family: var(--font-mono); font-size: 18px; font-weight: 700; color: var(--green);">0.85</div>
           </div>
-          <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--canvas); border-radius: 8px;">
+          <div class="settings-status-row" style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--canvas); border-radius: 8px;">
             <div><div style="font-weight: 600;">Clarification Range</div><div style="font-size: 13px; color: var(--mute);">Agent asks clarifying questions for claims in this confidence range.</div></div>
             <div style="font-family: var(--font-mono); font-size: 18px; font-weight: 700; color: var(--amber);">0.60 – 0.84</div>
           </div>

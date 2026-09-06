@@ -93,3 +93,17 @@ test('customer meeting details use the secure form and server-only booking route
   assert.match(client, /\/meeting-requests\/latest/);
   assert.doesNotMatch(call, /innerHTML/);
 });
+
+test('the complete manager workspace has a real tablet and mobile layout instead of an off-screen desktop sidebar', () => {
+  const styles = fs.readFileSync(path.join(publicRoot, 'css', 'style.css'), 'utf8');
+  const pages = ['overview.html', 'deals.html', 'dashboard.html', 'recordings.html', 'agents.html', 'analytics.html', 'integrations.html', 'settings.html'];
+  const source = pages.map(file => fs.readFileSync(path.join(publicRoot, file), 'utf8')).join('\n');
+  assert.match(styles, /@media \(max-width: 960px\)[\s\S]*?\.layout-app \{ display: block; height: auto;/);
+  assert.match(styles, /\.nav-links-sidebar \{ width: 100%;[\s\S]*?overflow-x: auto;/);
+  assert.match(styles, /\.deals-table thead \{ display: none; \}/);
+  assert.match(styles, /\.deal-summary-grid \{ grid-template-columns: 1fr !important;/);
+  assert.match(source, /class="agent-status-grid"/);
+  assert.match(source, /class="deal-summary-grid"/);
+  assert.match(source, /class="hubspot-link-form"/);
+  assert.match(source, /class="settings-profile-row"/);
+});

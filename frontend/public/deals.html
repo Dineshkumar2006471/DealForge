@@ -175,6 +175,7 @@
       }
 
       const table = node('table', undefined, { width: '100%', borderCollapse: 'collapse', textAlign: 'left' });
+      table.className = 'deals-table';
       const headerRow = node('tr', undefined, { borderBottom: '1px solid var(--hairline)', color: 'var(--mute)' });
       ['Company', 'Status', 'Stage', 'Target ARR', 'Action'].forEach(label => headerRow.append(node('th', label, { padding: '16px', fontFamily: 'var(--font-mono)', fontSize: '12px', textTransform: 'uppercase' })));
       const thead = document.createElement('thead');
@@ -190,12 +191,12 @@
           row.addEventListener('mouseenter', () => { row.style.background = 'var(--canvas)'; });
           row.addEventListener('mouseleave', () => { row.style.background = 'transparent'; });
           row.addEventListener('click', () => { window.location.href = `/dashboard.html?id=${encodeURIComponent(id)}`; });
-          const cell = styles => node('td', undefined, Object.assign({ padding: '24px 16px' }, styles));
-          const companyCell = cell(); companyCell.append(node('div', companyName, { fontWeight: '600', fontSize: '16px', color: 'var(--ink)' }));
-          const statusCell = cell(); const badge = node('div', status); badge.className = `pill-badge${status === 'CLOSED_WON' ? '' : ' dark'}`; const dot = node('div'); dot.className = 'dot'; if (status === 'CLOSED_WON') dot.style.background = 'var(--green)'; badge.prepend(dot); statusCell.append(badge);
-          const stageCell = cell({ fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--mute)' }); stageCell.textContent = stage;
-          const arrCell = cell({ fontFamily: 'var(--font-mono)', fontSize: '16px', fontWeight: '700' }); arrCell.textContent = arr;
-          const actionCell = cell(); const button = node('button', 'Open workspace'); button.className = 'btn-secondary'; Object.assign(button.style, { padding: '6px 12px', fontSize: '11px' }); actionCell.append(button);
+          const cell = (label, styles = {}) => { const element = node('td', undefined, Object.assign({ padding: '24px 16px' }, styles)); element.dataset.label = label; return element; };
+          const companyCell = cell('Company'); companyCell.append(node('div', companyName, { fontWeight: '600', fontSize: '16px', color: 'var(--ink)' }));
+          const statusCell = cell('Status'); const badge = node('div', status); badge.className = `pill-badge${status === 'CLOSED_WON' ? '' : ' dark'}`; const dot = node('div'); dot.className = 'dot'; if (status === 'CLOSED_WON') dot.style.background = 'var(--green)'; badge.prepend(dot); statusCell.append(badge);
+          const stageCell = cell('Stage', { fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--mute)' }); stageCell.textContent = stage;
+          const arrCell = cell('Target ARR', { fontFamily: 'var(--font-mono)', fontSize: '16px', fontWeight: '700' }); arrCell.textContent = arr;
+          const actionCell = cell('Action'); const button = node('button', 'Open workspace'); button.className = 'btn-secondary'; Object.assign(button.style, { padding: '6px 12px', fontSize: '11px' }); actionCell.append(button);
           row.append(companyCell, statusCell, stageCell, arrCell, actionCell);
           tbody.append(row);
       });

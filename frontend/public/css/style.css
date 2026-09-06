@@ -610,6 +610,98 @@ h1, h2, h3, h4, .headline-xl, .headline-lg, .headline-md {
 .final-cta .btn-secondary { background: transparent; color: var(--surface); border-color: rgba(255,255,255,0.2); }
 .final-cta .btn-secondary:hover { background: rgba(255,255,255,0.1); border-color: var(--surface); }
 
+/* ═══════════════════════════════════════════════════
+   RESPONSIVE APPLICATION SHELL
+   The manager app is a distinct product surface from the marketing site. On
+   tablet and phone it becomes a vertical shell with a touch-scrollable
+   navigation rail rather than squeezing the desktop sidebar beside content.
+═══════════════════════════════════════════════════ */
+@media (max-width: 960px) {
+  html, body { min-width: 0; overflow-x: hidden; }
+  .layout-app { display: block; height: auto; min-height: 100svh; overflow: visible; }
+  .sidebar { width: 100%; min-width: 0; height: auto; min-height: 0; padding: 12px 0 0; border-right: 0; border-bottom: 1px solid var(--hairline); }
+  .sidebar-logo { padding: 0 20px; margin-bottom: 12px; }
+  .sidebar-logo img { height: 34px; }
+  .nav-links-sidebar { width: 100%; min-width: 0; flex: 0 0 auto; flex-direction: row; gap: 2px; overflow-x: auto; overscroll-behavior-x: contain; padding: 0 12px; scrollbar-width: none; }
+  .nav-links-sidebar::-webkit-scrollbar { display: none; }
+  .nav-links-sidebar a { flex: 0 0 auto; gap: 8px; padding: 11px 13px; border-radius: 8px 8px 0 0; white-space: nowrap; font-size: 11px; }
+  .sidebar-footer { display: none; }
+  .main-content { display: block; width: 100%; min-width: 0; min-height: 0; overflow: visible; }
+  .topbar { position: static; height: auto; min-height: 0; padding: 14px 20px; align-items: stretch; flex-direction: column; gap: 12px; }
+  .topbar-left, .topbar-right { width: 100%; min-width: 0; flex-wrap: wrap; gap: 10px; }
+  .topbar-left { align-items: center; }
+  .topbar-right { justify-content: space-between; }
+  .topbar-title { max-width: 100%; font-size: 16px; line-height: 1.35; overflow-wrap: anywhere; }
+  .user-info { display: none; }
+  .search-bar { width: min(100%, 460px); flex: 1 1 220px; }
+  .main-content > .container, .main-content > main.container, .main-content > .dashboard-grid { width: 100%; min-width: 0; padding-left: 20px !important; padding-right: 20px !important; }
+  .page-dashboard .dashboard-grid { grid-template-columns: 1fr; margin-top: 20px !important; gap: 20px; }
+  .dashboard-col { gap: 20px; }
+  .agent-status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 16px !important; }
+  .integration-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .analytics-stats, .overview-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .deal-summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 16px !important; }
+  #create-deal-form { grid-template-columns: minmax(0, 1fr) minmax(140px, .45fr) auto !important; }
+  .page-call { min-height: 100svh; }
+}
+
+@media (max-width: 640px) {
+  .sidebar-logo { padding: 0 16px; }
+  .sidebar-logo img { height: 30px; }
+  .nav-links-sidebar { padding: 0 8px; }
+  .nav-links-sidebar a { padding: 10px 11px; }
+  .topbar { padding: 12px 16px; }
+  .topbar-left { align-items: flex-start; }
+  .topbar-title { font-size: 14px; }
+  .main-content > .container, .main-content > main.container, .main-content > .dashboard-grid { padding-left: 16px !important; padding-right: 16px !important; }
+  .bento-card, .hero-terminal-card { padding: 18px; }
+  .bento-header { align-items: flex-start; gap: 10px; }
+  .bento-header h3 { font-size: 16px; line-height: 1.35; }
+  .overview-stats, .analytics-stats, .integration-grid, .agent-status-grid, .deal-summary-grid { grid-template-columns: 1fr !important; gap: 12px !important; }
+  .overview-grid, .analytics-grid, .dashboard-grid { gap: 16px; }
+  .deal-summary-grid > div { padding-bottom: 12px; border-bottom: 1px solid var(--hairline); }
+  .deal-summary-grid > div:last-child { padding-bottom: 0; border-bottom: 0; }
+  #create-deal-form { grid-template-columns: 1fr !important; }
+  #create-deal-form label, #create-deal-form button { min-width: 0; }
+  .hubspot-link-form { flex-direction: column; }
+  .hubspot-link-form .btn-secondary { width: 100%; }
+  #hubspot-sync-toggle-wrap { align-items: flex-start !important; }
+  .deals-table, .deals-table tbody, .deals-table tr, .deals-table td { display: block; width: 100%; }
+  .deals-table thead { display: none; }
+  .deals-table tbody { display: grid; gap: 12px; }
+  .deals-table tr { border: 1px solid var(--hairline) !important; border-radius: var(--radius-md); padding: 6px 14px; background: var(--surface); }
+  .deals-table td { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0 !important; border-bottom: 1px solid var(--hairline); text-align: right; }
+  .deals-table td:last-child { border-bottom: 0; }
+  .deals-table td::before { content: attr(data-label); flex: 0 0 auto; color: var(--mute); font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: .04em; text-align: left; text-transform: uppercase; }
+  .deals-table td:first-child { justify-content: flex-start; }
+  .deals-table td:first-child::before { display: none; }
+  .deals-table .pill-badge { margin-left: auto; }
+  .page-call .call-container { padding: 32px 16px 28px; }
+  .call-title { font-size: 25px; }
+  .orb-container { width: 210px; height: 210px; margin-bottom: 24px; }
+  .orb-inner, .wave { width: 120px; height: 120px; }
+  .call-controls { width: 100%; max-width: 360px; justify-content: space-between; gap: 10px; padding: 10px; }
+  .btn-start-call { flex: 1; min-width: 0; padding-left: 14px; padding-right: 14px; }
+  .captions-container { height: 240px !important; margin-top: 24px !important; }
+  .meeting-panel { margin-top: 20px; padding: 16px; }
+  .meeting-panel-header { flex-direction: column; }
+  .meeting-form { grid-template-columns: 1fr; }
+  .meeting-form label, .meeting-form button { grid-column: auto; }
+  .navbar-inner, .nav-container { width: calc(100% - 32px); height: 72px; }
+  .logo img { height: 36px; }
+  .nav-cta { padding: 10px 12px; font-size: 11px; }
+  .hero { padding-top: 104px; min-height: auto; }
+  .headline-xl { font-size: clamp(34px, 10vw, 48px); }
+  .bento-right { min-height: 280px; }
+  .stat-number { font-size: 40px; }
+  .demo-terminal { padding: 18px; font-size: 12px; overflow-x: auto; }
+  .terminal-line { min-width: 480px; }
+  .auth-container { margin: 96px 16px 24px; padding: 28px 20px; }
+  .auth-title { font-size: 24px; }
+  .footer-grid { grid-template-columns: 1fr; gap: var(--sp-7); }
+  .footer-bottom { flex-direction: column; align-items: flex-start; gap: var(--sp-3); }
+}
+
 .footer { padding: var(--sp-8) 0; border-top: 1px solid var(--hairline); background: var(--canvas); }
 .footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: var(--sp-8); margin-bottom: var(--sp-8); }
 .footer-col h4 { font-family: var(--font-mono); font-size: 14px; margin-bottom: var(--sp-4); color: var(--ink); }
