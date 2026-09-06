@@ -171,7 +171,7 @@ Copy `.env.example` for local development only. Never commit a populated environ
 | `ELEVENLABS_VOICE_ID`, `ELEVENLABS_MODEL_ID`, `ELEVENLABS_BASE_URL`, `ELEVENLABS_SAMPLE_RATE` | Server-side ElevenLabs TTS configuration | Cloud Run configuration |
 | `GEMINI_MODEL` | Vertex AI model selection | Cloud Run configuration |
 | `HUBSPOT_ACCESS_TOKEN` | Server-only private-app token for explicitly linked staging deals | Secret Manager |
-| `CALCOM_API_KEY`, `CALCOM_EVENT_TYPE_ID`, `CALCOM_API_VERSION` | Server-only verified booking configuration | Secret Manager / Cloud Run configuration |
+| `CALCOM_API_KEY`, `CALCOM_EVENT_TYPE_ID` | Server-only verified booking configuration; endpoint API versions are pinned in the backend to Cal.com's documented contracts | Secret Manager / Cloud Run configuration |
 
 ## Testing and staging
 
