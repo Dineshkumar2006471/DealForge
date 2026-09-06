@@ -20,7 +20,7 @@
     <nav class="nav-links-sidebar">
       <a href="/overview.html">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-        Dashboard
+        Command Center
       </a>
       <a href="/deals.html" class="active">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
@@ -78,13 +78,23 @@
     </header>
 
     <main class="container">
-      <section class="bento-card" style="margin-bottom: 20px; padding: 22px 24px; display: flex; align-items: center; justify-content: space-between; gap: 20px;">
+      <section class="bento-card" style="margin-bottom: 20px; padding: 22px 24px; display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;">
         <div>
           <div style="font-family: var(--font-mono); font-size: 11px; color: var(--amber); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 6px;">Manager workspace</div>
           <h1 style="font-size: 24px; margin: 0;">Open a deal to run its live call workspace.</h1>
           <p style="margin: 8px 0 0; color: var(--mute); font-size: 14px;">Choose a deal to create a secure customer call link, review live evidence, and resolve approvals.</p>
         </div>
-        <div id="deal-count" class="pill-badge dark" aria-live="polite">LOADING</div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><div id="deal-count" class="pill-badge dark" aria-live="polite">LOADING</div><button id="show-create-deal" class="btn-primary" type="button">Create deal</button></div>
+      </section>
+      <section id="create-deal-panel" class="bento-card" hidden style="margin-bottom:20px;padding:20px 24px;">
+        <div class="bento-header"><h3>Create a deal workspace</h3><span class="pill-badge">MANAGER ONLY</span></div>
+        <p style="margin:0 0 16px;color:var(--mute);font-size:13px;line-height:1.5">Create a new organization-bound Deal Workspace. The customer conversation will populate its verified Deal State.</p>
+        <form id="create-deal-form" style="display:grid;grid-template-columns:minmax(180px,1fr) minmax(140px,.45fr) auto;gap:10px;align-items:end;">
+          <label class="form-label">Company name<input id="new-deal-company" class="form-input" maxlength="160" required placeholder="Example: Northstar Labs"></label>
+          <label class="form-label">Target ARR (USD)<input id="new-deal-arr" class="form-input" type="number" min="0" max="100000000" step="1000" value="0"></label>
+          <button id="create-deal-submit" class="btn-primary" type="submit">Create workspace</button>
+        </form>
+        <p id="create-deal-status" style="min-height:1.5em;margin:12px 0 0;font-size:12px;color:var(--mute);" role="status"></p>
       </section>
       <div id="deals-list" class="bento-card">
         <div style="padding: 24px; color: var(--mute);">Loading active deals…</div>
@@ -185,7 +195,7 @@
           const statusCell = cell(); const badge = node('div', status); badge.className = `pill-badge${status === 'CLOSED_WON' ? '' : ' dark'}`; const dot = node('div'); dot.className = 'dot'; if (status === 'CLOSED_WON') dot.style.background = 'var(--green)'; badge.prepend(dot); statusCell.append(badge);
           const stageCell = cell({ fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--mute)' }); stageCell.textContent = stage;
           const arrCell = cell({ fontFamily: 'var(--font-mono)', fontSize: '16px', fontWeight: '700' }); arrCell.textContent = arr;
-          const actionCell = cell(); const button = node('button', 'View Intel'); button.className = 'btn-secondary'; Object.assign(button.style, { padding: '6px 12px', fontSize: '11px' }); actionCell.append(button);
+          const actionCell = cell(); const button = node('button', 'Open workspace'); button.className = 'btn-secondary'; Object.assign(button.style, { padding: '6px 12px', fontSize: '11px' }); actionCell.append(button);
           row.append(companyCell, statusCell, stageCell, arrCell, actionCell);
           tbody.append(row);
       });
@@ -210,6 +220,24 @@
     }
 
     document.getElementById('deal-search').addEventListener('input', renderDeals);
+    document.getElementById('show-create-deal').addEventListener('click', () => {
+      const panel = document.getElementById('create-deal-panel'); panel.hidden = !panel.hidden;
+      if (!panel.hidden) document.getElementById('new-deal-company').focus();
+    });
+    document.getElementById('create-deal-form').addEventListener('submit', async event => {
+      event.preventDefault();
+      const company = document.getElementById('new-deal-company').value.trim();
+      const targetArr = Number(document.getElementById('new-deal-arr').value || 0);
+      const button = document.getElementById('create-deal-submit'); const status = document.getElementById('create-deal-status');
+      button.disabled = true; status.style.color = 'var(--mute)'; status.textContent = 'Creating secure deal workspace…';
+      try {
+        const deal = await createDeal(company, targetArr);
+        status.style.color = 'var(--green)'; status.textContent = 'Deal Workspace created. Opening it now…';
+        window.location.assign(`/dashboard.html?id=${encodeURIComponent(deal.dealId)}`);
+      } catch (error) {
+        status.style.color = 'var(--red)'; status.textContent = error.message || 'Deal could not be created.';
+      } finally { button.disabled = false; }
+    });
   </script>
 </body>
 </html>

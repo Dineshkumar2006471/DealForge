@@ -49,6 +49,21 @@ test('customer call links are not sent as referrers', () => {
   assert.match(callPage, /<meta name="referrer" content="no-referrer">/);
 });
 
+test('customer call page never replaces the manager Firebase session in another tab', () => {
+  const callPage = fs.readFileSync(path.resolve(__dirname, '../../frontend/public/call.html'), 'utf8');
+  assert.doesNotMatch(callPage, /signInWithCustomToken|firebase\.auth\(\)\.signOut/);
+  assert.match(callPage, /getCustomerTranscript/);
+  assert.match(callPage, /getCustomerMeetingRequest/);
+});
+
+test('active deals provides a manager-only server-backed deal creation path', () => {
+  const deals = fs.readFileSync(path.join(publicRoot, 'deals.html'), 'utf8');
+  const client = fs.readFileSync(path.join(publicRoot, 'js', 'backendClient.js'), 'utf8');
+  assert.match(deals, /id="create-deal-form"/);
+  assert.match(deals, /createDeal\(company, targetArr\)/);
+  assert.match(client, /api\('\/manager\/deals'/);
+});
+
 test('customer call controls remain reachable on desktop and narrow screens', () => {
   const callPage = fs.readFileSync(path.resolve(__dirname, '../../frontend/public/call.html'), 'utf8');
   const styles = fs.readFileSync(path.join(publicRoot, 'css', 'style.css'), 'utf8');
@@ -59,11 +74,11 @@ test('customer call controls remain reachable on desktop and narrow screens', ()
   assert.doesNotMatch(styles, /\.page-call \{ display: flex; flex-direction: column; height: 100vh; overflow: hidden;/);
 });
 
-test('customer captions consume the stored durable message payload in sequence order', () => {
+test('customer captions consume durable messages through the server-bound session feed', () => {
   const call = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'public', 'call.html'), 'utf8');
   const client = fs.readFileSync(path.join(publicRoot, 'js', 'backendClient.js'), 'utf8');
-  assert.match(call, /orderBy\('sequence', 'asc'\)/);
-  assert.match(call, /snapshot\.docs\.map\(d => d\.data\(\)\.message\)\.filter\(Boolean\)/);
+  assert.match(call, /async function pollCaptions\(\)/);
+  assert.match(call, /response\.messages \|\| \[\]/);
   assert.match(call, /startCaptionFallback\(\)/);
   assert.match(client, /\/public\/calls\/\$\{encodeURIComponent\(linkToken\)\}\/transcript/);
 });
@@ -73,7 +88,6 @@ test('customer meeting details use the secure form and server-only booking route
   const client = fs.readFileSync(path.join(publicRoot, 'js', 'backendClient.js'), 'utf8');
   assert.match(call, /id="meeting-details-form"/);
   assert.match(call, /Use this form instead of saying your email address aloud/);
-  assert.match(call, /collection\('meetingRequests'\)/);
   assert.match(call, /startMeetingRequestFallback\(\)/);
   assert.match(client, /\/meeting-requests\/\$\{encodeURIComponent\(requestId\)\}\/slots/);
   assert.match(client, /\/meeting-requests\/latest/);

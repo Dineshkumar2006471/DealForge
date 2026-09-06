@@ -1,7 +1,7 @@
 const express = require('express');
 const { db } = require('../lib/firebase/admin');
 const { requireManager, HttpError } = require('../lib/security/auth');
-const { parse, callLinkSchema, approvalResolutionSchema, hubspotLinkSchema, bookingSyncSchema } = require('../lib/schema/validation');
+const { parse, callLinkSchema, createDealSchema, approvalResolutionSchema, hubspotLinkSchema, bookingSyncSchema } = require('../lib/schema/validation');
 const { createCallSession, endSession, sessionRef } = require('../lib/calls/callSessions');
 const { stopAgent } = require('../lib/calls/agoraAgentService');
 const { resolveApproval } = require('../lib/policy/approvalQueue');
@@ -10,6 +10,8 @@ const { EVENT_TYPES } = require('../lib/audit/eventTypes');
 const { runPostCallAutopilot } = require('../lib/agent/postCallAutopilot');
 const { probeHubspot, verifyHubspotDeal, verifyBookingProperty } = require('../lib/integrations/hubspot');
 const { probeCalcom } = require('../lib/tools/bookMeeting');
+const { createBlankDealState } = require('../lib/schema/dealState');
+const { v4: uuidv4 } = require('uuid');
 const router = express.Router();
 router.use(requireManager);
 
@@ -34,6 +36,34 @@ router.post('/call-links', async (req, res, next) => {
     const publicAppUrl = process.env.PUBLIC_APP_URL?.replace(/\/$/, '');
     if (!publicAppUrl) throw new HttpError(503, 'Public application URL is not configured');
     res.status(201).json({ sessionId: session.sessionId, expiresAt: session.expiresAt, callUrl: `${publicAppUrl}/call.html?link=${encodeURIComponent(linkToken)}` });
+  } catch (error) { next(error); }
+});
+
+// Browser clients cannot write deals directly. This manager-only route creates a
+// blank, organization-bound Deal State that can then be populated by verified
+// customer conversation evidence.
+router.post('/deals', async (req, res, next) => {
+  try {
+    const input = parse(createDealSchema, req.body);
+    const dealRef = db.collection('deals').doc();
+    const createdAt = new Date().toISOString();
+    const deal = createBlankDealState(null);
+    deal.organizationId = req.manager.organizationId;
+    deal.company = { value: input.company, confidence: 1, source: 'manager_input', evidence_turn: null, last_updated: createdAt };
+    deal.arr = input.targetArr;
+    deal.owner = { value: req.manager.uid, confidence: 1, source: 'manager_input', evidence_turn: null, last_updated: createdAt };
+    deal.createdBy = req.manager.uid;
+    deal.createdAt = createdAt;
+    deal.updatedAt = createdAt;
+    await db.runTransaction(async tx => {
+      tx.create(dealRef, deal);
+      tx.create(db.collection('auditEvents').doc(uuidv4()), {
+        organizationId: req.manager.organizationId, dealId: dealRef.id, sessionId: null,
+        eventType: EVENT_TYPES.DEAL_CREATED, trigger: 'Manager created a new Deal Workspace',
+        actionResult: { company: input.company, targetArr: input.targetArr, verified: true }, timestamp: createdAt,
+      });
+    });
+    res.status(201).json({ dealId: dealRef.id, company: input.company, targetArr: input.targetArr });
   } catch (error) { next(error); }
 });
 

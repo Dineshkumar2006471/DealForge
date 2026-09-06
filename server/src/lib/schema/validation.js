@@ -7,6 +7,7 @@ const MEDDIC = ['metrics', 'economicBuyer', 'decisionCriteria', 'decisionProcess
 const FIELD_NAMES = ['company', 'teamSize', 'timeline', 'budget', 'competitor', 'pain', 'sentiment'];
 
 const callLinkSchema = z.object({ dealId: z.string().min(1).max(128), expiresInMinutes: z.number().int().min(5).max(60).default(60) }).strict();
+const createDealSchema = z.object({ company: z.string().trim().min(2).max(160), targetArr: z.number().finite().min(0).max(100000000).default(0) }).strict();
 const sessionCredentialSchema = z.object({ sessionCredential: z.string().min(32).max(256) }).strict();
 const callActivitySchema = z.object({ sessionCredential: z.string().min(32).max(256), eventType: z.enum(['AGENT_AUDIO_PUBLISHED', 'CUSTOMER_AUDIO_PLAYBACK_STARTED', 'AGENT_AUDIO_TIMEOUT', 'CUSTOMER_AUDIO_PLAYBACK_FAILED']) }).strict();
 const meetingTypeSchema = z.enum(['enterprise_demo', 'technical_review', 'executive_briefing']);
@@ -44,4 +45,4 @@ const toolSchemas = {
 
 function parse(schema, value) { return schema.parse(value); }
 function parseTool(tool, args) { if (!toolSchemas[tool]) throw new Error(`Unknown tool: ${tool}`); return toolSchemas[tool].parse(args); }
-module.exports = { STAGES, STATUSES, callLinkSchema, approvalResolutionSchema, callStopSchema, sessionCredentialSchema, callActivitySchema, meetingDetailsSchema, meetingBookingSchema, hubspotLinkSchema, bookingSyncSchema, chatSchema, parse, parseTool };
+module.exports = { STAGES, STATUSES, callLinkSchema, createDealSchema, approvalResolutionSchema, callStopSchema, sessionCredentialSchema, callActivitySchema, meetingDetailsSchema, meetingBookingSchema, hubspotLinkSchema, bookingSyncSchema, chatSchema, parse, parseTool };

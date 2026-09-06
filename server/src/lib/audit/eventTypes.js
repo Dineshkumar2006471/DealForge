@@ -4,6 +4,7 @@
  * Centralized enum of all auditable events in DealForge.
  */
 const EVENT_TYPES = {
+  DEAL_CREATED: 'DEAL_CREATED',
   DEAL_STATE_UPDATED: 'DEAL_STATE_UPDATED',
   TOOL_EXECUTED: 'TOOL_EXECUTED',
   POLICY_CHECKED: 'POLICY_CHECKED',
