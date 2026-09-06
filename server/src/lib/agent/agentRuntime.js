@@ -8,7 +8,8 @@ const { getDeal } = require('../firebase/dealState');
 const { db } = require('../firebase/admin');
 const { writeAuditEvent } = require('../audit/eventStore');
 const { EVENT_TYPES } = require('../audit/eventTypes');
-require('../tools/calculateDiscount'); require('../tools/updateDealState'); require('../tools/checkProductAvailability'); require('../tools/bookMeeting'); require('../tools/escalateToHuman');
+const { claimTurnReceipt } = require('./turnReceipts');
+require('../tools/calculateDiscount'); require('../tools/updateDealState'); require('../tools/checkProductAvailability'); require('../tools/bookMeeting'); require('../tools/requestMeetingDetails'); require('../tools/escalateToHuman');
 require('../integrations/hubspot');
 
 async function handleChatCompletion(requestBody, res, session) {
@@ -18,15 +19,19 @@ async function handleChatCompletion(requestBody, res, session) {
   const chatId = `chatcmpl-${uuidv4()}`;
   const userText = currentUserText(requestBody.messages);
 
-  // Agora sends an empty turn when a Conversational AI agent joins. Vertex rejects
-  // empty model input, so greet through the verified SSE channel instead of making
-  // a doomed Gemini call. Approval replay remains tied to a real customer turn.
+  // Agora sends lifecycle and empty ASR turns around joins, TTS, and reconnects.
+  // The RTC-ready Speak request owns the only greeting. An empty lifecycle turn is
+  // never a customer prompt, and must never wake Gemini or create a second greeting.
   if (!userText) {
-    const opening = history.some(message => message.role === 'assistant')
-      ? "I'm here when you're ready. What would you like to discuss about your team, timeline, or pricing?"
-      : "Hello, I'm the DealForge sales assistant. To get started, tell me about your team size, timeline, or what you want to improve.";
-    if (!history.some(message => message.role === 'assistant')) await addMessage(session.sessionId, { role: 'assistant', content: opening });
-    writeSseReply(res, chatId, opening);
+    await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_EMPTY_TURN_IGNORED, trigger: 'Ignored empty Agora lifecycle turn', actionResult: { verified: true } });
+    writeNoopSseReply(res, chatId);
+    return;
+  }
+
+  const receipt = await claimTurnReceipt(session.sessionId, userText);
+  if (!receipt.claimed) {
+    await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_DUPLICATE_TURN_IGNORED, trigger: 'Ignored replayed Agora customer turn', actionResult: { verified: true } });
+    writeNoopSseReply(res, chatId);
     return;
   }
 
@@ -44,6 +49,7 @@ async function handleChatCompletion(requestBody, res, session) {
   const tools = getToolDefinitions(); history = await getHistory(session.sessionId);
   let content = ''; let calls = []; let finishReason;
   try {
+    writeInterruptableMetadata(res, chatId, true);
     for await (const chunk of generateResponse(await currentModelMessages(context), tools, context)) {
       const choice = chunk.choices?.[0]; if (!choice) continue;
       if (choice.delta?.content) content += choice.delta.content;
@@ -117,4 +123,23 @@ function writeSseReply(res, chatId, content) {
   res.end();
 }
 
-module.exports = { handleChatCompletion, writeSafeFallback, writeSseReply, currentUserText, extractTextContent, currentModelMessages };
+function writeNoopSseReply(res, chatId) {
+  res.write(`data: ${JSON.stringify({
+    id: chatId,
+    object: 'chat.completion.chunk',
+    choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+  })}\n\n`);
+  res.write('data: [DONE]\n\n');
+  res.end();
+}
+
+function writeInterruptableMetadata(res, chatId, interruptable) {
+  res.write(`data: ${JSON.stringify({
+    id: chatId,
+    object: 'chat.completion.custom_metadata',
+    choices: [],
+    metadata: { interruptable },
+  })}\n\n`);
+}
+
+module.exports = { handleChatCompletion, writeSafeFallback, writeSseReply, writeNoopSseReply, writeInterruptableMetadata, currentUserText, extractTextContent, currentModelMessages };

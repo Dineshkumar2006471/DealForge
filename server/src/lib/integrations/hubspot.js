@@ -2,6 +2,10 @@ const { registerMcpTool } = require('../mcp/mcpGateway');
 const { executeMcpTool } = require('../mcp/mcpGateway');
 const { registerTool } = require('../tools/registry');
 const { getDeal } = require('../firebase/dealState');
+const { db } = require('../firebase/admin');
+const { writeAuditEvent } = require('../audit/eventStore');
+const { EVENT_TYPES } = require('../audit/eventTypes');
+const crypto = require('crypto');
 
 const HUBSPOT_API = 'https://api.hubapi.com';
 const ALLOWED_DEAL_PROPERTIES = new Set(['dealname', 'amount', 'dealstage', 'closedate', 'description']);
@@ -50,6 +54,54 @@ async function probeHubspot() {
   }
 }
 
+async function verifyHubspotDeal(hubspotDealId) {
+  if (!/^\d+$/.test(String(hubspotDealId || ''))) throw new Error('HubSpot deal ID must be numeric');
+  const deal = await request(`/crm/v3/objects/deals/${encodeURIComponent(String(hubspotDealId))}?properties=dealname`);
+  if (!deal?.id) throw new Error('HubSpot did not return the requested deal');
+  return { hubspotDealId: String(deal.id), dealName: String(deal.properties?.dealname || '') };
+}
+
+async function verifyBookingProperty() {
+  const property = await request('/crm/v3/properties/deals/dealforge_last_booking');
+  if (!property?.name || property.name !== 'dealforge_last_booking') throw new Error('HubSpot DealForge Last Booking property is unavailable');
+  return { name: property.name, type: property.type || null, fieldType: property.fieldType || null };
+}
+
+function bookingSummary(booking) {
+  const parts = [`Cal.com booking ${booking.bookingId}`, `Start ${booking.start}`];
+  if (booking.meetingUrl) parts.push(`Join ${booking.meetingUrl}`);
+  return parts.join(' | ').slice(0, 5000);
+}
+
+async function syncBookingToHubspot({ organizationId, dealId, sessionId, booking }) {
+  if (!configuration()) return { verified: false, externalStatus: 'NOT_CONFIGURED', skipped: true, error: 'HubSpot is not configured. Booking was not synced to CRM.' };
+  const deal = await getDeal(dealId, organizationId);
+  const integration = deal?.integrations?.hubspot;
+  if (!integration?.dealId) return { verified: false, externalStatus: 'NOT_LINKED', skipped: true, error: 'No linked HubSpot deal. Booking was not synced to CRM.' };
+  if (integration.bookingSyncEnabled !== true) return { verified: false, externalStatus: 'SYNC_DISABLED', skipped: true, error: 'Manager booking-to-CRM sync is disabled.' };
+  const operationId = crypto.createHash('sha256').update(`${sessionId}:${dealId}:hubspot-booking:${booking.bookingId}`).digest('hex');
+  const operationRef = db.collection('externalOperations').doc(operationId);
+  const existing = await operationRef.get();
+  if (existing.exists && existing.data().status === 'SUCCEEDED') return existing.data().result;
+  await operationRef.set({ operationId, organizationId, dealId, sessionId, provider: 'hubspot', toolName: 'sync_booking_to_hubspot', status: 'RUNNING', createdAt: new Date().toISOString() }, { merge: true });
+  try {
+    await verifyBookingProperty();
+    const value = bookingSummary(booking);
+    await request(`/crm/v3/objects/deals/${encodeURIComponent(integration.dealId)}`, { method: 'PATCH', body: { properties: { dealforge_last_booking: value } } });
+    const verified = await request(`/crm/v3/objects/deals/${encodeURIComponent(integration.dealId)}?properties=dealforge_last_booking`);
+    if (String(verified.properties?.dealforge_last_booking || '') !== value) throw new Error('HubSpot booking read-back did not match the requested value');
+    const result = { verified: true, externalStatus: 'SYNCED', hubspotDealId: String(integration.dealId), syncedFields: ['dealforge_last_booking'] };
+    await operationRef.set({ status: 'SUCCEEDED', result, completedAt: new Date().toISOString() }, { merge: true });
+    await writeAuditEvent({ organizationId, dealId, sessionId, eventType: EVENT_TYPES.TOOL_EXECUTED, trigger: 'Verified Cal.com booking synced to linked HubSpot deal', actionResult: { tool: 'sync_booking_to_hubspot', verified: true, hubspotDealId: result.hubspotDealId } });
+    return result;
+  } catch (error) {
+    const result = { verified: false, externalStatus: 'SYNC_FAILED', error: error.message };
+    await operationRef.set({ status: 'FAILED', error: error.message.slice(0, 500), updatedAt: new Date().toISOString() }, { merge: true });
+    await writeAuditEvent({ organizationId, dealId, sessionId, eventType: EVENT_TYPES.EXTERNAL_ACTION_FAILED, trigger: 'HubSpot booking sync failed', actionResult: { tool: 'sync_booking_to_hubspot', verified: false } });
+    return result;
+  }
+}
+
 async function syncToHubspot(args, context = {}) {
   if (!configuration()) return { verified: false, externalStatus: 'NOT_CONFIGURED', error: 'HubSpot is not configured. No data was synced to CRM.' };
   const dealId = context.dealId || args?.dealId;
@@ -91,4 +143,4 @@ registerTool('sync_to_hubspot', (args, context) => executeMcpTool({
   },
 });
 
-module.exports = { probeHubspot, syncToHubspot, normalizeProperties, request };
+module.exports = { probeHubspot, syncToHubspot, normalizeProperties, request, verifyHubspotDeal, verifyBookingProperty, syncBookingToHubspot, bookingSummary };

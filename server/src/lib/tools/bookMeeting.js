@@ -13,23 +13,37 @@ const { EVENT_TYPES } = require('../audit/eventTypes');
 const CALCOM_API = 'https://api.cal.com/v2';
 
 function calcomConfig() {
-  const { CALCOM_API_KEY: apiKey, CALCOM_EVENT_TYPE_ID: eventTypeId, CALCOM_API_VERSION: apiVersion } = process.env;
-  if (!apiKey || !eventTypeId || !apiVersion) return null;
+  const { CALCOM_API_KEY: apiKey, CALCOM_EVENT_TYPE_ID: eventTypeId, CALCOM_API_VERSION: apiVersion = '2024-09-04' } = process.env;
+  if (!apiKey || !eventTypeId) return null;
   if (!/^\d+$/.test(String(eventTypeId))) return null;
   return { apiKey, eventTypeId: Number(eventTypeId), apiVersion };
 }
 
-async function calcomRequest(path, { method = 'GET', body } = {}) {
+async function calcomRequest(path, { method = 'GET', body, apiVersion = '2024-09-04' } = {}) {
   const config = calcomConfig();
   if (!config) throw new Error('Cal.com is not configured');
   const response = await fetch(`${CALCOM_API}${path}`, {
     method,
-    headers: { Authorization: `Bearer ${config.apiKey}`, 'Content-Type': 'application/json', 'cal-api-version': config.apiVersion },
+    headers: { Authorization: `Bearer ${config.apiKey}`, 'Content-Type': 'application/json', 'cal-api-version': apiVersion },
     body: body ? JSON.stringify(body) : undefined,
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(`Cal.com ${method} ${path} failed (${response.status}): ${String(payload.message || payload.error || 'provider error').slice(0, 180)}`);
   return payload;
+}
+
+async function configuredEventType() {
+  const config = calcomConfig();
+  if (!config) throw new Error('Cal.com is not configured');
+  // Cal.com's supported v2 event-type probe is the collection endpoint. The
+  // single-record route is not available for this API surface.
+  const response = await calcomRequest('/event-types', { apiVersion: '2024-06-14' });
+  const eventType = Array.isArray(response.data) ? response.data.find(item => Number(item.id) === config.eventTypeId) : null;
+  if (!eventType) throw new Error('Configured Cal.com event type was not found');
+  if (!eventType.active) throw new Error('Configured Cal.com event type is inactive');
+  const unsupported = (eventType.bookingFields || []).filter(field => field?.required && !['name', 'email'].includes(field.type));
+  if (unsupported.length) throw new Error('Configured Cal.com event type has unsupported required booking fields');
+  return eventType;
 }
 
 function operationIdFor(args, context) {
@@ -54,12 +68,32 @@ async function probeCalcom() {
   const config = calcomConfig();
   if (!config) return { status: 'NOT CONFIGURED', verified: false };
   try {
-    await calcomRequest(`/event-types/${config.eventTypeId}`);
-    // The credential and event type work, but no booking has been verified yet.
+    await configuredEventType();
+    // The credential and active event type work, but no booking has been verified yet.
     return { status: 'AVAILABLE', verified: true };
   } catch (error) {
-    return { status: 'ERROR', verified: false, error: error.message };
+    return { status: /inactive|unsupported/i.test(error.message) ? 'DEGRADED' : 'ERROR', verified: false, error: error.message };
   }
+}
+
+function assertIanaTimeZone(timeZone) {
+  try { Intl.DateTimeFormat('en-US', { timeZone }).format(); }
+  catch (_) { throw new Error('Time zone must be a valid IANA time zone'); }
+}
+
+function flattenSlots(slotData) {
+  return Object.values(slotData || {}).flat().map(slot => typeof slot === 'string' ? { start: slot } : slot).filter(slot => slot?.start).slice(0, 24);
+}
+
+async function getAvailableSlots({ preferredDate, timeZone }) {
+  const config = calcomConfig();
+  if (!config) throw new Error('Scheduling is not configured');
+  assertIanaTimeZone(timeZone);
+  await configuredEventType();
+  const range = dayRange(`${preferredDate}T12:00:00.000Z`);
+  const query = new URLSearchParams({ eventTypeId: String(config.eventTypeId), start: range.day, end: range.end, timeZone, format: 'range' });
+  const slots = await calcomRequest(`/slots?${query.toString()}`, { apiVersion: '2024-09-04' });
+  return flattenSlots(slots.data);
 }
 
 async function bookMeeting(args, context) {
@@ -81,20 +115,18 @@ async function bookMeeting(args, context) {
     if (existing.exists && existing.data().status === 'RUNNING') return { booked: false, verified: false, externalStatus: 'BOOKING_IN_PROGRESS', error: 'A booking for this exact request is already in progress.' };
     await operationRef.set({ operationId, organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, provider: 'calcom', toolName: 'book_meeting', status: 'RUNNING', createdAt: new Date().toISOString() }, { merge: true });
 
-    await calcomRequest(`/event-types/${config.eventTypeId}`);
-    const range = dayRange(args.preferred_date);
-    const query = new URLSearchParams({ eventTypeId: String(config.eventTypeId), start: range.day, end: range.end, timeZone: args.attendee.timeZone, format: 'range' });
-    const slots = await calcomRequest(`/slots?${query.toString()}`);
-    if (!availableAt(slots.data, args.preferred_date)) throw new Error('The requested Cal.com slot is not available');
+    await configuredEventType();
+    const slots = await getAvailableSlots({ preferredDate: new Date(args.preferred_date).toISOString().slice(0, 10), timeZone: args.attendee.timeZone });
+    if (!availableAt({ slots }, args.preferred_date)) throw new Error('The requested Cal.com slot is not available');
 
-    const created = await calcomRequest('/bookings', { method: 'POST', body: {
+    const created = await calcomRequest('/bookings', { method: 'POST', apiVersion: config.apiVersion, body: {
       start: args.preferred_date, eventTypeId: config.eventTypeId,
       attendee: { name: args.attendee.name, email: args.attendee.email, timeZone: args.attendee.timeZone },
       metadata: { dealforgeOperationId: operationId, meetingType: args.meeting_type },
     } });
     const bookingId = created.data?.uid || created.data?.id;
     if (!bookingId) throw new Error('Cal.com did not return a booking identifier');
-    const verifiedBooking = await calcomRequest(`/bookings/${encodeURIComponent(bookingId)}`);
+    const verifiedBooking = await calcomRequest(`/bookings/${encodeURIComponent(bookingId)}`, { apiVersion: '2024-08-13' });
     if (!verifiedBooking.data) throw new Error('Cal.com booking verification returned no booking');
     const result = { booked: true, verified: true, externalStatus: 'BOOKED', bookingId: String(bookingId), meetingUrl: verifiedBooking.data.location || created.data?.location || null };
     await operationRef.set({ status: 'SUCCEEDED', result, completedAt: new Date().toISOString() }, { merge: true });
@@ -114,6 +146,9 @@ async function bookMeeting(args, context) {
 }
 
 registerTool('book_meeting', bookMeeting, {
+  // Booking is initiated only by the validated customer form. Giving raw booking
+  // arguments to the model would invite spoken email/time transcription errors.
+  agentVisible: false,
   description: 'Request a verified follow-up meeting. It returns an error until a verified server-side scheduling integration is enabled.',
   parameters: {
     type: 'object',
@@ -129,4 +164,7 @@ module.exports = bookMeeting;
 module.exports.probeCalcom = probeCalcom;
 module.exports.calcomConfig = calcomConfig;
 module.exports.availableAt = availableAt;
+module.exports.getAvailableSlots = getAvailableSlots;
+module.exports.configuredEventType = configuredEventType;
+module.exports.assertIanaTimeZone = assertIanaTimeZone;
 module.exports.calcomRequest = calcomRequest;

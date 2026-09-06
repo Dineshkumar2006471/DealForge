@@ -64,3 +64,13 @@ test('customer captions consume the stored durable message payload in sequence o
   assert.match(call, /orderBy\('sequence', 'asc'\)/);
   assert.match(call, /snapshot\.docs\.map\(d => d\.data\(\)\.message\)\.filter\(Boolean\)/);
 });
+
+test('customer meeting details use the secure form and server-only booking routes', () => {
+  const call = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'public', 'call.html'), 'utf8');
+  const client = fs.readFileSync(path.join(publicRoot, 'js', 'backendClient.js'), 'utf8');
+  assert.match(call, /id="meeting-details-form"/);
+  assert.match(call, /Use this form instead of saying your email address aloud/);
+  assert.match(call, /collection\('meetingRequests'\)/);
+  assert.match(client, /\/meeting-requests\/\$\{encodeURIComponent\(requestId\)\}\/slots/);
+  assert.doesNotMatch(call, /innerHTML/);
+});

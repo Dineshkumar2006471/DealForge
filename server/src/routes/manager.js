@@ -1,14 +1,14 @@
 const express = require('express');
 const { db } = require('../lib/firebase/admin');
 const { requireManager, HttpError } = require('../lib/security/auth');
-const { parse, callLinkSchema, approvalResolutionSchema } = require('../lib/schema/validation');
+const { parse, callLinkSchema, approvalResolutionSchema, hubspotLinkSchema, bookingSyncSchema } = require('../lib/schema/validation');
 const { createCallSession, endSession, sessionRef } = require('../lib/calls/callSessions');
 const { stopAgent } = require('../lib/calls/agoraAgentService');
 const { resolveApproval } = require('../lib/policy/approvalQueue');
 const { writeAuditEvent } = require('../lib/audit/eventStore');
 const { EVENT_TYPES } = require('../lib/audit/eventTypes');
 const { runPostCallAutopilot } = require('../lib/agent/postCallAutopilot');
-const { probeHubspot } = require('../lib/integrations/hubspot');
+const { probeHubspot, verifyHubspotDeal, verifyBookingProperty } = require('../lib/integrations/hubspot');
 const { probeCalcom } = require('../lib/tools/bookMeeting');
 const router = express.Router();
 router.use(requireManager);
@@ -34,6 +34,46 @@ router.post('/call-links', async (req, res, next) => {
     const publicAppUrl = process.env.PUBLIC_APP_URL?.replace(/\/$/, '');
     if (!publicAppUrl) throw new HttpError(503, 'Public application URL is not configured');
     res.status(201).json({ sessionId: session.sessionId, expiresAt: session.expiresAt, callUrl: `${publicAppUrl}/call.html?link=${encodeURIComponent(linkToken)}` });
+  } catch (error) { next(error); }
+});
+
+async function ownedDeal(dealId, organizationId) {
+  const ref = db.collection('deals').doc(dealId);
+  const snapshot = await ref.get();
+  if (!snapshot.exists || snapshot.data().organizationId !== organizationId) throw new HttpError(404, 'Deal not found');
+  return { ref, data: snapshot.data() };
+}
+
+router.post('/deals/:dealId/integrations/hubspot/link', async (req, res, next) => {
+  try {
+    const { hubspotDealId } = parse(hubspotLinkSchema, req.body);
+    const deal = await ownedDeal(req.params.dealId, req.manager.organizationId);
+    const verified = await verifyHubspotDeal(hubspotDealId);
+    await deal.ref.update({
+      'integrations.hubspot.dealId': verified.hubspotDealId,
+      'integrations.hubspot.linkedAt': new Date().toISOString(),
+      'integrations.hubspot.linkedBy': req.manager.uid,
+      'integrations.hubspot.bookingSyncEnabled': false,
+    });
+    await writeAuditEvent({ organizationId: req.manager.organizationId, dealId: req.params.dealId, sessionId: null, eventType: EVENT_TYPES.HUBSPOT_DEAL_LINKED, trigger: 'Manager linked verified HubSpot staging deal', actionResult: { hubspotDealId: verified.hubspotDealId, verified: true } });
+    res.status(201).json({ linked: true, ...verified, bookingSyncEnabled: false });
+  } catch (error) { next(error); }
+});
+
+router.post('/deals/:dealId/integrations/hubspot/booking-sync', async (req, res, next) => {
+  try {
+    const { enabled } = parse(bookingSyncSchema, req.body);
+    const deal = await ownedDeal(req.params.dealId, req.manager.organizationId);
+    const link = deal.data.integrations?.hubspot?.dealId;
+    if (!link) throw new HttpError(409, 'Link a verified HubSpot deal before enabling booking sync');
+    if (enabled) await verifyBookingProperty();
+    await deal.ref.update({
+      'integrations.hubspot.bookingSyncEnabled': enabled,
+      'integrations.hubspot.bookingSyncUpdatedAt': new Date().toISOString(),
+      'integrations.hubspot.bookingSyncUpdatedBy': req.manager.uid,
+    });
+    await writeAuditEvent({ organizationId: req.manager.organizationId, dealId: req.params.dealId, sessionId: null, eventType: EVENT_TYPES.HUBSPOT_BOOKING_SYNC_UPDATED, trigger: `Manager ${enabled ? 'enabled' : 'disabled'} verified booking-to-CRM sync`, actionResult: { enabled, verified: enabled } });
+    res.json({ enabled });
   } catch (error) { next(error); }
 });
 

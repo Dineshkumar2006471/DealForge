@@ -26,6 +26,7 @@ const TIERS = {
 const TOOL_TIERS = {
   check_product_availability: TIERS.OBSERVE,
   update_deal_state: TIERS.ACT,
+  request_meeting_details: TIERS.ACT,
   calculate_discount: TIERS.ACT, // escalates to APPROVAL if > 18%
   book_meeting: TIERS.ACT,
   escalate_to_human: TIERS.ACT,

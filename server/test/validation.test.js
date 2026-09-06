@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parseTool, parse, callLinkSchema } = require('../src/lib/schema/validation');
+const { parseTool, parse, callLinkSchema, meetingDetailsSchema, meetingBookingSchema } = require('../src/lib/schema/validation');
+const { checkPolicy, TIERS } = require('../src/lib/policy/policyEngine');
 test('discount validation rejects negative and over-limit values', () => {
   assert.throws(() => parseTool('calculate_discount', { requested_pct: -1 }));
   assert.throws(() => parseTool('calculate_discount', { requested_pct: 25.01 }));
@@ -15,4 +16,14 @@ test('call links have a bounded expiry', () => {
   assert.throws(() => parse(callLinkSchema, { dealId: 'd', expiresInMinutes: 1 }));
   assert.throws(() => parse(callLinkSchema, { dealId: 'd', expiresInMinutes: 61 }));
   assert.equal(parse(callLinkSchema, { dealId: 'd', expiresInMinutes: 60 }).expiresInMinutes, 60);
+});
+test('meeting form requires safe attendee details, date, and a selected ISO slot', () => {
+  const credential = 'a'.repeat(32);
+  assert.deepEqual(parse(meetingDetailsSchema, { sessionCredential: credential, attendee: { name: 'Alex Buyer', email: 'alex@example.com', timeZone: 'Asia/Kolkata' }, preferredDate: '2026-09-08' }).preferredDate, '2026-09-08');
+  assert.throws(() => parse(meetingDetailsSchema, { sessionCredential: credential, attendee: { name: 'Alex', email: 'not-an-email', timeZone: 'UTC' }, preferredDate: 'tomorrow' }));
+  assert.equal(parse(meetingBookingSchema, { sessionCredential: credential, slotStart: '2026-09-08T10:00:00.000+05:30' }).slotStart, '2026-09-08T10:00:00.000+05:30');
+});
+test('the agent can request the secure meeting form but cannot invoke raw booking arguments', () => {
+  assert.equal(checkPolicy('request_meeting_details', { meeting_type: 'enterprise_demo' }).tier, TIERS.ACT);
+  assert.equal(checkPolicy('book_meeting', {}).tier, TIERS.ACT);
 });

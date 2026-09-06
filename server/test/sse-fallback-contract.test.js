@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { writeSafeFallback, currentUserText, writeSseReply } = require('../src/lib/agent/agentRuntime');
+const { writeSafeFallback, currentUserText, writeSseReply, writeNoopSseReply, writeInterruptableMetadata } = require('../src/lib/agent/agentRuntime');
 const { parse, chatSchema } = require('../src/lib/schema/validation');
 
 test('Gemini failure fallback is a complete OpenAI-compatible SSE response', () => {
@@ -29,7 +29,7 @@ test('empty Agora join turns are identified before reaching Gemini', () => {
   assert.doesNotThrow(() => parse(chatSchema, { stream: true, messages: [{ role: 'user', content: [{ type: 'input_text', text: 'We have 300 users.' }] }] }));
 });
 
-test('opening greeting uses the same complete SSE contract', () => {
+test('explicit assistant speech uses the complete SSE contract', () => {
   const writes = [];
   let ended = false;
   writeSseReply({ write: value => writes.push(value), end: () => { ended = true; } }, 'chatcmpl-opening', 'Hello from DealForge.');
@@ -39,4 +39,24 @@ test('opening greeting uses the same complete SSE contract', () => {
   assert.equal(first.choices[0].delta.role, 'assistant');
   assert.equal(first.choices[0].delta.content, 'Hello from DealForge.');
   assert.equal(terminal.choices[0].finish_reason, 'stop');
+});
+
+test('empty Agora lifecycle turns receive a silent terminal SSE completion', () => {
+  const writes = [];
+  let ended = false;
+  writeNoopSseReply({ write: value => writes.push(value), end: () => { ended = true; } }, 'chatcmpl-empty');
+  assert.equal(ended, true);
+  assert.equal(writes.length, 2);
+  const terminal = JSON.parse(writes[0].replace(/^data: |\n\n$/g, ''));
+  assert.equal(terminal.choices[0].delta.content, undefined);
+  assert.equal(terminal.choices[0].finish_reason, 'stop');
+  assert.equal(writes[1], 'data: [DONE]\n\n');
+});
+
+test('normal replies declare that customer speech may interrupt them', () => {
+  const writes = [];
+  writeInterruptableMetadata({ write: value => writes.push(value) }, 'chatcmpl-turn', true);
+  const metadata = JSON.parse(writes[0].replace(/^data: |\n\n$/g, ''));
+  assert.equal(metadata.object, 'chat.completion.custom_metadata');
+  assert.equal(metadata.metadata.interruptable, true);
 });

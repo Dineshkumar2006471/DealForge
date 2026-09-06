@@ -33,3 +33,7 @@ function revokeCall(sessionId) { return api(`/manager/calls/${encodeURIComponent
 function joinCustomerCall(linkToken) { return api(`/public/calls/${encodeURIComponent(linkToken)}/join`, { method: 'POST', body: '{}' }); }
 function getIntegrationStatus() { return api('/manager/integrations/status', {}, true); }
 function getAgentStatus() { return api('/manager/agent-status', {}, true); }
+function linkHubspotDeal(dealId, hubspotDealId) { return api(`/manager/deals/${encodeURIComponent(dealId)}/integrations/hubspot/link`, { method: 'POST', body: JSON.stringify({ hubspotDealId }) }, true); }
+function setHubspotBookingSync(dealId, enabled) { return api(`/manager/deals/${encodeURIComponent(dealId)}/integrations/hubspot/booking-sync`, { method: 'POST', body: JSON.stringify({ enabled }) }, true); }
+function findMeetingSlots(linkToken, requestId, payload) { return api(`/public/calls/${encodeURIComponent(linkToken)}/meeting-requests/${encodeURIComponent(requestId)}/slots`, { method: 'POST', body: JSON.stringify(payload) }); }
+function bookMeetingSlot(linkToken, requestId, payload) { return api(`/public/calls/${encodeURIComponent(linkToken)}/meeting-requests/${encodeURIComponent(requestId)}/book`, { method: 'POST', body: JSON.stringify(payload) }); }

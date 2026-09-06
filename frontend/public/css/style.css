@@ -469,6 +469,13 @@ h1, h2, h3, h4, .headline-xl, .headline-lg, .headline-md {
 .call-controls { display: flex; align-items: center; gap: var(--sp-4); background: var(--surface); padding: var(--sp-3) var(--sp-4); border-radius: var(--radius-pill); box-shadow: 0 12px 48px rgba(0,0,0,0.05); border: 1px solid var(--hairline); }
 .btn-control { width: 48px; height: 48px; border-radius: 50%; background: var(--canvas); color: var(--ink); transition: background 0.2s, color 0.2s, transform 0.2s; }
 .btn-control:hover { background: var(--hairline); transform: scale(1.05); }
+.meeting-panel { width:min(600px, 100%); margin-top:28px; padding:20px; border:1px solid rgba(247, 165, 1, .35); border-radius:var(--radius-md); background:var(--surface); box-shadow:0 16px 40px rgba(0,0,0,.05); }
+.meeting-panel[hidden] { display:none; }
+.meeting-panel-header { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; border-bottom:1px solid var(--hairline); padding-bottom:14px; margin-bottom:12px; }
+.meeting-panel h2 { margin:2px 0 0; font-size:19px; }.meeting-eyebrow,.meeting-slots-label { font-family:var(--font-mono); color:var(--amber); font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+.meeting-panel p { color:var(--mute); line-height:1.5; font-size:13px; }
+.meeting-form { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px; }.meeting-form label { display:flex; flex-direction:column; gap:6px; color:var(--mute); font-family:var(--font-mono); font-size:11px; text-transform:uppercase; }.meeting-form label:nth-child(1),.meeting-form label:nth-child(2),.meeting-form button { grid-column:1 / -1; }.meeting-form .form-input { width:100%; background:var(--canvas); font-family:var(--font-sans); text-transform:none; }
+.meeting-slots { margin-top:16px; }.meeting-slot-buttons { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }.meeting-slot { padding:8px 10px; font-family:var(--font-mono); font-size:11px; }.meeting-result { min-height:1.5em; margin:14px 0 0!important; }.meeting-result.success { color:var(--green); }.meeting-result.error { color:var(--red); }
 
 /* Keep the primary call control in the initial desktop viewport on short laptop
    screens. The same component sizing remains unchanged on normal-height screens. */
@@ -516,6 +523,7 @@ h1, h2, h3, h4, .headline-xl, .headline-lg, .headline-md {
   .hero-terminal-header { align-items:flex-start; flex-direction:column; gap:10px; }.hero-terminal-title { font-size:19px; line-height:1.35; }.audit-entry { align-items:flex-start; flex-direction:column; gap:4px; }
   #deals-list { overflow-x:auto; }
   .page-call { height:auto; min-height:100vh; overflow:auto; }.call-container { padding:48px 20px 36px; justify-content:flex-start; }.call-header { margin-bottom:32px; }.orb-container { width:230px; height:230px; margin-bottom:32px; }.orb-inner,.wave { width:130px; height:130px; }
+  .meeting-form { grid-template-columns:1fr; }.meeting-form label,.meeting-form button { grid-column:auto; }.meeting-panel { padding:16px; }.meeting-panel-header { flex-direction:column; }
 }
 
 /* ═══════════════════════════════════════════════════

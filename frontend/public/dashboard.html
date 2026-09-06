@@ -201,6 +201,15 @@
           </div>
         </div>
 
+        <div class="bento-card" id="hubspot-sync-card">
+          <div class="bento-header"><h3>HubSpot Booking Sync</h3><span id="hubspot-sync-status" class="pill-badge">NOT LINKED</span></div>
+          <p id="hubspot-sync-copy" style="font-size:13px;color:var(--mute);line-height:1.55;margin:0 0 12px;">Link one explicit staging deal. DealForge will verify it before it can receive a booking reference.</p>
+          <label class="form-label" for="hubspot-deal-id">HubSpot staging deal ID</label>
+          <div style="display:flex;gap:8px;margin-top:6px;"><input id="hubspot-deal-id" class="form-input" inputmode="numeric" maxlength="32" placeholder="Numeric deal ID"><button id="hubspot-link-button" class="btn-secondary" type="button" style="white-space:nowrap;">Verify & link</button></div>
+          <label id="hubspot-sync-toggle-wrap" style="display:flex;gap:9px;align-items:center;margin-top:14px;color:var(--mute);font-size:13px;"><input id="hubspot-sync-toggle" type="checkbox" disabled> Sync verified Cal.com bookings to <code>dealforge_last_booking</code></label>
+          <p id="hubspot-sync-message" style="min-height:1.5em;font-size:12px;margin:10px 0 0;color:var(--mute);" role="status"></p>
+        </div>
+
         <!-- System Audit Log -->
         <div class="bento-card">
           <div class="bento-header">
@@ -259,6 +268,19 @@
       event.preventDefault();
       try { showCallLink(await createCallLink(dealId)); }
       catch (error) { const status = document.getElementById('call-link-status'); status.textContent = error.message; status.style.color = 'var(--red)'; }
+    });
+    document.getElementById('hubspot-link-button').addEventListener('click', async () => {
+      const input = document.getElementById('hubspot-deal-id'); const button = document.getElementById('hubspot-link-button'); const message = document.getElementById('hubspot-sync-message');
+      button.disabled = true; message.style.color = 'var(--mute)'; message.textContent = 'Verifying the HubSpot staging deal…';
+      try { const result = await linkHubspotDeal(dealId, input.value.trim()); input.value = result.hubspotDealId; message.style.color = 'var(--green)'; message.textContent = 'Verified and linked. Enable booking sync only when ready.'; }
+      catch (error) { message.style.color = 'var(--red)'; message.textContent = error.message || 'HubSpot deal could not be linked.'; }
+      finally { button.disabled = false; }
+    });
+    document.getElementById('hubspot-sync-toggle').addEventListener('change', async event => {
+      const toggle = event.currentTarget; const message = document.getElementById('hubspot-sync-message'); toggle.disabled = true;
+      try { const result = await setHubspotBookingSync(dealId, toggle.checked); toggle.checked = result.enabled; message.style.color = 'var(--green)'; message.textContent = result.enabled ? 'Verified booking-to-CRM sync enabled.' : 'Booking-to-CRM sync disabled.'; }
+      catch (error) { toggle.checked = false; message.style.color = 'var(--red)'; message.textContent = error.message || 'Booking sync setting could not be updated.'; }
+      finally { toggle.disabled = false; }
     });
 
     // Auth observer
@@ -326,6 +348,7 @@
       probability.innerText = Number.isFinite(confidence) && confidence >= 0 && confidence <= 1 ? `${Math.round(confidence * 100)}%` : '—';
       probability.style.color = Number.isFinite(confidence) ? 'var(--green)' : 'var(--mute)';
       document.getElementById('deal-action').innerText = data.nextBestAction?.reason || 'No recommendations.';
+      renderHubspotControls(data.integrations?.hubspot || null);
       const plan = document.getElementById('autonomy-plan');
       const action = data.nextBestAction || {};
       const authority = document.getElementById('action-authority');
@@ -436,6 +459,15 @@
         });
         discountEl.replaceChildren(...discountNodes);
       }
+    }
+
+    function renderHubspotControls(integration) {
+      const status = document.getElementById('hubspot-sync-status'); const copy = document.getElementById('hubspot-sync-copy'); const input = document.getElementById('hubspot-deal-id'); const toggle = document.getElementById('hubspot-sync-toggle');
+      const linked = Boolean(integration?.dealId); input.value = integration?.dealId || '';
+      toggle.disabled = !linked; toggle.checked = integration?.bookingSyncEnabled === true;
+      status.textContent = linked ? (toggle.checked ? 'SYNC ENABLED' : 'LINKED') : 'NOT LINKED';
+      status.style.color = toggle.checked ? 'var(--green)' : linked ? 'var(--amber)' : 'var(--mute)';
+      copy.textContent = linked ? 'This exact HubSpot deal was verified. Only a verified Cal.com booking may update dealforge_last_booking.' : 'Link one explicit staging deal. DealForge will verify it before it can receive a booking reference.';
     }
 
     function renderEvidence(records) {

@@ -6,6 +6,20 @@
     <div class="call-controls"><button class="btn-control" id="btn-mute" aria-label="Mute Microphone" disabled>Mute</button><button class="btn-primary btn-start-call" id="btn-call">Start AI Sales Call</button></div>
     <p id="call-hint" style="color:var(--mute);min-height:1.5em;text-align:center;font-size:13px" aria-live="polite">After the agent connects, start with: “We have 300 users.”</p>
     <p id="call-error" style="color:var(--red);min-height:1.5em;text-align:center" aria-live="polite"></p>
+    <section id="meeting-panel" class="meeting-panel" hidden aria-labelledby="meeting-panel-title">
+      <div class="meeting-panel-header"><div><div class="meeting-eyebrow">Secure scheduling</div><h2 id="meeting-panel-title">Complete your meeting details</h2></div><span id="meeting-status" class="pill-badge">DETAILS REQUIRED</span></div>
+      <p id="meeting-description">Use this form instead of saying your email address aloud. We’ll show verified available times before anything is booked.</p>
+      <form id="meeting-details-form" class="meeting-form">
+        <label>Full name<input id="meeting-name" class="form-input" name="name" autocomplete="name" maxlength="120" required></label>
+        <label>Email address<input id="meeting-email" class="form-input" name="email" type="email" autocomplete="email" maxlength="254" required></label>
+        <label>Timezone<input id="meeting-timezone" class="form-input" name="timezone" maxlength="80" required></label>
+        <label>Meeting type<select id="meeting-type" class="form-input" name="meetingType"><option value="enterprise_demo">Enterprise demo</option><option value="technical_review">Technical review</option><option value="executive_briefing">Executive briefing</option></select></label>
+        <label>Preferred date<input id="meeting-date" class="form-input" name="preferredDate" type="date" required></label>
+        <button id="meeting-slots-button" class="btn-primary" type="submit">Find available times</button>
+      </form>
+      <div id="meeting-slots" class="meeting-slots" aria-live="polite"></div>
+      <p id="meeting-result" class="meeting-result" aria-live="polite"></p>
+    </section>
     
     <div id="live-captions" class="captions-container" style="margin-top: 32px; max-width: 600px; width: 100%; display: flex; flex-direction: column; gap: 12px; height: 300px; overflow-y: auto; padding: 16px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px solid var(--gray-800);">
       <div id="captions-status" style="text-align: center; color: var(--mute); font-size: 13px; font-family: var(--font-mono);">Live transcript will appear here when connected.</div>
@@ -27,7 +41,7 @@
     const db = getFirestore();
     const linkToken = new URLSearchParams(location.search).get('link');
     const callButton = document.getElementById('btn-call'), muteButton = document.getElementById('btn-mute'), status = document.getElementById('status-text'), errorText = document.getElementById('call-error'), hintText = document.getElementById('call-hint');
-    const waves = document.querySelectorAll('.wave'); let call = null; let active = false; let agentAudioTimer = null; let agentAudioObserved = false;
+    const waves = document.querySelectorAll('.wave'); let call = null; let active = false; let agentAudioTimer = null; let agentAudioObserved = false; let meetingRequestUnsubscribe = null; let meetingRequestId = null;
     function setStatus(text, color) { status.textContent = text; status.style.color = color || 'var(--gray-400)'; }
     function setButton(text, primary) { callButton.textContent = text; callButton.classList.toggle('btn-primary', primary); callButton.classList.toggle('btn-secondary', !primary); }
     let renewalTimer = null;
@@ -37,6 +51,7 @@
       if (renewalTimer) clearTimeout(renewalTimer); renewalTimer = null;
       if (agentAudioTimer) clearTimeout(agentAudioTimer); agentAudioTimer = null; agentAudioObserved = false;
       if (captionsUnsubscribe) { captionsUnsubscribe(); captionsUnsubscribe = null; }
+      if (meetingRequestUnsubscribe) { meetingRequestUnsubscribe(); meetingRequestUnsubscribe = null; }
       try { await firebase.auth().signOut(); } catch (e) {}
       try { await leaveCall(); } finally { muteButton.disabled = true; active = false; call = null; waves.forEach(w => w.style.animationPlayState = 'paused'); }
     }
@@ -106,6 +121,66 @@
       container.scrollTop = container.scrollHeight;
     }
 
+    function localDateTomorrow() { const value = new Date(); value.setDate(value.getDate() + 1); return value.toISOString().slice(0, 10); }
+    document.getElementById('meeting-timezone').value = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    document.getElementById('meeting-date').value = localDateTomorrow();
+
+    function renderMeetingRequest(request) {
+      if (!request) return;
+      meetingRequestId = request.requestId;
+      const panel = document.getElementById('meeting-panel'); const status = document.getElementById('meeting-status');
+      const description = document.getElementById('meeting-description'); const form = document.getElementById('meeting-details-form'); const result = document.getElementById('meeting-result');
+      panel.hidden = false; status.textContent = String(request.status || 'DETAILS_REQUIRED').replace(/_/g, ' ');
+      document.getElementById('meeting-type').value = request.meetingType || 'enterprise_demo';
+      if (request.status === 'BOOKED') {
+        form.hidden = true; description.textContent = 'Your meeting was verified. The result below is recorded in the call activity.';
+        result.textContent = request.result?.crm?.verified ? 'Meeting booked and CRM updated.' : 'Meeting booked and verified.'; result.className = 'meeting-result success';
+      } else if (request.status === 'BOOKING_FAILED') {
+        form.hidden = false; result.textContent = request.result?.error || 'Booking could not be completed. Choose another available time.'; result.className = 'meeting-result error';
+      } else if (request.status === 'BOOKING') {
+        form.hidden = true; description.textContent = 'Booking your selected time. Please keep this page open.';
+      } else {
+        form.hidden = false; description.textContent = 'Use this form instead of saying your email address aloud. We’ll show verified available times before anything is booked.';
+      }
+    }
+
+    function renderMeetingSlots(slots) {
+      const container = document.getElementById('meeting-slots');
+      const heading = document.createElement('div'); heading.className = 'meeting-slots-label'; heading.textContent = 'Available times';
+      const buttons = document.createElement('div'); buttons.className = 'meeting-slot-buttons';
+      for (const slot of slots) {
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'btn-secondary meeting-slot';
+        button.textContent = new Date(slot.start).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+        button.addEventListener('click', () => confirmMeetingSlot(slot.start, button)); buttons.append(button);
+      }
+      container.replaceChildren(heading, buttons);
+    }
+
+    async function submitMeetingDetails(event) {
+      event.preventDefault();
+      if (!call?.sessionCredential || !meetingRequestId) return;
+      const button = document.getElementById('meeting-slots-button'); const result = document.getElementById('meeting-result');
+      const attendee = { name: document.getElementById('meeting-name').value.trim(), email: document.getElementById('meeting-email').value.trim(), timeZone: document.getElementById('meeting-timezone').value.trim() };
+      button.disabled = true; result.textContent = 'Checking verified availability…'; result.className = 'meeting-result';
+      try {
+        const response = await findMeetingSlots(linkToken, meetingRequestId, { sessionCredential: call.sessionCredential, attendee, preferredDate: document.getElementById('meeting-date').value });
+        renderMeetingSlots(response.slots); result.textContent = 'Choose one of the verified available times.'; result.className = 'meeting-result';
+      } catch (error) { result.textContent = error.message || 'Availability could not be checked.'; result.className = 'meeting-result error'; }
+      finally { button.disabled = false; }
+    }
+
+    async function confirmMeetingSlot(slotStart, button) {
+      if (!call?.sessionCredential || !meetingRequestId) return;
+      const result = document.getElementById('meeting-result'); const buttons = document.querySelectorAll('.meeting-slot');
+      buttons.forEach(item => { item.disabled = true; }); result.textContent = 'Booking the selected verified time…'; result.className = 'meeting-result';
+      try {
+        const response = await bookMeetingSlot(linkToken, meetingRequestId, { sessionCredential: call.sessionCredential, slotStart });
+        if (!response.booked) throw new Error(response.result?.error || 'Booking could not be completed.');
+        result.textContent = response.result?.crm?.verified ? 'Meeting booked and CRM updated.' : 'Meeting booked and verified.'; result.className = 'meeting-result success';
+      } catch (error) { result.textContent = error.message || 'Booking could not be completed.'; result.className = 'meeting-result error'; buttons.forEach(item => { item.disabled = false; }); }
+    }
+    document.getElementById('meeting-details-form').addEventListener('submit', submitMeetingDetails);
+
     async function start() {
       if (!linkToken) { errorText.textContent = 'This call link is missing or invalid.'; setStatus('Call unavailable', 'var(--red)'); return; }
       let startupFailed = false;
@@ -123,6 +198,9 @@
             .onSnapshot(snapshot => {
                renderCaptions(snapshot.docs.map(d => d.data().message).filter(Boolean));
             });
+          meetingRequestUnsubscribe = db.collection('callSessions').doc(credentials.sessionId).collection('meetingRequests')
+            .orderBy('createdAt', 'desc').limit(1)
+            .onSnapshot(snapshot => renderMeetingRequest(snapshot.empty ? null : snapshot.docs[0].data()));
         }
         
         // 3. Connect to Agora

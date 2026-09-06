@@ -59,7 +59,7 @@ test('Agora greeting uses the documented server-side Speak endpoint only after R
   global.fetch = async (url, options) => {
     assert.equal(url, `https://api.agora.io/api/conversational-ai-agent/v2/projects/${'a'.repeat(32)}/agents/agent-1/speak`);
     assert.equal(options.method, 'POST');
-    assert.deepEqual(JSON.parse(options.body), { text: 'Hello', priority: 'INTERRUPT', interrupt: false });
+    assert.deepEqual(JSON.parse(options.body), { text: 'Hello', priority: 'APPEND', interruptable: true });
     return new Response(JSON.stringify({ message: 'accepted' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   };
   try { assert.deepEqual(await speakAgent({ agentId: 'agent-1' }, 'Hello'), { accepted: true }); }

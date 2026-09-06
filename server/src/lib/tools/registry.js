@@ -22,7 +22,7 @@ function registerTool(name, handler, schema) {
  * Get OpenAI-format tool definitions for Gemini.
  */
 function getToolDefinitions() {
-  return Object.entries(toolHandlers).map(([name, { schema }]) => ({
+  return Object.entries(toolHandlers).filter(([, { schema }]) => schema.agentVisible !== false).map(([name, { schema }]) => ({
     type: 'function',
     function: {
       name,

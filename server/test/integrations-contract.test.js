@@ -28,14 +28,14 @@ test('HubSpot field normalization rejects arbitrary CRM writes', () => {
   assert.throws(() => normalizeProperties({ owner_id: 'someone-else' }), /not allowlisted/);
 });
 
-test('Cal.com client uses current v2 endpoint, bearer authentication, and an explicit API version', async () => {
+test('Cal.com client uses supported v2 event-type collection endpoint, bearer authentication, and endpoint-specific version', async () => {
   Object.assign(process.env, { CALCOM_API_KEY: 'cal_test', CALCOM_EVENT_TYPE_ID: '123', CALCOM_API_VERSION: '2024-09-04' });
   global.fetch = async (url, options) => {
-    assert.equal(url, 'https://api.cal.com/v2/event-types/123');
+    assert.equal(url, 'https://api.cal.com/v2/event-types');
     assert.equal(options.headers.Authorization, 'Bearer cal_test');
-    assert.equal(options.headers['cal-api-version'], '2024-09-04');
-    return new Response(JSON.stringify({ status: 'success', data: { id: 123 } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    assert.equal(options.headers['cal-api-version'], '2024-06-14');
+    return new Response(JSON.stringify({ status: 'success', data: [{ id: 123, active: true, bookingFields: [] }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   };
-  assert.deepEqual(await calcomRequest('/event-types/123'), { status: 'success', data: { id: 123 } });
+  assert.deepEqual(await calcomRequest('/event-types', { apiVersion: '2024-06-14' }), { status: 'success', data: [{ id: 123, active: true, bookingFields: [] }] });
   assert.equal(availableAt({ '2026-09-06': [{ start: '2026-09-06T10:00:00.000Z' }] }, '2026-09-06T10:00:00Z'), true);
 });

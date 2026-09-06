@@ -76,14 +76,15 @@ async function stopAgent(session) {
   if (!response.ok) throw new HttpError(502, 'Agora agent stop failed');
 }
 
-async function speakAgent(session, text) {
+async function speakAgent(session, text, { priority = 'APPEND', interruptable = true } = {}) {
   if (!session.agentId) throw new HttpError(409, 'Agora agent is not active');
   if (typeof text !== 'string' || !text.trim() || Buffer.byteLength(text, 'utf8') > 512) throw new HttpError(400, 'Agent speech text is invalid');
+  if (!['INTERRUPT', 'APPEND', 'IGNORE'].includes(priority) || typeof interruptable !== 'boolean') throw new HttpError(400, 'Agent speech options are invalid');
   const config = credentials();
   const response = await fetch(`${BASE}/${config.appId}/agents/${encodeURIComponent(session.agentId)}/speak`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Basic ${Buffer.from(`${config.customerId}:${config.customerSecret}`).toString('base64')}` },
-    body: JSON.stringify({ text: text.trim(), priority: 'INTERRUPT', interrupt: false }),
+    body: JSON.stringify({ text: text.trim(), priority, interruptable }),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new HttpError(502, `Agora agent speech request failed: ${String(data.message || response.status).slice(0, 180)}`);

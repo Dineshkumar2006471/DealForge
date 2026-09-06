@@ -101,8 +101,8 @@
               <div id="status-hubspot" class="pill-badge" style="font-size: 10px; padding: 2px 8px; margin-top: 4px;">NOT CONFIGURED</div>
             </div>
           </div>
-          <p style="font-size: 13px; color: var(--mute); line-height: 1.6;">CRM credentials are checked by the backend. A configured integration is not shown as connected until a verified action succeeds.</p>
-          <button class="btn-secondary" style="margin-top: 12px; width: 100%; text-align: center;" disabled>Server-side configuration required</button>
+          <p id="copy-hubspot" style="font-size: 13px; color: var(--mute); line-height: 1.6;">CRM credentials are checked by the backend. A configured integration is not shown as connected until a verified action succeeds.</p>
+          <button id="action-hubspot" class="btn-secondary" style="margin-top: 12px; width: 100%; text-align: center;" disabled>Manage from a deal workspace</button>
         </div>
 
         <!-- Cal.com -->
@@ -113,8 +113,8 @@
             </div>
             <div><h3 style="font-size: 16px;">Cal.com Scheduling</h3><div id="status-calcom" class="pill-badge" style="font-size: 10px; padding: 2px 8px; margin-top: 4px;">NOT CONFIGURED</div></div>
           </div>
-          <p style="font-size: 13px; color: var(--mute); line-height: 1.6;">Availability and bookings are unavailable until a staging event type and server-side credential are configured and verified.</p>
-          <button class="btn-secondary" style="margin-top: 12px; width: 100%; text-align: center;" disabled>Not configured</button>
+          <p id="copy-calcom" style="font-size: 13px; color: var(--mute); line-height: 1.6;">Availability and bookings are unavailable until a staging event type and server-side credential are configured and verified.</p>
+          <button id="action-calcom" class="btn-secondary" style="margin-top: 12px; width: 100%; text-align: center;" disabled>Checking backend status</button>
         </div>
 
         <!-- Salesforce -->
@@ -161,7 +161,13 @@
         if (!await window.managerReady) return;
         renderProfileIcon('user-email');
         document.getElementById('user-display-name').innerText = user.displayName || user.email || 'User';
-        const setStatus = (name, value) => { const element = document.getElementById(`status-${name}`); if (!element) return; element.textContent = value; element.style.color = value === 'CONNECTED' ? 'var(--green)' : value === 'ERROR' ? 'var(--red)' : 'var(--amber)'; };
+        const setStatus = (name, value) => {
+          const element = document.getElementById(`status-${name}`); if (!element) return;
+          element.textContent = value; element.style.color = value === 'CONNECTED' ? 'var(--green)' : ['ERROR', 'DEGRADED'].includes(value) ? 'var(--red)' : value === 'AVAILABLE' ? 'var(--amber)' : 'var(--mute)';
+          const copy = document.getElementById(`copy-${name}`); const action = document.getElementById(`action-${name}`);
+          if (name === 'hubspot' && copy) { copy.textContent = value === 'AVAILABLE' ? 'Credential read verification passed. Link a staging deal and enable booking sync from that deal workspace; CONNECTED requires a verified write.' : value === 'CONNECTED' ? 'A verified booking reference was written to the explicitly linked HubSpot staging deal.' : 'HubSpot is unavailable. No CRM data will be sent until the backend probe succeeds.'; if (action) action.textContent = 'Manage from a deal workspace'; }
+          if (name === 'calcom' && copy) { copy.textContent = value === 'AVAILABLE' ? 'The active staging event type is verified. CONNECTED requires one verified booking.' : value === 'CONNECTED' ? 'A staging booking was created and read back successfully.' : value === 'DEGRADED' ? 'The configured staging event type is inactive or has unsupported required fields. No meeting can be booked.' : 'Scheduling is not available. No meeting can be booked.'; if (action) action.textContent = value === 'DEGRADED' ? 'Activate event type in Cal.com' : value; }
+        };
         const updateCardTruthfulness = (name, value) => {
           const card = document.getElementById(`integration-${name}`);
           if (card) card.style.opacity = value === 'NOT CONFIGURED' ? '0.5' : '1';

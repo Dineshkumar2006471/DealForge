@@ -1,7 +1,7 @@
 const express = require('express');
 const { redeemLink, rtcCredentials, webhookTokenFor, findSessionByHash, endSession, sessionRef } = require('../lib/calls/callSessions');
 const { startAgent, speakAgent } = require('../lib/calls/agoraAgentService');
-const { parse, sessionCredentialSchema, callActivitySchema } = require('../lib/schema/validation');
+const { parse, sessionCredentialSchema, callActivitySchema, meetingDetailsSchema, meetingBookingSchema } = require('../lib/schema/validation');
 const { writeAuditEvent } = require('../lib/audit/eventStore');
 const { EVENT_TYPES } = require('../lib/audit/eventTypes');
 const { HttpError } = require('../lib/security/auth');
@@ -10,6 +10,8 @@ const { runPostCallAutopilot } = require('../lib/agent/postCallAutopilot');
 const router = express.Router();
 const joinRateLimit = createRateLimit({ scope: 'public-call-join', limit: 8, windowMs: 60_000 });
 const { db, admin } = require('../lib/firebase/admin');
+const { findMeetingSlots, confirmMeeting } = require('../lib/meetings/meetingRequests');
+const { addMessage } = require('../lib/agent/conversationHistory');
 
 router.post('/calls/:linkToken/join', joinRateLimit, async (req, res, next) => {
   try {
@@ -32,7 +34,7 @@ router.post('/calls/:linkToken/join', joinRateLimit, async (req, res, next) => {
   } catch (error) { next(error); }
 });
 async function activeSessionFromCredential(req) {
-  const { sessionCredential } = parse(sessionCredentialSchema, req.body);
+  const { sessionCredential } = parse(sessionCredentialSchema, { sessionCredential: req.body?.sessionCredential });
   const { session } = await findSessionByHash('hashedRefreshToken', sessionCredential);
   if (session.status !== 'ACTIVE' || session.revokedAt || new Date(session.expiresAt) <= new Date()) throw new HttpError(410, 'Call session is not active');
   return session;
@@ -57,10 +59,32 @@ router.post('/calls/:linkToken/ready', async (req, res, next) => {
       }
     });
     if (shouldSpeak) {
-      await speakAgent(session, "Hello, I'm the DealForge sales assistant. I'm ready to help with your team, timeline, or pricing needs.");
+      await speakAgent(session, "Hello, I'm the DealForge sales assistant. I'm ready to help with your team, timeline, or pricing needs.", { priority: 'INTERRUPT', interruptable: false });
       await writeAuditEvent({ organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, eventType: EVENT_TYPES.AGENT_GREETING_REQUESTED, trigger: 'Customer RTC ready; Agora greeting requested', actionResult: { accepted: true } });
     }
     res.status(202).json({ status: shouldSpeak ? 'GREETING_REQUESTED' : 'ALREADY_READY' });
+  } catch (error) { next(error); }
+});
+router.post('/calls/:linkToken/meeting-requests/:requestId/slots', async (req, res, next) => {
+  try {
+    const input = parse(meetingDetailsSchema, req.body);
+    const session = await activeSessionFromCredential({ ...req, body: input });
+    const result = await findMeetingSlots(session, req.params.requestId, input);
+    res.json(result);
+  } catch (error) { next(error); }
+});
+router.post('/calls/:linkToken/meeting-requests/:requestId/book', async (req, res, next) => {
+  try {
+    const input = parse(meetingBookingSchema, req.body);
+    const session = await activeSessionFromCredential({ ...req, body: input });
+    const outcome = await confirmMeeting(session, req.params.requestId, input.slotStart);
+    const crm = outcome.result?.crm;
+    const spoken = outcome.booked
+      ? `Your meeting is confirmed for the selected time.${crm?.verified ? ' I also updated our CRM.' : ''}`
+      : 'I could not complete that booking. Please choose another available time or try again later.';
+    await addMessage(session.sessionId, { role: 'assistant', content: spoken });
+    await speakAgent(session, spoken, { priority: 'APPEND', interruptable: true }).catch(error => console.warn('Verified meeting outcome could not be spoken:', error.message));
+    res.status(outcome.booked ? 201 : 409).json({ ...outcome, spoken });
   } catch (error) { next(error); }
 });
 router.post('/calls/:linkToken/stop', async (req, res, next) => {

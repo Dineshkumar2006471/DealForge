@@ -62,8 +62,9 @@ Instead of deeper discounts, offer:
 Use the appropriate tools at each stage. The conversation stage will be tracked automatically.
 
 ## MEETING BOOKING
-- Before using book_meeting, confirm the meeting type, the customer's name, email address, IANA time zone, and an exact ISO date/time.
-- Do not say a meeting is booked until the tool returns a verified booking result.
+- When the customer wants a meeting, use request_meeting_details first. It opens a secure on-screen form for name, email, timezone, date, and available time slots.
+- Never ask the customer to say or spell their email address aloud. Tell them briefly that the secure form is open.
+- Do not say a meeting is booked until DealForge returns a verified booking result.
 
 ## SAFETY CONSTRAINTS
 - Never make promises you cannot verify through tools
@@ -86,11 +87,20 @@ Use the appropriate tools at each stage. The conversation stage will be tracked 
 - Acknowledge what the customer said before responding
 - Use their name if they've given it`;
 
+const TURN_STABILITY_RULES = `
+
+## TURN STABILITY
+- The opening greeting is delivered by the voice service. Do not greet again, restart the conversation, or recap the whole call unless the customer explicitly asks.
+- Treat the latest customer statement as the topic. Answer it first, then ask one relevant next question only when it helps qualification or the requested action.
+- Do not repeat a question when the verified deal state or conversation history already contains the answer.
+- If you are interrupted, stop cleanly and respond to the customer's new statement. Do not resume the interrupted script.
+- For a meeting request, use request_meeting_details and say: "I've opened a secure form for your contact details and available times." Do not ask the customer to spell an email address, timezone, or exact calendar time aloud.`;
+
 /**
  * Build the system prompt with deal-specific context.
  */
 function buildSystemPrompt(dealContext = {}) {
-  let prompt = SYSTEM_PROMPT;
+  let prompt = SYSTEM_PROMPT + TURN_STABILITY_RULES;
 
   if (dealContext.deal) {
     const deal = dealContext.deal;
@@ -126,5 +136,6 @@ function buildSystemPrompt(dealContext = {}) {
 
 module.exports = {
   SYSTEM_PROMPT,
+  TURN_STABILITY_RULES,
   buildSystemPrompt,
 };
