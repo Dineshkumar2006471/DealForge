@@ -74,6 +74,36 @@ async function ownedDeal(dealId, organizationId) {
   return { ref, data: snapshot.data() };
 }
 
+// A deal is the account-level commercial record. Each link creates a distinct
+// call session beneath it, so managers must select a session before reviewing
+// conversation-specific evidence, approvals, and audit activity. Never return
+// bearer-token hashes or Agora credentials to the browser.
+router.get('/deals/:dealId/call-sessions', async (req, res, next) => {
+  try {
+    await ownedDeal(req.params.dealId, req.manager.organizationId);
+    const snapshot = await db.collection('callSessions')
+      .where('organizationId', '==', req.manager.organizationId)
+      .where('dealId', '==', req.params.dealId)
+      .limit(50)
+      .get();
+    const sessions = snapshot.docs
+      .map(doc => {
+        const session = doc.data();
+        return {
+          sessionId: session.sessionId,
+          status: session.status,
+          createdAt: session.createdAt,
+          startedAt: session.startedAt || null,
+          endedAt: session.endedAt || null,
+          expiresAt: session.expiresAt,
+          failureReason: session.failureReason || null,
+        };
+      })
+      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+    res.json({ dealId: req.params.dealId, sessions });
+  } catch (error) { next(error); }
+});
+
 router.post('/deals/:dealId/integrations/hubspot/link', async (req, res, next) => {
   try {
     const { hubspotDealId } = parse(hubspotLinkSchema, req.body);

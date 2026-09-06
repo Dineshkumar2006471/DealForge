@@ -8,6 +8,10 @@ test('manager API rejects missing Firebase token', async () => {
   const response = await request(app).post('/api/manager/call-links').send({ dealId: 'deal-a', expiresInMinutes: 60 });
   assert.equal(response.status, 401);
 });
+test('manager conversation-session listing rejects missing Firebase token', async () => {
+  const response = await request(app).get('/api/manager/deals/deal-a/call-sessions');
+  assert.equal(response.status, 401);
+});
 test('webhook rejects missing, malformed, and wrong authorization before SSE', async () => {
   for (const authorization of [undefined, 'Basic abc', 'Bearer wrong']) {
     let query = request(app).post('/chat/completions/not-a-session').send({ stream: true, messages: [] });

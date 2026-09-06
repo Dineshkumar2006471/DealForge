@@ -28,6 +28,7 @@ async function api(path, options = {}, manager = false) {
 }
 function createCallLink(dealId, expiresInMinutes = 60) { return api('/manager/call-links', { method: 'POST', body: JSON.stringify({ dealId, expiresInMinutes }) }, true); }
 function createDeal(company, targetArr = 0) { return api('/manager/deals', { method: 'POST', body: JSON.stringify({ company, targetArr }) }, true); }
+function getDealCallSessions(dealId) { return api(`/manager/deals/${encodeURIComponent(dealId)}/call-sessions`, {}, true); }
 function resolveApproval(approvalId, decision) { return api(`/manager/approvals/${encodeURIComponent(approvalId)}/resolve`, { method: 'POST', body: JSON.stringify({ decision }) }, true); }
 function stopCall(sessionId) { return api(`/manager/calls/${encodeURIComponent(sessionId)}/stop`, { method: 'POST', body: '{}' }, true); }
 function revokeCall(sessionId) { return api(`/manager/calls/${encodeURIComponent(sessionId)}/revoke`, { method: 'POST', body: '{}' }, true); }

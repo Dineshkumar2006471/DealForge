@@ -62,9 +62,16 @@
   <div class="main-content">
     <header class="topbar">
       <div class="topbar-left">
-        <div class="topbar-title">Deal Workspace: <span id="deal-company">Loading...</span></div>
+        <div>
+          <div class="topbar-title">Deal Workspace: <span id="deal-company">Loading...</span></div>
+          <span style="font-family: var(--font-mono); font-size: 10px; color: var(--mute); text-transform: uppercase;">Account-level commercial state</span>
+        </div>
         <a id="btn-resume-call" href="#" class="btn-secondary" style="margin-left: 16px; padding: 6px 12px; font-size: 11px;">Create customer call link</a>
         <span id="call-link-status" style="font-family: var(--font-mono); font-size: 11px; color: var(--mute); margin-left: 12px;" role="status"></span>
+        <div class="conversation-selector" style="margin-left: 12px; display: flex; align-items: center; gap: 6px;">
+          <label for="conversation-session" style="font-family: var(--font-mono); font-size: 10px; color: var(--mute); text-transform: uppercase;">Customer conversation</label>
+          <select id="conversation-session" class="form-input" style="width: 220px; padding: 6px 9px; font-size: 11px;" aria-describedby="conversation-scope"><option>Loading conversations…</option></select>
+        </div>
       </div>
       <div class="topbar-right">
         <div class="search-bar">
@@ -82,6 +89,8 @@
     </header>
 
     <main class="dashboard-grid container" style="margin-top: 24px; padding-bottom: 48px;">
+
+      <div id="conversation-scope" class="bento-card" style="grid-column: 1 / -1; margin-bottom: 0; padding: 13px 18px; font-size: 13px; color: var(--mute);" role="status">Loading customer conversations…</div>
 
       <!-- HERO TERMINAL -->
       <div class="hero-terminal-card" style="grid-column: 1 / -1;">
@@ -243,6 +252,8 @@
     const db = getFirestore();
     const urlParams = new URLSearchParams(window.location.search);
     const dealId = urlParams.get('id');
+    let selectedSessionId = urlParams.get('session');
+    let callSessions = [];
     function node(tag, text, styles = {}) {
       const element = document.createElement(tag);
       if (text !== undefined) element.textContent = text;
@@ -266,7 +277,11 @@
     }
     document.getElementById('btn-resume-call').addEventListener('click', async event => {
       event.preventDefault();
-      try { showCallLink(await createCallLink(dealId)); }
+      try {
+        const link = await createCallLink(dealId);
+        await selectConversation(link.sessionId);
+        showCallLink(link);
+      }
       catch (error) { const status = document.getElementById('call-link-status'); status.textContent = error.message; status.style.color = 'var(--red)'; }
     });
     document.getElementById('hubspot-link-button').addEventListener('click', async () => {
@@ -289,7 +304,10 @@
         if (!await window.managerReady) return;
         renderProfileIcon('user-email');
         document.getElementById('user-display-name').innerText = user.displayName || user.email || 'User';
-        setupListeners();
+        setupListeners().catch(error => {
+          console.error('Unable to initialize workspace conversation scope:', error);
+          document.getElementById('conversation-scope').textContent = 'Customer conversations are temporarily unavailable. Refresh to retry.';
+        });
       } else {
         window.location.href = '/login.html';
       }
@@ -300,43 +318,98 @@
     let auditUnsubscribe = null;
     let approvalsUnsubscribe = null;
 
-    function setupListeners() {
-      // 1. Listen to Deal State
+    function updateConversationUrl() {
+      const url = new URL(window.location.href);
+      if (selectedSessionId) url.searchParams.set('session', selectedSessionId); else url.searchParams.delete('session');
+      window.history.replaceState({}, '', url);
+    }
+
+    function sessionLabel(session, index) {
+      const time = session.startedAt || session.createdAt;
+      const stamp = time ? new Date(time).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'time unavailable';
+      return `Conversation ${callSessions.length - index} · ${session.status || 'CREATED'} · ${stamp}`;
+    }
+
+    function renderConversationPicker() {
+      const picker = document.getElementById('conversation-session');
+      picker.replaceChildren();
+      if (!callSessions.length) {
+        const option = document.createElement('option'); option.value = ''; option.textContent = 'No customer conversations yet'; picker.append(option); picker.disabled = true;
+      } else {
+        picker.disabled = false;
+        callSessions.forEach((session, index) => {
+          const option = document.createElement('option'); option.value = session.sessionId; option.textContent = sessionLabel(session, index); option.selected = session.sessionId === selectedSessionId; picker.append(option);
+        });
+      }
+    }
+
+    function clearConversationListeners() {
+      [evidenceUnsubscribe, auditUnsubscribe, approvalsUnsubscribe].forEach(unsubscribe => { if (typeof unsubscribe === 'function') unsubscribe(); });
+      evidenceUnsubscribe = null; auditUnsubscribe = null; approvalsUnsubscribe = null;
+    }
+
+    function renderEmptyConversation() {
+      renderEvidence([]); renderAudit([]); renderApprovals([]);
+    }
+
+    function attachConversationListeners() {
+      clearConversationListeners();
+      const scope = document.getElementById('conversation-scope');
+      if (!selectedSessionId) {
+        scope.textContent = 'Create a customer call link to start an isolated conversation. Account Deal State remains separate from customer-specific activity.';
+        renderEmptyConversation();
+        return;
+      }
+      const session = callSessions.find(value => value.sessionId === selectedSessionId);
+      const status = session?.status || 'CREATED';
+      const time = session?.startedAt || session?.createdAt;
+      scope.textContent = `Showing only Conversation ${callSessions.findIndex(value => value.sessionId === selectedSessionId) + 1} (${status})${time ? ` · started ${new Date(time).toLocaleString()}` : ''}. Evidence, approvals, and audit activity below belong only to this customer session.`;
+
+      evidenceUnsubscribe = db.collection('evidence')
+        .where('organizationId', '==', window.managerOrganizationId)
+        .where('dealId', '==', dealId)
+        .where('sessionId', '==', selectedSessionId)
+        .orderBy('timestamp', 'desc')
+        .limit(10)
+        .onSnapshot(snapshot => renderEvidence(snapshot.docs.map(d => d.data())));
+
+      auditUnsubscribe = db.collection('auditEvents')
+        .where('organizationId', '==', window.managerOrganizationId)
+        .where('dealId', '==', dealId)
+        .where('sessionId', '==', selectedSessionId)
+        .orderBy('timestamp', 'desc')
+        .limit(15)
+        .onSnapshot(snapshot => renderAudit(snapshot.docs.map(d => d.data())));
+
+      approvalsUnsubscribe = db.collection('approvals')
+        .where('organizationId', '==', window.managerOrganizationId)
+        .where('dealId', '==', dealId)
+        .where('sessionId', '==', selectedSessionId)
+        .where('status', '==', 'PENDING')
+        .onSnapshot(snapshot => renderApprovals(snapshot.docs.map(d => ({ id: d.id, ...d.data() }))));
+    }
+
+    async function selectConversation(sessionId) {
+      selectedSessionId = sessionId || null;
+      const result = await getDealCallSessions(dealId);
+      callSessions = Array.isArray(result.sessions) ? result.sessions : [];
+      if (!callSessions.some(session => session.sessionId === selectedSessionId)) selectedSessionId = callSessions[0]?.sessionId || null;
+      updateConversationUrl(); renderConversationPicker(); attachConversationListeners();
+    }
+
+    document.getElementById('conversation-session').addEventListener('change', event => selectConversation(event.currentTarget.value).catch(error => {
+      document.getElementById('conversation-scope').textContent = error.message || 'Customer conversations could not be loaded.';
+    }));
+
+    async function setupListeners() {
+      // Account state is intentionally shared; conversation evidence and activity are scoped below.
       dealUnsubscribe = db.collection('deals').doc(dealId)
         .onSnapshot(doc => {
           if (doc.exists) {
             renderDealState(doc.data());
           }
         });
-
-      // 2. Listen to Evidence
-      evidenceUnsubscribe = db.collection('evidence')
-        .where('organizationId', '==', window.managerOrganizationId)
-        .where('dealId', '==', dealId)
-        .orderBy('timestamp', 'desc')
-        .limit(10)
-        .onSnapshot(snapshot => {
-          renderEvidence(snapshot.docs.map(d => d.data()));
-        });
-
-      // 3. Listen to Audit Trail
-      auditUnsubscribe = db.collection('auditEvents')
-        .where('organizationId', '==', window.managerOrganizationId)
-        .where('dealId', '==', dealId)
-        .orderBy('timestamp', 'desc')
-        .limit(15)
-        .onSnapshot(snapshot => {
-          renderAudit(snapshot.docs.map(d => d.data()));
-        });
-
-      // 4. Listen to Approvals
-      approvalsUnsubscribe = db.collection('approvals')
-        .where('organizationId', '==', window.managerOrganizationId)
-        .where('dealId', '==', dealId)
-        .where('status', '==', 'PENDING')
-        .onSnapshot(snapshot => {
-          renderApprovals(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-        });
+      await selectConversation(selectedSessionId);
     }
 
     function renderDealState(data) {

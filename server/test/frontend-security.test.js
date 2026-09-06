@@ -107,3 +107,12 @@ test('the complete manager workspace has a real tablet and mobile layout instead
   assert.match(source, /class="hubspot-link-form"/);
   assert.match(source, /class="settings-profile-row"/);
 });
+
+test('manager workspace scopes customer conversation artifacts to one server-authorized call session', () => {
+  const dashboard = fs.readFileSync(path.join(publicRoot, 'dashboard.html'), 'utf8');
+  const client = fs.readFileSync(path.join(publicRoot, 'js', 'backendClient.js'), 'utf8');
+  assert.match(client, /\/manager\/deals\/\$\{encodeURIComponent\(dealId\)\}\/call-sessions/);
+  assert.match(dashboard, /id="conversation-session"/);
+  assert.match(dashboard, /where\('sessionId', '==', selectedSessionId\)/);
+  assert.match(dashboard, /Account state is intentionally shared; conversation evidence and activity are scoped below/);
+});

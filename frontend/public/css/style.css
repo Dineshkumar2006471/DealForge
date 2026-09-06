@@ -513,6 +513,8 @@ h1, h2, h3, h4, .headline-xl, .headline-lg, .headline-md {
   .topbar-left, .topbar-right { width:100%; min-width:0; flex-wrap:wrap; gap:8px; }
   .topbar-left { align-items:flex-start; }.topbar-right { justify-content:space-between; }
   .topbar-title { max-width:100%; font-size:14px; line-height:1.35; overflow-wrap:anywhere; }
+  .conversation-selector { width:100%; margin-left:0 !important; flex-wrap:wrap; }
+  .conversation-selector select { width:100% !important; }
   #btn-resume-call { margin-left:0!important; padding:8px 10px!important; font-size:10px!important; }
   #call-link-status { flex-basis:100%; max-width:100%; margin-left:0!important; overflow-wrap:anywhere; }
   .search-bar { width:auto; min-width:0; flex:1 1 180px; max-width:100%; }
