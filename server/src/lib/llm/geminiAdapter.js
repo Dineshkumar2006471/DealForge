@@ -49,40 +49,58 @@ function openaiToGeminiMessages(messages) {
   const systemInstruction = [];
   const contents = [];
 
-  for (const msg of messages) {
+  for (let index = 0; index < messages.length; index += 1) {
+    const msg = messages[index];
     if (msg.role === 'system') {
       systemInstruction.push({ text: msg.content });
     } else if (msg.role === 'user') {
       contents.push({ role: 'user', parts: [{ text: msg.content }] });
     } else if (msg.role === 'assistant') {
       if (msg.tool_calls) {
-        // Assistant requesting tool calls
+        // Gemini requires every functionResponse for one model function-call
+        // turn to be grouped in *one* following user message. The prior code
+        // emitted one user message per tool result, which Vertex rejected with
+        // HTTP 400 once a call had more than one tool action.
         const parts = msg.tool_calls.map(tc => ({
           functionCall: {
             name: tc.function.name,
-            args: JSON.parse(tc.function.arguments || '{}'),
+            args: parseToolArguments(tc.function.arguments),
           },
         }));
-        if (msg.content) parts.unshift({ text: msg.content });
         contents.push({ role: 'model', parts });
+
+        const responseParts = [];
+        while (messages[index + 1]?.role === 'tool') {
+          const toolResult = messages[index + 1];
+          responseParts.push({
+            functionResponse: {
+              name: toolResult.name || 'tool_result',
+              response: { result: parseToolResult(toolResult.content) },
+            },
+          });
+          index += 1;
+        }
+        if (responseParts.length) contents.push({ role: 'user', parts: responseParts });
       } else {
         contents.push({ role: 'model', parts: [{ text: msg.content || '' }] });
       }
     } else if (msg.role === 'tool') {
-      // Tool result → Gemini functionResponse
-      contents.push({
-        role: 'user',
-        parts: [{
-          functionResponse: {
-            name: msg.name || 'tool_result',
-            response: { result: msg.content },
-          },
-        }],
-      });
+      // A legacy orphaned tool result cannot be paired with a model turn. Do
+      // not send an invalid Gemini request; the verified result remains in
+      // Firestore/audit history but is excluded from model context.
+      continue;
     }
   }
 
   return { systemInstruction, contents };
+}
+
+function parseToolArguments(value) {
+  try { return JSON.parse(value || '{}'); } catch { return {}; }
+}
+
+function parseToolResult(value) {
+  try { return JSON.parse(value); } catch { return { value: String(value || '') }; }
 }
 
 /**
@@ -233,4 +251,5 @@ async function generateResponseSync(messages, tools = []) {
 module.exports = {
   generateResponse,
   generateResponseSync,
+  openaiToGeminiMessages,
 };

@@ -48,7 +48,10 @@ async function joinCall(appId, channel, token, uid) {
   console.log(`✅ Joined Agora channel: ${channel}`);
 
   // Create and publish local audio track (microphone)
-  localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+  // Keep the agent's remote voice from being recognized again as customer
+  // speech when speakers are in use. These are Agora's browser audio
+  // processing controls; headphones remain the clearest call setup.
+  localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({ AEC: true, ANS: true, AGC: true });
   await rtcClient.publish([localAudioTrack]);
   console.log('🎤 Published local audio track');
 

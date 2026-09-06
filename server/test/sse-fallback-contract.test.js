@@ -53,6 +53,18 @@ test('empty Agora lifecycle turns receive a silent terminal SSE completion', () 
   assert.equal(writes[1], 'data: [DONE]\n\n');
 });
 
+test('a terminal-only SSE response safely closes a stream after partial speech without another apology', () => {
+  const writes = [];
+  let ended = false;
+  writeNoopSseReply({ write: value => writes.push(value), end: () => { ended = true; } }, 'chatcmpl-partial');
+  assert.equal(ended, true);
+  assert.equal(writes.length, 2);
+  const terminal = JSON.parse(writes[0].replace(/^data: |\n\n$/g, ''));
+  assert.equal(terminal.choices[0].finish_reason, 'stop');
+  assert.equal(terminal.choices[0].delta.content, undefined);
+  assert.equal(writes[1], 'data: [DONE]\n\n');
+});
+
 test('normal replies declare that customer speech may interrupt them', () => {
   const writes = [];
   writeInterruptableMetadata({ write: value => writes.push(value) }, 'chatcmpl-turn', true);

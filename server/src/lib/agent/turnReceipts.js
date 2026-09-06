@@ -1,10 +1,20 @@
 const crypto = require('crypto');
 const { db, admin } = require('../firebase/admin');
 
-const DUPLICATE_WINDOW_MS = 15_000;
+// Agora can replay a finalized ASR turn after it has already started the
+// corresponding agent response. Keep the receipt long enough to cover a full
+// streamed answer, not merely a transport retry.
+const DUPLICATE_WINDOW_MS = 60_000;
 
 function normalizedTurn(text) {
-  return String(text || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US');
+  return String(text || '')
+    .normalize('NFKC')
+    .toLocaleLowerCase('en-US')
+    // ASR finalization often changes punctuation ("users" → "users."). It
+    // must not create a second customer turn or second spoken answer.
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
 }
 
 function receiptIdFor(text) {

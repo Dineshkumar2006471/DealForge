@@ -47,32 +47,60 @@ async function handleChatCompletion(requestBody, res, session) {
     }
   }
   const tools = getToolDefinitions(); history = await getHistory(session.sessionId);
-  let content = ''; let calls = []; let finishReason;
+  let content = ''; let calls = []; let finishReason; let hasSpokenContent = false;
   try {
     writeInterruptableMetadata(res, chatId, true);
+    // Buffer the first model pass. A tool-using pass is provisional: speaking
+    // it before verification can produce two answers for a single customer
+    // turn (the provisional answer, then the verified follow-up).
+    const initialTextChunks = [];
     for await (const chunk of generateResponse(await currentModelMessages(context), tools, context)) {
       const choice = chunk.choices?.[0]; if (!choice) continue;
-      if (choice.delta?.content) content += choice.delta.content;
+      if (choice.delta?.content) {
+        content += choice.delta.content;
+        initialTextChunks.push(chunk);
+      }
       if (choice.delta?.tool_calls) calls.push(...choice.delta.tool_calls.map(item => ({ id: item.id, type: item.type, function: { name: item.function.name, arguments: item.function.arguments || '{}' } })));
       if (choice.finish_reason) finishReason = choice.finish_reason;
-      if (!choice.delta?.tool_calls) res.write(`data: ${JSON.stringify(chunk)}\n\n`);
     }
     if (finishReason === 'tool_calls' && calls.length) {
-      await addMessage(session.sessionId, { role: 'assistant', tool_calls: calls, content: content || null });
+      // Do not retain or speak interim prose from a tool-calling pass. It was
+      // not an executed or verified answer.
+      content = '';
+      await addMessage(session.sessionId, { role: 'assistant', tool_calls: calls, content: null });
       for (const call of calls) {
         let args; try { args = JSON.parse(call.function.arguments || '{}'); } catch { args = {}; }
         const { result } = await executeTool(call.function.name, args, context);
         await addMessage(session.sessionId, { role: 'tool', tool_call_id: call.id, name: call.function.name, content: JSON.stringify(result) });
       }
-      for await (const chunk of generateResponse(await currentModelMessages(context), tools, context)) { res.write(`data: ${JSON.stringify(chunk)}\n\n`); if (chunk.choices?.[0]?.delta?.content) content += chunk.choices[0].delta.content; }
+      for await (const chunk of generateResponse(await currentModelMessages(context), tools, context)) {
+        const choice = chunk.choices?.[0];
+        if (choice?.delta?.tool_calls) throw new Error('Unexpected follow-up tool call after verified tool execution');
+        if (choice?.delta?.content) {
+          content += choice.delta.content;
+          hasSpokenContent = true;
+          res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+        }
+      }
+    } else {
+      for (const chunk of initialTextChunks) {
+        hasSpokenContent = true;
+        res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+      }
     }
     if (content) await addMessage(session.sessionId, { role: 'assistant', content });
     await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_RESPONSE_COMPLETED, trigger: 'Gemini response streamed to Agora', actionResult: { verified: true, hasContent: Boolean(content) } });
-    res.write('data: [DONE]\n\n'); res.end();
+    writeTerminalSseReply(res, chatId);
   } catch (error) {
     console.error('Agent runtime error:', error.message);
     await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_RESPONSE_FAILED, trigger: 'Gemini/runtime response failed', actionResult: { verified: false, error: String(error.message).slice(0, 200) } }).catch(() => {});
-    if (!res.writableEnded) writeSafeFallback(res, chatId);
+    if (!res.writableEnded) {
+      // Never append a spoken apology after a customer has already received
+      // part of an answer. That is the source of repeated/conflicting agent
+      // speech during provider stream failures.
+      if (hasSpokenContent) writeTerminalSseReply(res, chatId);
+      else writeSafeFallback(res, chatId);
+    }
   }
 }
 
@@ -124,6 +152,10 @@ function writeSseReply(res, chatId, content) {
 }
 
 function writeNoopSseReply(res, chatId) {
+  writeTerminalSseReply(res, chatId);
+}
+
+function writeTerminalSseReply(res, chatId) {
   res.write(`data: ${JSON.stringify({
     id: chatId,
     object: 'chat.completion.chunk',
