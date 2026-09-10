@@ -7,6 +7,7 @@
 
 let rtcClient = null;
 let localAudioTrack = null;
+let micActivityLogged = false;
 
 /**
  * Join an Agora channel and publish microphone audio.
@@ -14,7 +15,18 @@ let localAudioTrack = null;
 async function acquireLocalTrack() {
   if (!window.AgoraRTC) return null;
   if (!localAudioTrack) {
-    localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({ AEC: true, ANS: true, AGC: true });
+    try {
+      localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({ AEC: true, ANS: true, AGC: true });
+      console.log('[MIC_PERMISSION_GRANTED] Browser microphone permission granted.');
+      console.log('[MIC_TRACK_CREATED] Local microphone track created.');
+      if (localAudioTrack && typeof localAudioTrack.setVolume === 'function') {
+        localAudioTrack.setVolume(100);
+      }
+      console.log('[MIC_TRACK_ENABLED]', localAudioTrack.enabled);
+    } catch (err) {
+      console.error('[MIC_PERMISSION_DENIED] Microphone access failed:', err.name || err.code || err.message);
+      throw err;
+    }
   }
   return localAudioTrack;
 }
@@ -29,6 +41,7 @@ async function joinCall(appId, channel, token, uid, preAcquiredTrack = null) {
   }
 
   rtcClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+  micActivityLogged = false;
 
   // Set up event listeners before joining
   rtcClient.on('user-published', async (user, mediaType) => {
@@ -64,19 +77,35 @@ async function joinCall(appId, channel, token, uid, preAcquiredTrack = null) {
   if (preAcquiredTrack) {
     localAudioTrack = preAcquiredTrack;
   } else if (!localAudioTrack) {
-    localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({ AEC: true, ANS: true, AGC: true });
+    try {
+      localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({ AEC: true, ANS: true, AGC: true });
+      console.log('[MIC_PERMISSION_GRANTED] Browser microphone permission granted during join.');
+      console.log('[MIC_TRACK_CREATED] Local microphone track created.');
+    } catch (err) {
+      console.error('[MIC_PERMISSION_DENIED] Microphone track creation failed during join:', err);
+      throw new Error('Microphone access is unavailable. Please grant microphone permission in your browser.');
+    }
+  }
+  if (!localAudioTrack) {
+    throw new Error('Microphone access is unavailable. Please grant microphone permission in your browser.');
   }
   if (localAudioTrack && typeof localAudioTrack.setVolume === 'function') {
     localAudioTrack.setVolume(100);
   }
+  console.log('[MIC_TRACK_ENABLED]', localAudioTrack.enabled);
+
   await rtcClient.publish([localAudioTrack]);
-  console.log('🎤 Published local audio track');
+  console.log('[MIC_TRACK_PUBLISHED] Local audio track published to channel:', channel, { enabled: localAudioTrack.enabled, muted: localAudioTrack.muted });
 
   try {
     rtcClient.enableAudioVolumeIndicator();
     rtcClient.on('volume-indicator', volumes => {
       volumes.forEach(v => {
         if (v.uid === 0 || v.uid === uid) {
+          if (v.level > 10 && !micActivityLogged) {
+            micActivityLogged = true;
+            console.log('[MIC_AUDIO_ACTIVITY_DETECTED] Local microphone activity detected:', v.level);
+          }
           window.dispatchEvent(new CustomEvent('agora:local-volume', { detail: { level: v.level } }));
         }
       });
@@ -118,6 +147,7 @@ function toggleMute() {
 
   const isMuted = !localAudioTrack.enabled;
   localAudioTrack.setEnabled(isMuted);
+  console.log('[MIC_TRACK_ENABLED]', localAudioTrack.enabled);
   return !isMuted; // Return new mute state (true = muted)
 }
 

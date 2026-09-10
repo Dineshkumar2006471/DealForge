@@ -2,7 +2,7 @@
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="referrer" content="no-referrer"><title>Live AI Call — DealForge</title><link rel="icon" href="/favicon.png"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/css/style.css?v=2"></head>
 <body class="page-call">
   <main class="call-container"><div class="call-header"><h1 class="call-title">Live AI Negotiation</h1><div class="call-status" id="status-text" role="status">Ready to connect</div><p style="color:var(--mute);font-size:13px;max-width:420px;margin:12px auto 0;line-height:1.5">When you start, your browser will request microphone access. This link is single-use and may expire. Text transcript retained for 30 days; audio is not recorded.</p></div>
-    <div class="orb-container"><div class="wave"></div><div class="wave"></div><div class="wave"></div><div class="orb-inner"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.8)" stroke-width="1.5"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg></div></div>
+    <div class="orb-container state-idle" id="call-orb"><div class="wave"></div><div class="wave"></div><div class="wave"></div><div class="orb-inner"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.8)" stroke-width="1.5"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg></div></div>
     <div class="call-controls"><button class="btn-control" id="btn-mute" aria-label="Mute Microphone" disabled>Mute</button><button class="btn-primary btn-start-call" id="btn-call">Start AI Sales Call</button></div>
     <p id="call-hint" style="color:var(--mute);min-height:1.5em;text-align:center;font-size:13px" aria-live="polite">After the agent connects, start with: “We have 300 users.”</p>
     <p id="call-error" style="color:var(--red);min-height:1.5em;text-align:center" aria-live="polite"></p>
@@ -40,8 +40,10 @@
     let renewalTimer = null;
     let captionsUnsubscribe = null;
     let captionsPollingTimer = null;
-    let micVolumeTimer = null;
-    let isAgentSpeaking = false;
+    const orbElement = document.getElementById('call-orb');
+    function setOrbState(state) {
+      if (orbElement) orbElement.className = `orb-container state-${state}`;
+    }
 
     async function cleanup() {
       if (renewalTimer) clearTimeout(renewalTimer); renewalTimer = null;
@@ -50,9 +52,9 @@
       if (captionsPollingTimer) { clearInterval(captionsPollingTimer); captionsPollingTimer = null; }
       if (meetingRequestUnsubscribe) { meetingRequestUnsubscribe(); meetingRequestUnsubscribe = null; }
       if (meetingRequestPollingTimer) { clearInterval(meetingRequestPollingTimer); meetingRequestPollingTimer = null; }
-      if (micVolumeTimer) { clearInterval(micVolumeTimer); micVolumeTimer = null; }
       isAgentSpeaking = false;
-      try { await leaveCall(); } finally { muteButton.disabled = true; active = false; call = null; waves.forEach(w => w.style.animationPlayState = 'paused'); }
+      setOrbState('idle');
+      try { await leaveCall(); } finally { muteButton.disabled = true; active = false; call = null; }
     }
     function scheduleRenewal(expiresAt) {
       const wait = new Date(expiresAt).getTime() - Date.now() - 120000;
@@ -224,88 +226,93 @@
     async function start() {
       if (!linkToken) { errorText.textContent = 'This call link is missing or invalid.'; setStatus('Call unavailable', 'var(--red)'); return; }
       let startupFailed = false;
-      callButton.disabled = true; errorText.textContent = ''; setStatus('Connecting…');
+      callButton.disabled = true; errorText.textContent = ''; setStatus('Requesting microphone permission…');
       try {
-        // Pre-acquire microphone directly inside the click event turn to preserve
-        // iOS Safari user activation and prevent silent audio capture
-        const micPromise = acquireLocalTrack().catch(err => {
-          console.warn('Microphone pre-acquisition note:', err.message || err);
-          return null;
-        });
+        // 1. Explicitly acquire local microphone track inside the user gesture
+        let localTrack = null;
+        try {
+          localTrack = await acquireLocalTrack();
+          if (!localTrack) throw new Error('Microphone access is unavailable.');
+        } catch (micErr) {
+          console.error('[MIC_ERROR]', micErr);
+          throw new Error('Microphone access is unavailable.');
+        }
 
+        setStatus('Microphone ready — connecting…');
         const credentials = await joinCustomerCall(linkToken);
         call = credentials;
-        const localTrack = await micPromise;
         
-        // Connect to Agora with pre-acquired track
+        // 2. Connect to Agora with pre-acquired track
+        setStatus('Joining secure audio channel…');
         await joinCall(credentials.appId, credentials.channel, credentials.token, credentials.uid, localTrack);
         
-        // Begin observing remote audio before the server is allowed to request
-        // speech; a fast first audio publication must not be discarded.
-        active = true; muteButton.disabled = false; setButton('End Call', false); setStatus('Connected — requesting agent greeting', 'var(--amber)'); hintText.textContent = 'Preparing the spoken greeting…'; scheduleRenewal(credentials.expiresAt); armAgentAudioTimeout();
+        // 3. Set call active and begin listening/observing
+        active = true;
+        muteButton.disabled = false;
+        setButton('End Call', false);
+        setStatus('Connected — requesting agent greeting', 'var(--amber)');
+        hintText.textContent = 'Preparing the spoken greeting…';
+        setOrbState('processing');
+        scheduleRenewal(credentials.expiresAt);
+        armAgentAudioTimeout();
         startCaptionFallback();
         startMeetingRequestFallback();
 
-        // Monitor local microphone volume to give instant visual feedback
+        // Monitor local microphone volume to drive audio-reactive animation
         let userSpeakingTimeout = null;
         window.addEventListener('agora:local-volume', (e) => {
-          if (!active) return;
+          if (!active || isAgentSpeaking) return;
           const level = e.detail?.level || 0;
-          if (level > 8 && !isAgentSpeaking) {
-            hintText.textContent = 'Listening to your voice… 🎙️';
-            hintText.style.color = 'var(--green)';
-            waves.forEach(w => {
-              w.style.animationPlayState = 'running';
-              w.style.borderColor = 'rgba(46, 213, 115, 0.6)';
-            });
+          if (level > 8) {
+            setOrbState('customer-speaking');
             if (userSpeakingTimeout) clearTimeout(userSpeakingTimeout);
             userSpeakingTimeout = setTimeout(() => {
               if (!isAgentSpeaking && active) {
-                hintText.textContent = 'You are live. Tell the agent about your team, timeline, or pricing needs.';
-                hintText.style.color = 'var(--mute)';
-                waves.forEach(w => {
-                  w.style.animationPlayState = 'paused';
-                  w.style.borderColor = '';
-                });
+                setOrbState('idle');
               }
-            }, 1000);
+            }, 800);
           }
         });
 
-        // The server starts the agent before issuing RTC credentials. Request the
-        // greeting only after this browser has joined and published its microphone
-        // so the greeting cannot be spoken into an empty channel.
+        // 4. Request the greeting only after RTC is published
         await api(`/public/calls/${encodeURIComponent(linkToken)}/ready`, { method: 'POST', body: JSON.stringify({ sessionCredential: call.sessionCredential }) });
-        setStatus('Connected — waiting for agent audio', 'var(--amber)'); hintText.textContent = 'Wait for the spoken greeting before you begin. Then tell the agent about your team, timeline, or pricing needs.';
-      } catch (error) { startupFailed = true; if (call?.sessionCredential) await api(`/public/calls/${encodeURIComponent(linkToken)}/fail`, { method: 'POST', body: JSON.stringify({ sessionCredential: call.sessionCredential }) }).catch(() => {}); await cleanup(); errorText.textContent = error.message || 'Unable to start the call. Ask your manager for a new link.'; setStatus('Connection failed', 'var(--red)'); setButton('Request a new link', false); callButton.disabled = true; }
+        setStatus('Connected — waiting for agent audio', 'var(--amber)');
+        hintText.textContent = 'Wait for the spoken greeting before you begin. Then tell the agent about your team, timeline, or pricing needs.';
+      } catch (error) {
+        startupFailed = true;
+        if (call?.sessionCredential) {
+          await api(`/public/calls/${encodeURIComponent(linkToken)}/fail`, { method: 'POST', body: JSON.stringify({ sessionCredential: call.sessionCredential }) }).catch(() => {});
+        }
+        await cleanup();
+        const isMicError = error.message && error.message.toLowerCase().includes('microphone');
+        errorText.textContent = isMicError ? 'Microphone access is unavailable.' : (error.message || 'Unable to start the call. Ask your manager for a new link.');
+        setStatus(isMicError ? 'Microphone access is unavailable' : 'Connection failed', 'var(--red)');
+        setButton(isMicError ? 'Retry with Microphone' : 'Request a new link', false);
+        callButton.disabled = !isMicError;
+      }
       finally { if (!startupFailed) callButton.disabled = false; }
     }
     async function end() { callButton.disabled = true; setStatus('Disconnecting…'); try { const result = await api(`/public/calls/${encodeURIComponent(linkToken)}/stop`, { method: 'POST', body: JSON.stringify({ sessionCredential: call.sessionCredential }) }); await cleanup(); setButton('Call ended', false); callButton.disabled = true; setStatus(result.agentStopped ? 'Call ended' : 'Disconnected — agent cleanup pending', result.agentStopped ? undefined : 'var(--amber)'); } catch (error) { errorText.textContent = error.message || 'Unable to confirm call termination.'; setStatus('Termination needs attention', 'var(--red)'); callButton.disabled = false; } }
     callButton.addEventListener('click', () => active ? end() : start());
-    muteButton.addEventListener('click', () => { const muted = toggleMute(); muteButton.textContent = muted ? 'Unmute' : 'Mute'; });
+    muteButton.addEventListener('click', () => {
+      const muted = toggleMute();
+      muteButton.textContent = muted ? 'Unmute' : 'Mute';
+      setOrbState(muted ? 'muted' : (isAgentSpeaking ? 'agent-speaking' : 'idle'));
+    });
     window.addEventListener('agora:agent-speaking', () => {
       isAgentSpeaking = true;
-      hintText.textContent = 'DealForge is speaking… 🔊';
-      hintText.style.color = 'var(--amber)';
-      waves.forEach(w => {
-        w.style.animationPlayState = 'running';
-        w.style.borderColor = 'rgba(247, 165, 1, 0.6)';
-      });
+      setOrbState('agent-speaking');
     });
     window.addEventListener('agora:agent-stopped-speaking', () => {
       isAgentSpeaking = false;
-      hintText.textContent = 'You are live. Tell the agent about your team, timeline, or pricing needs.';
-      hintText.style.color = 'var(--mute)';
-      waves.forEach(w => {
-        w.style.animationPlayState = 'paused';
-        w.style.borderColor = '';
-      });
+      setOrbState('idle');
     });
     window.addEventListener('agora:agent-audio-playing', () => {
       if (!active || agentAudioObserved) return;
       agentAudioObserved = true; if (agentAudioTimer) clearTimeout(agentAudioTimer); agentAudioTimer = null;
       recordAudioActivity('AGENT_AUDIO_PUBLISHED'); recordAudioActivity('CUSTOMER_AUDIO_PLAYBACK_STARTED');
       setStatus('Agent audio live', 'var(--green)'); hintText.textContent = 'You are live. Tell the agent about your team, timeline, or pricing needs.';
+      setOrbState('idle');
     });
     window.addEventListener('agora:agent-audio-failed', async () => {
       if (!active) return;

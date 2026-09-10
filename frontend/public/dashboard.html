@@ -216,14 +216,24 @@
         <div class="bento-card">
           <div class="bento-header">
             <h3>Discount Ledger</h3>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+          </div>
+          <div id="discount-ledger">
+            <p style="color: var(--mute); font-size: 13px;">No discount negotiations recorded.</p>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
 
-  <!-- Auth Integration -->
+  <!-- Firebase & Core Client Libraries -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="/__/firebase/init.js"></script>
   <script src="/js/firebaseConfig.js"></script>
   <script src="/js/auth.js"></script>
   <script src="/js/runtimeConfig.js"></script>
-  <script src="/js/backendClient.js"></script>
+  <script src="/js/backendClient.js?v=3"></script>
 
   <script>
     const db = getFirestore();
@@ -337,7 +347,7 @@
       // customer. The parent account listener remains available for account
       // identity, but never supplies conversation values.
       const sessionStateUnsubscribe = db.collection('callSessions').doc(selectedSessionId).collection('state').doc('current')
-        .onSnapshot(snapshot => { if (snapshot.exists) renderDealState(snapshot.data()); });
+        .onSnapshot(snapshot => { if (snapshot.exists) renderDealState(snapshot.data()); }, err => console.warn('Session state listen note:', err.message));
       const previousStateUnsubscribe = window.__dealforgeSessionStateUnsubscribe;
       if (typeof previousStateUnsubscribe === 'function') previousStateUnsubscribe();
       window.__dealforgeSessionStateUnsubscribe = sessionStateUnsubscribe;
@@ -348,7 +358,7 @@
         .where('sessionId', '==', selectedSessionId)
         .orderBy('timestamp', 'desc')
         .limit(10)
-        .onSnapshot(snapshot => renderEvidence(snapshot.docs.map(d => d.data())));
+        .onSnapshot(snapshot => renderEvidence(snapshot.docs.map(d => d.data())), err => console.warn('Evidence listen note:', err.message));
 
       auditUnsubscribe = db.collection('auditEvents')
         .where('organizationId', '==', window.managerOrganizationId)
@@ -356,26 +366,31 @@
         .where('sessionId', '==', selectedSessionId)
         .orderBy('timestamp', 'desc')
         .limit(15)
-        .onSnapshot(snapshot => renderAudit(snapshot.docs.map(d => d.data())));
+        .onSnapshot(snapshot => renderAudit(snapshot.docs.map(d => d.data())), err => console.warn('Audit listen note:', err.message));
 
       approvalsUnsubscribe = db.collection('approvals')
         .where('organizationId', '==', window.managerOrganizationId)
         .where('dealId', '==', dealId)
         .where('sessionId', '==', selectedSessionId)
         .where('status', '==', 'PENDING')
-        .onSnapshot(snapshot => renderApprovals(snapshot.docs.map(d => ({ id: d.id, ...d.data() }))));
+        .onSnapshot(snapshot => renderApprovals(snapshot.docs.map(d => ({ id: d.id, ...d.data() }))), err => console.warn('Approvals listen note:', err.message));
     }
 
     async function selectConversation(sessionId) {
       selectedSessionId = sessionId || null;
-      const result = await getDealCallSessions(dealId);
-      callSessions = Array.isArray(result.sessions) ? result.sessions : [];
-      if (!callSessions.some(session => session.sessionId === selectedSessionId)) selectedSessionId = callSessions[0]?.sessionId || null;
-      updateConversationUrl(); renderConversationPicker(); attachConversationListeners();
+      try {
+        const result = await getDealCallSessions(dealId);
+        callSessions = Array.isArray(result.sessions) ? result.sessions : [];
+        if (!callSessions.some(session => session.sessionId === selectedSessionId)) selectedSessionId = callSessions[0]?.sessionId || null;
+        updateConversationUrl(); renderConversationPicker(); attachConversationListeners();
+      } catch (error) {
+        console.error('Customer conversations load error:', error);
+        document.getElementById('conversation-scope').textContent = 'Unable to load deal data. Retry.';
+      }
     }
 
     document.getElementById('conversation-session').addEventListener('change', event => selectConversation(event.currentTarget.value).catch(error => {
-      document.getElementById('conversation-scope').textContent = error.message || 'Customer conversations could not be loaded.';
+      document.getElementById('conversation-scope').textContent = error.message || 'Unable to load deal data. Retry.';
     }));
 
     async function setupListeners() {
@@ -383,10 +398,17 @@
       dealUnsubscribe = db.collection('deals').doc(dealId)
         .onSnapshot(doc => {
           if (doc.exists) {
-            const company = doc.data().company?.value || 'Unknown';
+            const company = doc.data().company?.value || doc.data().name || 'Unknown';
             document.getElementById('deal-company').textContent = company;
             document.getElementById('workspace-account-label').textContent = company;
+          } else {
+            document.getElementById('deal-company').textContent = 'Unable to load deal data. Retry.';
+            document.getElementById('workspace-account-label').textContent = 'Deal not found';
           }
+        }, err => {
+          console.error('Deal listen error:', err);
+          document.getElementById('deal-company').textContent = 'Unable to load deal data. Retry.';
+          document.getElementById('workspace-account-label').textContent = 'Unable to load deal data. Retry.';
         });
       await selectConversation(selectedSessionId);
     }
@@ -401,54 +423,6 @@
       probability.innerText = Number.isFinite(confidence) && confidence >= 0 && confidence <= 1 ? `${Math.round(confidence * 100)}%` : '—';
       probability.style.color = Number.isFinite(confidence) ? 'var(--green)' : 'var(--mute)';
       document.getElementById('deal-action').innerText = data.nextBestAction?.reason || 'No recommendations.';
-      const plan = document.getElementById('autonomy-plan');
-      const action = data.nextBestAction || {};
-      const authority = document.getElementById('action-authority');
-      authority.textContent = action.authority || 'OBSERVE';
-      authority.style.color = action.authority === 'ACT' ? 'var(--green)' : action.authority === 'APPROVAL' ? 'var(--amber)' : 'var(--mute)';
-      plan.replaceChildren(node('strong', action.action ? action.action.replace(/_/g, ' ') : 'No action proposed'), document.createElement('br'), node('span', action.expectedOutcome || action.reason || 'Awaiting verified deal state.'));
-
-      // --- MEDDIC ---
-      if (data.meddic) {
-        const grid = document.getElementById('meddic-grid');
-        let confirmedCount = 0;
-        const meddicNodes = [];
-        const pillars = [
-          { key: 'metrics', label: 'Metrics' },
-          { key: 'economicBuyer', label: 'Economic Buyer' },
-          { key: 'decisionCriteria', label: 'Decision Criteria' },
-          { key: 'decisionProcess', label: 'Decision Process' },
-          { key: 'identifyPain', label: 'Identify Pain' },
-          { key: 'champion', label: 'Champion' }
-        ];
-
-        pillars.forEach(p => {
-          const item = data.meddic[p.key];
-          const isConfirmed = item?.status === 'confirmed';
-          if (isConfirmed) confirmedCount++;
-          const fillClass = isConfirmed ? 'success' : '';
-          const blocks = isConfirmed ? '[██████████]' : '[███░░░░░░░]';
-          const score = isConfirmed ? '100%' : ' 30%';
-
-          const row = node('div', undefined, { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px dashed var(--hairline)', paddingBottom: '8px' });
-          const bar = node('div'); bar.className = `viz-mono-bar ${fillClass}`;
-          const track = node('span', blocks); track.className = 'track';
-          const fill = node('span', score); fill.className = 'fill';
-          bar.append(track, fill);
-          row.append(node('span', p.label, { fontFamily: 'var(--font-mono)', fontSize: '12px', textTransform: 'uppercase' }), bar);
-          meddicNodes.push(row);
-        });
-        grid.replaceChildren(...meddicNodes);
-        document.getElementById('meddic-score').innerText = `${confirmedCount}/6`;
-      }
-
-      // --- Deal State Fields ---
-      const stateFields = document.getElementById('deal-state-fields');
-      const fields = [
-        { key: 'company', label: 'Company' },
-        { key: 'teamSize', label: 'Team Size' },
-        { key: 'timeline', label: 'Timeline' },
-        { key: 'budget', label: 'Budget' },
       const plan = document.getElementById('autonomy-plan');
       const action = data.nextBestAction || {};
       const authority = document.getElementById('action-authority');
