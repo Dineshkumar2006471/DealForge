@@ -14,3 +14,5 @@ server/playwright-report/
 server/blob-report/
 node_modules/
 frontend/public/node_modules/
+test-results/
+*.wav

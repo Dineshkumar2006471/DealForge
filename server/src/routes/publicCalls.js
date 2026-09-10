@@ -1,5 +1,5 @@
 const express = require('express');
-const { redeemLink, rtcCredentials, webhookTokenFor, findSessionByHash, endSession, sessionRef } = require('../lib/calls/callSessions');
+const { redeemLink, consumeLink, restoreForRetry, rtcCredentials, webhookTokenFor, findSessionByHash, endSession, sessionRef } = require('../lib/calls/callSessions');
 const { startAgent, speakAgent } = require('../lib/calls/agoraAgentService');
 const { parse, sessionCredentialSchema, callActivitySchema, meetingDetailsSchema, meetingBookingSchema } = require('../lib/schema/validation');
 const { writeAuditEvent } = require('../lib/audit/eventStore');
@@ -18,7 +18,18 @@ router.post('/calls/:linkToken/join', joinRateLimit, async (req, res, next) => {
     const { session, refreshToken } = await redeemLink(req.params.linkToken);
     const doc = await require('../lib/calls/callSessions').sessionRef(session.sessionId).get();
     const stored = doc.data();
-    const agentId = await startAgent(stored, webhookTokenFor(stored.sessionId));
+    let agentId;
+    try {
+      agentId = await startAgent(stored, webhookTokenFor(stored.sessionId));
+    } catch (startError) {
+      // Agent startup failed — restore the session so the customer can retry
+      // the same link. restoreForRetry only acts if hashedLinkToken is intact.
+      await restoreForRetry(stored.sessionId).catch(() => {});
+      throw startError;
+    }
+    // Agent is running and session is ACTIVE. Consume the link token so the
+    // same URL cannot start a second agent.
+    await consumeLink(stored.sessionId);
     const activeDoc = await require('../lib/calls/callSessions').sessionRef(stored.sessionId).get();
     const activeSession = activeDoc.data();
     const credentials = rtcCredentials(activeSession);
@@ -133,4 +144,80 @@ router.post('/calls/:linkToken/activity', async (req, res, next) => {
     res.status(202).json({ status: 'RECORDED' });
   } catch (error) { next(error); }
 });
+router.post('/tts/sarvam', async (req, res, next) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const expectedSecret = process.env.INTERNAL_API_KEY;
+    if (expectedSecret && (!authHeader || authHeader !== `Bearer ${expectedSecret}`)) {
+      return res.status(401).json({
+        error: { message: 'Unauthorized', type: 'authentication_error', code: 'invalid_token' }
+      });
+    }
+
+    const { input, voice, speed } = req.body; // OpenAI TTS payload from Agora generic_http
+    if (!input) {
+      return res.status(400).json({
+        error: { message: 'Missing input text', type: 'invalid_request_error', code: 'missing_parameter' }
+      });
+    }
+
+    const sarvamApiKey = process.env.SARVAM_API_KEY;
+    if (!sarvamApiKey) {
+      return res.status(503).json({
+        error: { message: 'Sarvam API key not configured', type: 'server_error', code: 'service_unavailable' }
+      });
+    }
+
+    // Agora generic_http requires raw PCM (linear16) output.
+    // Default speaker is Ishita (en-IN) using Bulbul v3.
+    const sarvamPayload = {
+      text: input,
+      model: process.env.SARVAM_MODEL || 'bulbul:v3',
+      language_code: process.env.SARVAM_LANGUAGE || 'en-IN',
+      speaker: voice || process.env.SARVAM_SPEAKER || 'ishita',
+      pace: typeof speed === 'number' ? speed : 1.0,
+      output_audio_codec: 'linear16' // Returns pure 16-bit linear PCM without RIFF/WAV header
+    };
+
+    const start = Date.now();
+    const response = await fetch('https://api.sarvam.ai/text-to-speech', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-subscription-key': sarvamApiKey
+      },
+      body: JSON.stringify(sarvamPayload)
+    });
+    const latency = Date.now() - start;
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Sarvam TTS API failed:', response.status, errorText);
+      return res.status(502).json({
+        error: { message: 'Upstream TTS provider failed', type: 'upstream_error', code: response.status }
+      });
+    }
+
+    const data = await response.json();
+    if (!data.audios || data.audios.length === 0) {
+      return res.status(502).json({
+        error: { message: 'No audio returned by TTS provider', type: 'upstream_error', code: 'empty_audio' }
+      });
+    }
+
+    const audioBuffer = Buffer.from(data.audios[0], 'base64');
+    console.info('Sarvam TTS OK', { speaker: sarvamPayload.speaker, latency, audioBytes: audioBuffer.length });
+    // Agora Conversational AI generic_http expects audio/pcm stream
+    res.setHeader('Content-Type', 'audio/pcm');
+    res.setHeader('Content-Length', audioBuffer.length);
+    res.status(200).send(audioBuffer);
+  } catch (error) {
+    console.error('Sarvam proxy unhandled exception:', error);
+    res.status(500).json({
+      error: { message: 'Internal TTS proxy error', type: 'server_error', code: 'internal_error' }
+    });
+  }
+});
+
+
 module.exports = router;

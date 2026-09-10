@@ -123,7 +123,7 @@
       const sessionsSnap = await db.collection('callSessions').where('organizationId', '==', window.managerOrganizationId).get();
       const negotiations = await Promise.all(sessionsSnap.docs.map(async doc => {
         const session = doc.data();
-        const stateDoc = await db.collection('callSessions').doc(session.sessionId).collection('state').doc('current').get();
+        const stateDoc = await db.collection('callSessions').doc(session.sessionId).collection('state').doc('current').get().catch(() => ({ exists: false, data: () => ({}) }));
         return { session, state: stateDoc.exists ? stateDoc.data() : {} };
       }));
       let totalArr = 0, activeCount = 0, wonCount = 0;

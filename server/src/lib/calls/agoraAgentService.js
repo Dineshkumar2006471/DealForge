@@ -8,6 +8,39 @@ const { EVENT_TYPES } = require('../audit/eventTypes');
 const BASE = 'https://api.agora.io/api/conversational-ai-agent/v2/projects';
 
 function ttsConfig() {
+  const provider = process.env.TTS_PROVIDER || 'elevenlabs';
+  
+  if (provider === 'sarvam') {
+    if (!process.env.SARVAM_API_KEY) {
+      throw new HttpError(503, 'Sarvam TTS configuration is incomplete');
+    }
+    // The DealForge TTS proxy at /api/public/tts/sarvam translates between
+    // Agora's OpenAI TTS protocol and Sarvam's native REST API.
+    // Conforms strictly to Agora generic_http schema: requires url, headers.Authorization
+    // (or params.api_key), and params with response_format='pcm'.
+    const cloudRunUrl = process.env.CLOUD_RUN_URL;
+    if (!cloudRunUrl) throw new HttpError(503, 'CLOUD_RUN_URL is required for Sarvam TTS proxy');
+    const internalSecret = process.env.INTERNAL_API_KEY || 'dealforge-internal-key';
+    return {
+      vendor: 'generic_http',
+      url: `${cloudRunUrl}/api/public/tts/sarvam`,
+      headers: {
+        Authorization: `Bearer ${internalSecret}`
+      },
+      params: {
+        model: process.env.SARVAM_MODEL || 'bulbul:v3',
+        voice: process.env.SARVAM_SPEAKER || 'ishita',
+        speed: 1.0,
+        sample_rate: 16000,
+        response_format: 'pcm'
+      }
+    };
+  }
+
+  if (provider === 'microsoft') {
+    return { vendor: 'microsoft', params: { voice_name: 'en-US-JennyNeural' } };
+  }
+
   const {
     ELEVENLABS_API_KEY: key,
     ELEVENLABS_VOICE_ID: voiceId,
@@ -17,10 +50,14 @@ function ttsConfig() {
   } = process.env;
   const sampleRate = Number(rawSampleRate);
   const validSampleRates = new Set([16000, 22050, 24000, 44100]);
-  if (!key || !voiceId || !modelId || !baseUrl || !validSampleRates.has(sampleRate)) {
+  // Agora's ElevenLabs adapter streams speech over WebSocket. Accepting an
+  // https URL here lets Agora start the agent but prevents it from ever
+  // publishing a remote audio track, which is indistinguishable to a caller
+  // from a silent agent.
+  if (!key || !voiceId || !modelId || !baseUrl || !baseUrl.startsWith('wss://') || !validSampleRates.has(sampleRate)) {
     throw new HttpError(503, 'ElevenLabs TTS configuration is incomplete');
   }
-  return { key, voiceId, modelId, baseUrl, sampleRate };
+  return { vendor: 'elevenlabs', params: { base_url: baseUrl, key, model_id: modelId, voice_id: voiceId, sample_rate: sampleRate } };
 }
 
 function credentials() {
@@ -37,12 +74,23 @@ function buildAgentStartPayload(session, webhookToken, nowSeconds = Math.floor(D
   const agentUid = 1000;
   const token = RtcTokenBuilder.buildTokenWithUid(config.appId, config.certificate, session.opaqueAgoraChannel, agentUid, RtcRole.PUBLISHER, expiry);
   return { config, payload: { name: `dealforge-${session.sessionId}`, properties: {
-    channel: session.opaqueAgoraChannel, token, agent_rtc_uid: String(agentUid), remote_rtc_uids: ['*'],
-    asr: { language: 'en-US', vendor: 'deepgram' },
-    llm: { url: `${config.baseUrl}/chat/completions/${webhookToken}`, api_key: process.env.AGORA_LLM_WEBHOOK_SECRET, system_messages: [], params: { model: 'dealforge-sales-agent' } },
-    // Agora's documented ElevenLabs REST contract requires every field below.
+    channel: session.opaqueAgoraChannel, token, agent_rtc_uid: String(agentUid),
+    // Conversational AI v2 supports one subscribed customer UID. A wildcard
+    // is not a reliable subscription target and can leave the agent detached
+    // from the customer's audio stream.
+    remote_rtc_uids: [String(session.customerUid)],
+    asr: {
+      credential_mode: 'managed',
+      vendor: 'deepgram',
+      params: {
+        url: 'wss://api.deepgram.com/v1/listen',
+        model: 'nova-3',
+        language: 'en'
+      }
+    },
+    llm: { credential_mode: 'byok', vendor: 'custom', style: 'openai', url: `${config.baseUrl}/chat/completions/${webhookToken}`, api_key: process.env.AGORA_LLM_WEBHOOK_SECRET, system_messages: [], params: { model: 'dealforge-sales-agent' } },
     // This object is sent only from Cloud Run to Agora and is never logged or returned.
-    tts: { vendor: 'elevenlabs', params: { base_url: config.tts.baseUrl, key: config.tts.key, model_id: config.tts.modelId, voice_id: config.tts.voiceId, sample_rate: config.tts.sampleRate } },
+    tts: config.tts,
   }}};
 }
 
@@ -58,6 +106,7 @@ async function startAgent(session, webhookToken) {
     if (!response.ok) throw new HttpError(502, `Agora agent start failed: ${data.message || response.status}`);
     agentId = data.agent_id || data.id;
     if (!agentId) throw new HttpError(502, 'Agora did not return an agent ID');
+    console.info('Agora agent accepted', { sessionId: session.sessionId, agentId, customerUid: session.customerUid, ttsVendor: payload.properties.tts.vendor, ttsSampleRate: payload.properties.tts.params.sample_rate });
     await markActive(session.sessionId, agentId);
     await writeAuditEvent({ organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, eventType: EVENT_TYPES.AGENT_STARTED, trigger: 'Agora agent started', actionResult: { agentId, verified: true } });
     return agentId;

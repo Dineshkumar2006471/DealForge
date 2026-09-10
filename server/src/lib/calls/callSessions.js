@@ -79,19 +79,55 @@ async function redeemLink(linkToken) {
     if (!snapshot.exists) throw new HttpError(404, 'Call session not found');
     const session = snapshot.data();
     assertCallable(session);
-    if (session.joinedAt) throw new HttpError(409, 'This call link has already been used');
+    if (session.status === 'JOINING') throw new HttpError(409, 'A join attempt is already in progress');
+    if (session.status === 'ACTIVE') throw new HttpError(409, 'This call is already active');
+    // Mark JOINING but KEEP hashedLinkToken so the customer can retry if
+    // agent startup fails downstream. The link is only consumed after the
+    // agent has been verified as running (see consumeLink).
     transaction.update(found.ref, {
       status: 'JOINING',
       joinedAt: now(),
-      // A link is a single-use bearer credential. The browser receives a separate
-      // short-lived-in-practice session credential for token renewal and cleanup.
-      hashedLinkToken: null,
       hashedRefreshToken: hash(refreshToken),
     });
   });
   const refreshed = await found.ref.get();
   return { ref: found.ref, session: refreshed.data(), refreshToken };
 }
+
+async function consumeLink(sessionId) {
+  const ref = sessionRef(sessionId);
+  await db.runTransaction(async tx => {
+    const snapshot = await tx.get(ref);
+    if (!snapshot.exists) return;
+    if (snapshot.data().status !== 'ACTIVE') return;
+    // The agent is running — the link is now spent. Nullifying the link
+    // token prevents a second browser from joining the same call while
+    // preserving the session credential for token renewal.
+    tx.update(ref, { hashedLinkToken: null });
+  });
+}
+
+async function restoreForRetry(sessionId) {
+  const ref = sessionRef(sessionId);
+  await db.runTransaction(async tx => {
+    const snapshot = await tx.get(ref);
+    if (!snapshot.exists) return;
+    const session = snapshot.data();
+    // Only reset sessions that are still in JOINING or freshly FAILED.
+    // An ACTIVE session must not be reverted. A session whose link token
+    // was already consumed cannot be restored (that should never happen
+    // because consumeLink only runs after ACTIVE).
+    if (!['JOINING', 'FAILED'].includes(session.status)) return;
+    if (!session.hashedLinkToken) return; // Link already consumed — no retry possible
+    tx.update(ref, {
+      status: 'CREATED',
+      joinedAt: null,
+      hashedRefreshToken: null,
+      failureReason: null,
+    });
+  });
+}
+
 
 function rtcCredentials(session) {
   assertActiveSession(session);
@@ -139,4 +175,4 @@ async function markFailed(sessionId, reason) {
 async function endSession(sessionId) { await sessionRef(sessionId).update({ status: 'ENDED', endedAt: now() }); }
 async function revokeSession(sessionId) { await sessionRef(sessionId).update({ status: 'REVOKED', revokedAt: now(), endedAt: now() }); }
 
-module.exports = { createCallSession, redeemLink, rtcCredentials, getWebhookSession, markActive, markFailed, endSession, revokeSession, sessionRef, sessionStateRef, findSessionByHash, assertActiveSession, hash, webhookTokenFor };
+module.exports = { createCallSession, redeemLink, consumeLink, restoreForRetry, rtcCredentials, getWebhookSession, markActive, markFailed, endSession, revokeSession, sessionRef, sessionStateRef, findSessionByHash, assertActiveSession, hash, webhookTokenFor };

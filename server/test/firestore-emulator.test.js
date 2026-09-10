@@ -15,5 +15,7 @@ test('emulator enforces anonymous denial, organization isolation, and browser wr
   const manager = env.authenticatedContext('manager-a', { role: 'manager', organizationId: 'org-a' }).firestore();
   await assertSucceeds(manager.collection('deals').doc('deal-a').get());
   await assertFails(manager.collection('deals').doc('deal-b').get());
+  await assertSucceeds(manager.collection('deals').where('organizationId', '==', 'org-a').get());
+  await assertSucceeds(manager.collection('callSessions').where('organizationId', '==', 'org-a').get());
   await assertFails(manager.collection('deals').doc('deal-a').update({ status: 'CLOSED_WON' }));
 });

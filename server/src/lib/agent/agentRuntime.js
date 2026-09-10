@@ -81,6 +81,7 @@ async function handleChatCompletion(requestBody, res, session) {
       if (choice.delta?.tool_calls) calls.push(...choice.delta.tool_calls.map(item => ({ id: item.id, type: item.type, function: { name: item.function.name, arguments: item.function.arguments || '{}' } })));
       if (choice.finish_reason) finishReason = choice.finish_reason;
     }
+    const MAX_TOOL_ROUNDS = 3;
     if (finishReason === 'tool_calls' && calls.length) {
       // Do not retain or speak interim prose from a tool-calling pass. It was
       // not an executed or verified answer.
@@ -91,13 +92,44 @@ async function handleChatCompletion(requestBody, res, session) {
         const { result } = await executeTool(call.function.name, args, context);
         await addMessage(session.sessionId, { role: 'tool', tool_call_id: call.id, name: call.function.name, content: JSON.stringify(result) });
       }
-      for await (const chunk of generateResponse(await currentModelMessages(context), tools, context)) {
-        const choice = chunk.choices?.[0];
-        if (choice?.delta?.tool_calls) throw new Error('Unexpected follow-up tool call after verified tool execution');
-        if (choice?.delta?.content) {
-          content += choice.delta.content;
-          hasSpokenContent = true;
-          res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+      // Bounded iterative loop: allow the LLM to emit further tool calls up
+      // to MAX_TOOL_ROUNDS total. Each round validates, executes, persists
+      // tool results, and returns them to the model for the next pass.
+      for (let round = 1; round < MAX_TOOL_ROUNDS; round++) {
+        let followUpCalls = []; let followUpContent = ''; let followUpFinish;
+        for await (const chunk of generateResponse(await currentModelMessages(context), tools, context)) {
+          const choice = chunk.choices?.[0]; if (!choice) continue;
+          if (choice.delta?.tool_calls) followUpCalls.push(...choice.delta.tool_calls.map(item => ({ id: item.id, type: item.type, function: { name: item.function.name, arguments: item.function.arguments || '{}' } })));
+          if (choice.delta?.content) followUpContent += choice.delta.content;
+          if (choice.finish_reason) followUpFinish = choice.finish_reason;
+        }
+        if (followUpFinish !== 'tool_calls' || !followUpCalls.length) {
+          // Model returned final text — stream it to the customer
+          content = followUpContent;
+          if (content) {
+            hasSpokenContent = true;
+            res.write(`data: ${JSON.stringify({ id: chatId, object: 'chat.completion.chunk', choices: [{ index: 0, delta: { role: 'assistant', content }, finish_reason: null }] })}\n\n`);
+          }
+          break;
+        }
+        // Another tool round — execute and persist
+        await addMessage(session.sessionId, { role: 'assistant', tool_calls: followUpCalls, content: null });
+        for (const call of followUpCalls) {
+          let args; try { args = JSON.parse(call.function.arguments || '{}'); } catch { args = {}; }
+          const { result } = await executeTool(call.function.name, args, context);
+          await addMessage(session.sessionId, { role: 'tool', tool_call_id: call.id, name: call.function.name, content: JSON.stringify(result) });
+        }
+      }
+      // If we exhausted all rounds without a final text, generate one last
+      // text-only pass with tools suppressed.
+      if (!content) {
+        for await (const chunk of generateResponse(await currentModelMessages(context), [], context)) {
+          const choice = chunk.choices?.[0];
+          if (choice?.delta?.content) {
+            content += choice.delta.content;
+            hasSpokenContent = true;
+            res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+          }
         }
       }
     } else {

@@ -84,14 +84,14 @@
       if (messages.length > 0) status.style.display = 'none';
       
       const nodes = messages
-        .filter(m => ['customer', 'assistant'].includes(m.role))
+        .filter(m => ['user', 'assistant'].includes(m.role))
         .map(m => {
           const div = document.createElement('div');
           div.style.padding = '8px';
           div.style.borderRadius = '8px';
-          div.style.background = m.role === 'customer' ? 'var(--surface)' : 'rgba(247, 165, 1, 0.1)';
+          div.style.background = m.role === 'user' ? 'var(--surface)' : 'rgba(247, 165, 1, 0.1)';
           div.style.border = m.role === 'assistant' ? '1px solid rgba(247, 165, 1, 0.2)' : '1px solid var(--hairline)';
-          div.style.marginLeft = m.role === 'customer' ? 'auto' : '0';
+          div.style.marginLeft = m.role === 'user' ? 'auto' : '0';
           div.style.marginRight = m.role === 'assistant' ? 'auto' : '0';
           div.style.maxWidth = '85%';
           
