@@ -83,10 +83,11 @@ function buildAgentStartPayload(session, webhookToken, nowSeconds = Math.floor(D
     asr: {
       credential_mode: 'managed',
       vendor: 'deepgram',
+      language: 'en-US',
       params: {
         url: 'wss://api.deepgram.com/v1/listen',
         model: 'nova-3',
-        language: 'en'
+        language: 'en-US'
       }
     },
     llm: { credential_mode: 'byok', vendor: 'custom', style: 'openai', url: `${config.baseUrl}/chat/completions/${webhookToken}`, api_key: process.env.AGORA_LLM_WEBHOOK_SECRET, system_messages: [], params: { model: 'dealforge-sales-agent' } },

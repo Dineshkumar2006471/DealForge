@@ -28,9 +28,9 @@
   </main>
 
   <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.20.2.js"></script>
-  <script src="/js/runtimeConfig.js?v=2"></script>
-  <script src="/js/backendClient.js?v=2"></script>
-  <script src="/js/agoraClient.js?v=2"></script>
+  <script src="/js/runtimeConfig.js?v=3"></script>
+  <script src="/js/backendClient.js?v=3"></script>
+  <script src="/js/agoraClient.js?v=3"></script>
   <script>
     const linkToken = new URLSearchParams(location.search).get('link');
     const callButton = document.getElementById('btn-call'), muteButton = document.getElementById('btn-mute'), status = document.getElementById('status-text'), errorText = document.getElementById('call-error'), hintText = document.getElementById('call-hint');
@@ -247,17 +247,30 @@
         startMeetingRequestFallback();
 
         // Monitor local microphone volume to give instant visual feedback
-        micVolumeTimer = setInterval(() => {
+        let userSpeakingTimeout = null;
+        window.addEventListener('agora:local-volume', (e) => {
           if (!active) return;
-          const vol = getLocalVolume();
-          if (!isAgentSpeaking) {
-            if (vol > 0.02) {
-              waves.forEach(w => w.style.animationPlayState = 'running');
-            } else {
-              waves.forEach(w => w.style.animationPlayState = 'paused');
-            }
+          const level = e.detail?.level || 0;
+          if (level > 8 && !isAgentSpeaking) {
+            hintText.textContent = 'Listening to your voice… 🎙️';
+            hintText.style.color = 'var(--green)';
+            waves.forEach(w => {
+              w.style.animationPlayState = 'running';
+              w.style.borderColor = 'rgba(46, 213, 115, 0.6)';
+            });
+            if (userSpeakingTimeout) clearTimeout(userSpeakingTimeout);
+            userSpeakingTimeout = setTimeout(() => {
+              if (!isAgentSpeaking && active) {
+                hintText.textContent = 'You are live. Tell the agent about your team, timeline, or pricing needs.';
+                hintText.style.color = 'var(--mute)';
+                waves.forEach(w => {
+                  w.style.animationPlayState = 'paused';
+                  w.style.borderColor = '';
+                });
+              }
+            }, 1000);
           }
-        }, 150);
+        });
 
         // The server starts the agent before issuing RTC credentials. Request the
         // greeting only after this browser has joined and published its microphone
@@ -270,8 +283,24 @@
     async function end() { callButton.disabled = true; setStatus('Disconnecting…'); try { const result = await api(`/public/calls/${encodeURIComponent(linkToken)}/stop`, { method: 'POST', body: JSON.stringify({ sessionCredential: call.sessionCredential }) }); await cleanup(); setButton('Call ended', false); callButton.disabled = true; setStatus(result.agentStopped ? 'Call ended' : 'Disconnected — agent cleanup pending', result.agentStopped ? undefined : 'var(--amber)'); } catch (error) { errorText.textContent = error.message || 'Unable to confirm call termination.'; setStatus('Termination needs attention', 'var(--red)'); callButton.disabled = false; } }
     callButton.addEventListener('click', () => active ? end() : start());
     muteButton.addEventListener('click', () => { const muted = toggleMute(); muteButton.textContent = muted ? 'Unmute' : 'Mute'; });
-    window.addEventListener('agora:agent-speaking', () => { isAgentSpeaking = true; waves.forEach(w => w.style.animationPlayState = 'running'); });
-    window.addEventListener('agora:agent-stopped-speaking', () => { isAgentSpeaking = false; waves.forEach(w => w.style.animationPlayState = 'paused'); });
+    window.addEventListener('agora:agent-speaking', () => {
+      isAgentSpeaking = true;
+      hintText.textContent = 'DealForge is speaking… 🔊';
+      hintText.style.color = 'var(--amber)';
+      waves.forEach(w => {
+        w.style.animationPlayState = 'running';
+        w.style.borderColor = 'rgba(247, 165, 1, 0.6)';
+      });
+    });
+    window.addEventListener('agora:agent-stopped-speaking', () => {
+      isAgentSpeaking = false;
+      hintText.textContent = 'You are live. Tell the agent about your team, timeline, or pricing needs.';
+      hintText.style.color = 'var(--mute)';
+      waves.forEach(w => {
+        w.style.animationPlayState = 'paused';
+        w.style.borderColor = '';
+      });
+    });
     window.addEventListener('agora:agent-audio-playing', () => {
       if (!active || agentAudioObserved) return;
       agentAudioObserved = true; if (agentAudioTimer) clearTimeout(agentAudioTimer); agentAudioTimer = null;

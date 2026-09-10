@@ -66,8 +66,24 @@ async function joinCall(appId, channel, token, uid, preAcquiredTrack = null) {
   } else if (!localAudioTrack) {
     localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({ AEC: true, ANS: true, AGC: true });
   }
+  if (localAudioTrack && typeof localAudioTrack.setVolume === 'function') {
+    localAudioTrack.setVolume(100);
+  }
   await rtcClient.publish([localAudioTrack]);
   console.log('🎤 Published local audio track');
+
+  try {
+    rtcClient.enableAudioVolumeIndicator();
+    rtcClient.on('volume-indicator', volumes => {
+      volumes.forEach(v => {
+        if (v.uid === 0 || v.uid === uid) {
+          window.dispatchEvent(new CustomEvent('agora:local-volume', { detail: { level: v.level } }));
+        }
+      });
+    });
+  } catch (volErr) {
+    console.warn('Volume indicator setup note:', volErr);
+  }
 
   return { client: rtcClient, localAudioTrack };
 }

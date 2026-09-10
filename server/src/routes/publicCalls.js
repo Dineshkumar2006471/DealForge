@@ -82,7 +82,9 @@ router.post('/calls/:linkToken/ready', async (req, res, next) => {
       }
     });
     if (shouldSpeak) {
-      await speakAgent(session, "Hello, I'm the DealForge sales assistant. I'm ready to help with your team, timeline, or pricing needs.", { priority: 'INTERRUPT', interruptable: false });
+      const greeting = "Hello, I'm the DealForge sales assistant. I'm ready to help with your team, timeline, or pricing needs.";
+      await addMessage(session.sessionId, { role: 'assistant', content: greeting });
+      await speakAgent(session, greeting, { priority: 'INTERRUPT', interruptable: false });
       await writeAuditEvent({ organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, eventType: EVENT_TYPES.AGENT_GREETING_REQUESTED, trigger: 'Customer RTC ready; Agora greeting requested', actionResult: { accepted: true } });
     }
     res.status(202).json({ status: shouldSpeak ? 'GREETING_REQUESTED' : 'ALREADY_READY' });
