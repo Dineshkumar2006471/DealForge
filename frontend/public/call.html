@@ -34,7 +34,7 @@
   <script>
     const linkToken = new URLSearchParams(location.search).get('link');
     const callButton = document.getElementById('btn-call'), muteButton = document.getElementById('btn-mute'), status = document.getElementById('status-text'), errorText = document.getElementById('call-error'), hintText = document.getElementById('call-hint');
-    const waves = document.querySelectorAll('.wave'); let call = null; let active = false; let agentAudioTimer = null; let agentAudioObserved = false; let meetingRequestUnsubscribe = null; let meetingRequestPollingTimer = null; let meetingRequestId = null;
+    const waves = document.querySelectorAll('.wave'); let call = null; let active = false; let isAgentSpeaking = false; let agentAudioTimer = null; let agentAudioObserved = false; let meetingRequestUnsubscribe = null; let meetingRequestPollingTimer = null; let meetingRequestId = null;
     function setStatus(text, color) { status.textContent = text; status.style.color = color || 'var(--gray-400)'; }
     function setButton(text, primary) { callButton.textContent = text; callButton.classList.toggle('btn-primary', primary); callButton.classList.toggle('btn-secondary', !primary); }
     let renewalTimer = null;

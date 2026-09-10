@@ -16,11 +16,16 @@ async function acquireLocalTrack() {
   if (!window.AgoraRTC) return null;
   if (!localAudioTrack) {
     try {
-      localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({ AEC: true, ANS: true, AGC: true });
+      localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({
+        encoderConfig: 'speech_standard',
+        AEC: true,
+        ANS: false,
+        AGC: true
+      });
       console.log('[MIC_PERMISSION_GRANTED] Browser microphone permission granted.');
-      console.log('[MIC_TRACK_CREATED] Local microphone track created.');
+      console.log('[MIC_TRACK_CREATED] Local microphone track created (speech_standard).');
       if (localAudioTrack && typeof localAudioTrack.setVolume === 'function') {
-        localAudioTrack.setVolume(100);
+        localAudioTrack.setVolume(200);
       }
       console.log('[MIC_TRACK_ENABLED]', localAudioTrack.enabled);
     } catch (err) {
@@ -78,9 +83,14 @@ async function joinCall(appId, channel, token, uid, preAcquiredTrack = null) {
     localAudioTrack = preAcquiredTrack;
   } else if (!localAudioTrack) {
     try {
-      localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({ AEC: true, ANS: true, AGC: true });
+      localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({
+        encoderConfig: 'speech_standard',
+        AEC: true,
+        ANS: false,
+        AGC: true
+      });
       console.log('[MIC_PERMISSION_GRANTED] Browser microphone permission granted during join.');
-      console.log('[MIC_TRACK_CREATED] Local microphone track created.');
+      console.log('[MIC_TRACK_CREATED] Local microphone track created (speech_standard).');
     } catch (err) {
       console.error('[MIC_PERMISSION_DENIED] Microphone track creation failed during join:', err);
       throw new Error('Microphone access is unavailable. Please grant microphone permission in your browser.');
@@ -90,7 +100,7 @@ async function joinCall(appId, channel, token, uid, preAcquiredTrack = null) {
     throw new Error('Microphone access is unavailable. Please grant microphone permission in your browser.');
   }
   if (localAudioTrack && typeof localAudioTrack.setVolume === 'function') {
-    localAudioTrack.setVolume(100);
+    localAudioTrack.setVolume(200);
   }
   console.log('[MIC_TRACK_ENABLED]', localAudioTrack.enabled);
 
