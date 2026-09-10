@@ -78,17 +78,11 @@ function buildAgentStartPayload(session, webhookToken, nowSeconds = Math.floor(D
     // Conversational AI v2 supports one subscribed customer UID. A wildcard
     // is not a reliable subscription target and can leave the agent detached
     // from the customer's audio stream.
-    remote_rtc_uids: [String(session.customerUid)],
+    remote_rtc_uids: ['*'],
     idle_timeout: 120,
     asr: {
-      credential_mode: 'managed',
-      vendor: 'deepgram',
       language: 'en-US',
-      params: {
-        url: 'wss://api.deepgram.com/v1/listen',
-        model: 'nova-3',
-        language: 'en-US'
-      }
+      vendor: 'deepgram'
     },
     llm: { credential_mode: 'byok', vendor: 'custom', style: 'openai', url: `${config.baseUrl}/chat/completions/${webhookToken}`, api_key: process.env.AGORA_LLM_WEBHOOK_SECRET, system_messages: [], params: { model: 'dealforge-sales-agent' } },
     // This object is sent only from Cloud Run to Agora and is never logged or returned.
