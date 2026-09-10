@@ -40,6 +40,8 @@
     let renewalTimer = null;
     let captionsUnsubscribe = null;
     let captionsPollingTimer = null;
+    let micVolumeTimer = null;
+    let isAgentSpeaking = false;
 
     async function cleanup() {
       if (renewalTimer) clearTimeout(renewalTimer); renewalTimer = null;
@@ -48,6 +50,8 @@
       if (captionsPollingTimer) { clearInterval(captionsPollingTimer); captionsPollingTimer = null; }
       if (meetingRequestUnsubscribe) { meetingRequestUnsubscribe(); meetingRequestUnsubscribe = null; }
       if (meetingRequestPollingTimer) { clearInterval(meetingRequestPollingTimer); meetingRequestPollingTimer = null; }
+      if (micVolumeTimer) { clearInterval(micVolumeTimer); micVolumeTimer = null; }
+      isAgentSpeaking = false;
       try { await leaveCall(); } finally { muteButton.disabled = true; active = false; call = null; waves.forEach(w => w.style.animationPlayState = 'paused'); }
     }
     function scheduleRenewal(expiresAt) {
@@ -122,19 +126,21 @@
         const response = await getCustomerTranscript(linkToken, call.sessionCredential);
         renderCaptions(response.messages || []);
       } catch (error) {
-        // Do not interrupt an otherwise healthy call for a caption refresh
-        // failure. Make the condition visible rather than leaving a blank panel.
         const captionStatus = document.getElementById('captions-status');
         captionStatus.style.display = 'block';
-        captionStatus.textContent = 'Live transcript is reconnecting…';
-        console.warn('Caption refresh failed:', error.message || error);
+        if (error.message && error.message.includes('429')) {
+          captionStatus.textContent = 'Live transcript updating…';
+        } else {
+          captionStatus.textContent = 'Live transcript is reconnecting…';
+          console.warn('Caption refresh failed:', error.message || error);
+        }
       }
     }
 
     function startCaptionFallback() {
       if (captionsPollingTimer) clearInterval(captionsPollingTimer);
       pollCaptions();
-      captionsPollingTimer = setInterval(pollCaptions, 1500);
+      captionsPollingTimer = setInterval(pollCaptions, 2500);
     }
 
     async function pollMeetingRequest() {
@@ -143,16 +149,16 @@
         const response = await getCustomerMeetingRequest(linkToken, call.sessionCredential);
         if (response.request) renderMeetingRequest(response.request);
       } catch (error) {
-        // A scheduling form is optional until the customer asks for a meeting;
-        // do not disrupt audio for a transient background refresh failure.
-        console.warn('Meeting request refresh failed:', error.message || error);
+        if (!error.message || !error.message.includes('429')) {
+          console.warn('Meeting request refresh failed:', error.message || error);
+        }
       }
     }
 
     function startMeetingRequestFallback() {
       if (meetingRequestPollingTimer) clearInterval(meetingRequestPollingTimer);
       pollMeetingRequest();
-      meetingRequestPollingTimer = setInterval(pollMeetingRequest, 1500);
+      meetingRequestPollingTimer = setInterval(pollMeetingRequest, 4000);
     }
 
     function localDateTomorrow() { const value = new Date(); value.setDate(value.getDate() + 1); return value.toISOString().slice(0, 10); }
@@ -220,20 +226,39 @@
       let startupFailed = false;
       callButton.disabled = true; errorText.textContent = ''; setStatus('Connecting…');
       try {
+        // Pre-acquire microphone directly inside the click event turn to preserve
+        // iOS Safari user activation and prevent silent audio capture
+        const micPromise = acquireLocalTrack().catch(err => {
+          console.warn('Microphone pre-acquisition note:', err.message || err);
+          return null;
+        });
+
         const credentials = await joinCustomerCall(linkToken);
         call = credentials;
+        const localTrack = await micPromise;
         
-        // Customer pages intentionally do not sign in to Firebase. Signing in
-        // with a temporary customer credential on this same Hosting origin would
-        // replace the manager's session in another tab. Captions and secure
-        // meeting requests use the server-issued call credential instead.
-        // Connect to Agora.
-        await joinCall(credentials.appId, credentials.channel, credentials.token, credentials.uid);
+        // Connect to Agora with pre-acquired track
+        await joinCall(credentials.appId, credentials.channel, credentials.token, credentials.uid, localTrack);
+        
         // Begin observing remote audio before the server is allowed to request
         // speech; a fast first audio publication must not be discarded.
         active = true; muteButton.disabled = false; setButton('End Call', false); setStatus('Connected — requesting agent greeting', 'var(--amber)'); hintText.textContent = 'Preparing the spoken greeting…'; scheduleRenewal(credentials.expiresAt); armAgentAudioTimeout();
         startCaptionFallback();
         startMeetingRequestFallback();
+
+        // Monitor local microphone volume to give instant visual feedback
+        micVolumeTimer = setInterval(() => {
+          if (!active) return;
+          const vol = getLocalVolume();
+          if (!isAgentSpeaking) {
+            if (vol > 0.02) {
+              waves.forEach(w => w.style.animationPlayState = 'running');
+            } else {
+              waves.forEach(w => w.style.animationPlayState = 'paused');
+            }
+          }
+        }, 150);
+
         // The server starts the agent before issuing RTC credentials. Request the
         // greeting only after this browser has joined and published its microphone
         // so the greeting cannot be spoken into an empty channel.
@@ -245,8 +270,8 @@
     async function end() { callButton.disabled = true; setStatus('Disconnecting…'); try { const result = await api(`/public/calls/${encodeURIComponent(linkToken)}/stop`, { method: 'POST', body: JSON.stringify({ sessionCredential: call.sessionCredential }) }); await cleanup(); setButton('Call ended', false); callButton.disabled = true; setStatus(result.agentStopped ? 'Call ended' : 'Disconnected — agent cleanup pending', result.agentStopped ? undefined : 'var(--amber)'); } catch (error) { errorText.textContent = error.message || 'Unable to confirm call termination.'; setStatus('Termination needs attention', 'var(--red)'); callButton.disabled = false; } }
     callButton.addEventListener('click', () => active ? end() : start());
     muteButton.addEventListener('click', () => { const muted = toggleMute(); muteButton.textContent = muted ? 'Unmute' : 'Mute'; });
-    window.addEventListener('agora:agent-speaking', () => waves.forEach(w => w.style.animationPlayState = 'running'));
-    window.addEventListener('agora:agent-stopped-speaking', () => waves.forEach(w => w.style.animationPlayState = 'paused'));
+    window.addEventListener('agora:agent-speaking', () => { isAgentSpeaking = true; waves.forEach(w => w.style.animationPlayState = 'running'); });
+    window.addEventListener('agora:agent-stopped-speaking', () => { isAgentSpeaking = false; waves.forEach(w => w.style.animationPlayState = 'paused'); });
     window.addEventListener('agora:agent-audio-playing', () => {
       if (!active || agentAudioObserved) return;
       agentAudioObserved = true; if (agentAudioTimer) clearTimeout(agentAudioTimer); agentAudioTimer = null;

@@ -79,6 +79,7 @@ function buildAgentStartPayload(session, webhookToken, nowSeconds = Math.floor(D
     // is not a reliable subscription target and can leave the agent detached
     // from the customer's audio stream.
     remote_rtc_uids: [String(session.customerUid)],
+    idle_timeout: 120,
     asr: {
       credential_mode: 'managed',
       vendor: 'deepgram',

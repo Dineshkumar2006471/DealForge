@@ -11,7 +11,19 @@ let localAudioTrack = null;
 /**
  * Join an Agora channel and publish microphone audio.
  */
-async function joinCall(appId, channel, token, uid) {
+async function acquireLocalTrack() {
+  if (!window.AgoraRTC) return null;
+  if (!localAudioTrack) {
+    localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({ AEC: true, ANS: true, AGC: true });
+  }
+  return localAudioTrack;
+}
+
+function getLocalVolume() {
+  return localAudioTrack ? localAudioTrack.getVolumeLevel() : 0;
+}
+
+async function joinCall(appId, channel, token, uid, preAcquiredTrack = null) {
   if (!window.AgoraRTC) {
     throw new Error('Agora RTC SDK not loaded');
   }
@@ -48,10 +60,12 @@ async function joinCall(appId, channel, token, uid) {
   console.log(`✅ Joined Agora channel: ${channel}`);
 
   // Create and publish local audio track (microphone)
-  // Keep the agent's remote voice from being recognized again as customer
-  // speech when speakers are in use. These are Agora's browser audio
-  // processing controls; headphones remain the clearest call setup.
-  localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({ AEC: true, ANS: true, AGC: true });
+  // Use pre-acquired track if available (critical for mobile Safari user-activation)
+  if (preAcquiredTrack) {
+    localAudioTrack = preAcquiredTrack;
+  } else if (!localAudioTrack) {
+    localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({ AEC: true, ANS: true, AGC: true });
+  }
   await rtcClient.publish([localAudioTrack]);
   console.log('🎤 Published local audio track');
 

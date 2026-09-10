@@ -97,6 +97,7 @@ test('Sarvam TTS adapter returns audio/pcm with linear16 audio buffer', async ()
   assert.equal(sentPayload.text, 'Welcome to DealForge');
   assert.equal(sentPayload.speaker, 'ishita');
   assert.equal(sentPayload.pace, 1.2);
+  assert.equal(sentPayload.speech_sample_rate, 16000);
   assert.equal(sentPayload.output_audio_codec, 'linear16');
   assert.deepEqual(res.body, samplePcm);
 });

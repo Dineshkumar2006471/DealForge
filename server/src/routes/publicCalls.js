@@ -154,7 +154,7 @@ router.post('/tts/sarvam', async (req, res, next) => {
       });
     }
 
-    const { input, voice, speed } = req.body; // OpenAI TTS payload from Agora generic_http
+    const { input, voice, speed, sample_rate } = req.body; // OpenAI TTS payload from Agora generic_http
     if (!input) {
       return res.status(400).json({
         error: { message: 'Missing input text', type: 'invalid_request_error', code: 'missing_parameter' }
@@ -170,12 +170,15 @@ router.post('/tts/sarvam', async (req, res, next) => {
 
     // Agora generic_http requires raw PCM (linear16) output.
     // Default speaker is Ishita (en-IN) using Bulbul v3.
+    // Explicitly set speech_sample_rate to match Agora's playback sample rate (16000).
+    const requestedSampleRate = typeof sample_rate === 'number' ? sample_rate : 16000;
     const sarvamPayload = {
       text: input,
       model: process.env.SARVAM_MODEL || 'bulbul:v3',
       language_code: process.env.SARVAM_LANGUAGE || 'en-IN',
       speaker: voice || process.env.SARVAM_SPEAKER || 'ishita',
       pace: typeof speed === 'number' ? speed : 1.0,
+      speech_sample_rate: requestedSampleRate,
       output_audio_codec: 'linear16' // Returns pure 16-bit linear PCM without RIFF/WAV header
     };
 

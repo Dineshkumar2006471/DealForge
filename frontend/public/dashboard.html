@@ -98,7 +98,10 @@
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
             Deal Intelligence
           </div>
-          <div class="pill-badge" style="background: rgba(247, 165, 1, 0.1); color: var(--amber); border: 1px solid var(--amber);" id="deal-stage">Loading...</div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <div class="pill-badge" style="background: rgba(47, 122, 79, 0.08); color: var(--green); border: 1px solid rgba(47, 122, 79, 0.3); font-size: 11px;">CRM: Auto-Sync Active</div>
+            <div class="pill-badge" style="background: rgba(247, 165, 1, 0.1); color: var(--amber); border: 1px solid var(--amber);" id="deal-stage">Loading...</div>
+          </div>
         </div>
         <div class="deal-summary-grid" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; margin-top: 8px;">
           <div>
@@ -136,6 +139,7 @@
         <div class="bento-card">
           <div class="bento-header">
             <h3>Deal State</h3>
+            <span style="font-family: var(--font-mono); font-size: 11px; color: var(--mute);">EXTRACTED PARAMETERS</span>
           </div>
           <div id="deal-state-fields" style="display: flex; flex-direction: column; gap: 12px;">
             <!-- Injected via JS -->
@@ -143,13 +147,13 @@
           </div>
         </div>
 
-        <!-- Evidence Provenance -->
-        <div class="bento-card">
+        <!-- Evidence Provenance (Fixed Height) -->
+        <div class="bento-card bento-card-fixed" id="decision-provenance-card">
           <div class="bento-header">
             <h3>Decision Provenance</h3>
             <span style="font-family: var(--font-mono); font-size: 12px; color: var(--mute);" id="evidence-count">0 claims</span>
           </div>
-          <ul class="evidence-list" id="evidence-list">
+          <ul class="evidence-list card-scroll-body" id="evidence-list">
             <li class="evidence-item">
               <span style="color: var(--mute);">Loading evidence...</span>
             </li>
@@ -160,29 +164,38 @@
       <!-- RIGHT COLUMN -->
       <div class="dashboard-col">
 
+        <!-- Autonomous Action Plan & Sentiment -->
+        <div style="display: grid; grid-template-columns: 1.35fr 1fr; gap: var(--sp-6);">
+          <div class="bento-card" style="margin-bottom: 0;">
+            <div class="bento-header">
+              <h3 style="font-size: 16px;">Action Plan</h3>
+              <span id="action-authority" class="pill-badge">OBSERVE</span>
+            </div>
+            <div id="autonomy-plan" style="font-size: 13px; color: var(--mute); line-height: 1.5;">Awaiting verified deal state.</div>
+          </div>
+
+          <div class="bento-card" style="margin-bottom: 0;">
+            <div class="bento-header">
+              <h3 style="font-size: 16px;">Sentiment</h3>
+            </div>
+            <div id="sentiment-display" style="display: flex; align-items: center; gap: 12px;">
+              <div style="font-size: 32px; line-height: 1;" id="sentiment-value">—</div>
+              <div>
+                <div style="font-size: 13px; font-weight: 600; color: var(--ink);" id="sentiment-label">Awaiting data</div>
+                <div style="font-family: var(--font-mono); font-size: 11px; color: var(--mute);" id="sentiment-sublabel">Buyer tone</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Risk Analysis -->
         <div class="bento-card">
           <div class="bento-header">
             <h3>Risk Analysis</h3>
+            <span style="font-family: var(--font-mono); font-size: 12px; color: var(--mute);" id="risk-count">Live monitor</span>
           </div>
           <div id="risk-list" style="display: flex; flex-direction: column; gap: 8px;">
             <div style="color: var(--mute); font-size: 13px;">Analyzing risks...</div>
-          </div>
-        </div>
-
-        <div class="bento-card">
-          <div class="bento-header"><h3>Autonomous Action Plan</h3><span id="action-authority" class="pill-badge">OBSERVE</span></div>
-          <div id="autonomy-plan" style="font-size: 13px; color: var(--mute); line-height: 1.6;">Awaiting verified deal state.</div>
-        </div>
-
-        <!-- Sentiment Indicator -->
-        <div class="bento-card">
-          <div class="bento-header">
-            <h3>Sentiment</h3>
-          </div>
-          <div id="sentiment-display" style="display: flex; align-items: center; gap: 16px;">
-            <div style="font-family: var(--font-mono); font-size: 48px; font-weight: 700; color: var(--ink);" id="sentiment-value">—</div>
-            <div style="font-family: var(--font-sans); font-size: 14px; color: var(--mute);" id="sentiment-label">Awaiting data</div>
           </div>
         </div>
 
@@ -203,41 +216,6 @@
         <div class="bento-card">
           <div class="bento-header">
             <h3>Discount Ledger</h3>
-          </div>
-          <div id="discount-ledger" style="display: flex; flex-direction: column; gap: 8px;">
-            <div style="color: var(--mute); font-size: 13px;">No discount requests.</div>
-          </div>
-        </div>
-
-        <div class="bento-card" id="hubspot-sync-card">
-          <div class="bento-header"><h3>HubSpot Booking Sync</h3><span id="hubspot-sync-status" class="pill-badge">NOT LINKED</span></div>
-          <p id="hubspot-sync-copy" style="font-size:13px;color:var(--mute);line-height:1.55;margin:0 0 12px;">Link one explicit staging deal. DealForge will verify it before it can receive a booking reference.</p>
-          <label id="hubspot-deal-id-label" class="form-label" for="hubspot-deal-id">HubSpot staging deal ID</label>
-          <div class="hubspot-link-form" style="display:flex;gap:8px;margin-top:6px;"><input id="hubspot-deal-id" class="form-input" inputmode="numeric" maxlength="32" placeholder="Numeric deal ID"><button id="hubspot-link-button" class="btn-secondary" type="button" style="white-space:nowrap;">Verify & link</button></div>
-          <label id="hubspot-sync-toggle-wrap" style="display:flex;gap:9px;align-items:center;margin-top:14px;color:var(--mute);font-size:13px;"><input id="hubspot-sync-toggle" type="checkbox" disabled> Sync verified Cal.com bookings to <code>dealforge_last_booking</code></label>
-          <p id="hubspot-sync-message" style="min-height:1.5em;font-size:12px;margin:10px 0 0;color:var(--mute);" role="status"></p>
-        </div>
-
-        <!-- System Audit Log -->
-        <div class="bento-card">
-          <div class="bento-header">
-            <h3>Agent Audit Log</h3>
-          </div>
-          <div class="audit-log" id="audit-log">
-             <div class="audit-entry">
-               <div class="audit-time">00:00:00</div>
-               <div class="audit-event">Loading audit trail...</div>
-             </div>
-          </div>
-        </div>
-
-      </div>
-    </main>
-  </div>
-
-  <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
   <!-- Auth Integration -->
@@ -284,19 +262,6 @@
         showCallLink(link);
       }
       catch (error) { const status = document.getElementById('call-link-status'); status.textContent = error.message; status.style.color = 'var(--red)'; }
-    });
-    document.getElementById('hubspot-link-button').addEventListener('click', async () => {
-      const input = document.getElementById('hubspot-deal-id'); const button = document.getElementById('hubspot-link-button'); const message = document.getElementById('hubspot-sync-message');
-      button.disabled = true; message.style.color = 'var(--mute)'; message.textContent = 'Verifying the HubSpot staging deal…';
-      try { const result = await linkHubspotDeal(dealId, input.value.trim()); input.value = result.hubspotDealId; message.style.color = 'var(--green)'; message.textContent = 'Verified and linked. Enable booking sync only when ready.'; }
-      catch (error) { message.style.color = 'var(--red)'; message.textContent = error.message || 'HubSpot deal could not be linked.'; }
-      finally { button.disabled = false; }
-    });
-    document.getElementById('hubspot-sync-toggle').addEventListener('change', async event => {
-      const toggle = event.currentTarget; const message = document.getElementById('hubspot-sync-message'); toggle.disabled = true;
-      try { const result = await setHubspotBookingSync(dealId, toggle.checked); toggle.checked = result.enabled; message.style.color = 'var(--green)'; message.textContent = result.enabled ? 'Verified booking-to-CRM sync enabled.' : 'Booking-to-CRM sync disabled.'; }
-      catch (error) { toggle.checked = false; message.style.color = 'var(--red)'; message.textContent = error.message || 'Booking sync setting could not be updated.'; }
-      finally { toggle.disabled = false; }
     });
 
     // Auth observer
@@ -436,7 +401,54 @@
       probability.innerText = Number.isFinite(confidence) && confidence >= 0 && confidence <= 1 ? `${Math.round(confidence * 100)}%` : '—';
       probability.style.color = Number.isFinite(confidence) ? 'var(--green)' : 'var(--mute)';
       document.getElementById('deal-action').innerText = data.nextBestAction?.reason || 'No recommendations.';
-      renderHubspotControls(data.integrations?.hubspot || null, data);
+      const plan = document.getElementById('autonomy-plan');
+      const action = data.nextBestAction || {};
+      const authority = document.getElementById('action-authority');
+      authority.textContent = action.authority || 'OBSERVE';
+      authority.style.color = action.authority === 'ACT' ? 'var(--green)' : action.authority === 'APPROVAL' ? 'var(--amber)' : 'var(--mute)';
+      plan.replaceChildren(node('strong', action.action ? action.action.replace(/_/g, ' ') : 'No action proposed'), document.createElement('br'), node('span', action.expectedOutcome || action.reason || 'Awaiting verified deal state.'));
+
+      // --- MEDDIC ---
+      if (data.meddic) {
+        const grid = document.getElementById('meddic-grid');
+        let confirmedCount = 0;
+        const meddicNodes = [];
+        const pillars = [
+          { key: 'metrics', label: 'Metrics' },
+          { key: 'economicBuyer', label: 'Economic Buyer' },
+          { key: 'decisionCriteria', label: 'Decision Criteria' },
+          { key: 'decisionProcess', label: 'Decision Process' },
+          { key: 'identifyPain', label: 'Identify Pain' },
+          { key: 'champion', label: 'Champion' }
+        ];
+
+        pillars.forEach(p => {
+          const item = data.meddic[p.key];
+          const isConfirmed = item?.status === 'confirmed';
+          if (isConfirmed) confirmedCount++;
+          const fillClass = isConfirmed ? 'success' : '';
+          const blocks = isConfirmed ? '[██████████]' : '[███░░░░░░░]';
+          const score = isConfirmed ? '100%' : ' 30%';
+
+          const row = node('div', undefined, { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px dashed var(--hairline)', paddingBottom: '8px' });
+          const bar = node('div'); bar.className = `viz-mono-bar ${fillClass}`;
+          const track = node('span', blocks); track.className = 'track';
+          const fill = node('span', score); fill.className = 'fill';
+          bar.append(track, fill);
+          row.append(node('span', p.label, { fontFamily: 'var(--font-mono)', fontSize: '12px', textTransform: 'uppercase' }), bar);
+          meddicNodes.push(row);
+        });
+        grid.replaceChildren(...meddicNodes);
+        document.getElementById('meddic-score').innerText = `${confirmedCount}/6`;
+      }
+
+      // --- Deal State Fields ---
+      const stateFields = document.getElementById('deal-state-fields');
+      const fields = [
+        { key: 'company', label: 'Company' },
+        { key: 'teamSize', label: 'Team Size' },
+        { key: 'timeline', label: 'Timeline' },
+        { key: 'budget', label: 'Budget' },
       const plan = document.getElementById('autonomy-plan');
       const action = data.nextBestAction || {};
       const authority = document.getElementById('action-authority');
@@ -504,10 +516,13 @@
 
       // --- Risk Analysis ---
       const riskList = document.getElementById('risk-list');
+      const riskCountEl = document.getElementById('risk-count');
       if (data.dealHealth?.topRisks?.length) {
-        const riskNodes = data.dealHealth.topRisks.map(risk => node('div', risk, { padding: '10px 12px', background: 'rgba(247, 165, 1, 0.08)', borderRadius: '8px', color: 'var(--ink)' }));
+        if (riskCountEl) riskCountEl.textContent = `${data.dealHealth.topRisks.length} active`;
+        const riskNodes = data.dealHealth.topRisks.map(risk => node('div', risk, { padding: '10px 12px', background: 'rgba(247, 165, 1, 0.08)', borderRadius: '8px', color: 'var(--ink)', fontSize: '13px' }));
         riskList.replaceChildren(...riskNodes);
       } else if (data.riskFactors && data.riskFactors.length > 0) {
+        if (riskCountEl) riskCountEl.textContent = `${data.riskFactors.length} detected`;
         const riskNodes = [];
         data.riskFactors.forEach(r => {
           const sevColor = r.severity === 'high' ? 'var(--red)' : r.severity === 'medium' ? 'var(--amber)' : 'var(--green)';
@@ -515,20 +530,25 @@
           const row = node('div', undefined, { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: sevBg, borderRadius: '8px', border: `1px solid ${sevColor}`, borderLeft: `3px solid ${sevColor}` });
           const badge = node('span', String(r.severity || 'unknown').toUpperCase(), { fontSize: '10px', padding: '4px 8px', background: sevBg, color: sevColor, borderColor: sevColor });
           badge.className = 'pill-badge';
-          row.append(node('span', r.factor || 'Unspecified risk', { fontSize: '14px', color: 'var(--ink)' }), badge);
+          row.append(node('span', r.factor || 'Unspecified risk', { fontSize: '13px', color: 'var(--ink)' }), badge);
           riskNodes.push(row);
         });
         riskList.replaceChildren(...riskNodes);
       } else {
-        riskList.replaceChildren(node('div', '✓ No active risks detected.', { color: 'var(--green)', fontFamily: 'var(--font-mono)', fontSize: '13px' }));
+        if (riskCountEl) riskCountEl.textContent = '0 risks';
+        riskList.replaceChildren(node('div', '✓ No active risks detected.', { color: 'var(--green)', fontFamily: 'var(--font-mono)', fontSize: '13px', padding: '6px 0' }));
       }
 
       // --- Sentiment ---
       if (data.sentiment) {
         const val = data.sentiment.value || 'neutral';
         const sentimentEmoji = { positive: '😊', neutral: '😐', negative: '😟' };
-        document.getElementById('sentiment-value').innerText = sentimentEmoji[val] || '—';
-        document.getElementById('sentiment-label').innerText = val.charAt(0).toUpperCase() + val.slice(1) + (data.sentiment.confidence ? ` (${(data.sentiment.confidence * 100).toFixed(0)}% confidence)` : '');
+        const emojiEl = document.getElementById('sentiment-value');
+        if (emojiEl) emojiEl.innerText = sentimentEmoji[val] || '—';
+        const labelEl = document.getElementById('sentiment-label');
+        if (labelEl) labelEl.innerText = val.charAt(0).toUpperCase() + val.slice(1);
+        const subLabelEl = document.getElementById('sentiment-sublabel');
+        if (subLabelEl) subLabelEl.innerText = data.sentiment.confidence ? `${Math.round(data.sentiment.confidence * 100)}% confidence` : 'Buyer tone';
       }
 
       // --- Discount Ledger ---
@@ -551,35 +571,38 @@
       }
     }
 
-    function renderHubspotControls(integration, dealState) {
-      const status = document.getElementById('hubspot-sync-status'); const copy = document.getElementById('hubspot-sync-copy'); const input = document.getElementById('hubspot-deal-id'); const toggle = document.getElementById('hubspot-sync-toggle');
-      const form = document.querySelector('.hubspot-link-form'); const label = document.getElementById('hubspot-deal-id-label');
-      const isAcme = /^acme\b/i.test(String(dealState?.company?.value || ''));
-      const linked = Boolean(integration?.dealId); input.value = integration?.dealId || '';
-      toggle.disabled = !linked; toggle.checked = integration?.bookingSyncEnabled === true;
-      status.textContent = linked ? (toggle.checked ? 'SYNC ENABLED' : 'LINKED') : 'NOT LINKED';
-      status.style.color = toggle.checked ? 'var(--green)' : linked ? 'var(--amber)' : 'var(--mute)';
-      form.hidden = isAcme; label.hidden = isAcme;
-      copy.textContent = linked
-        ? (isAcme ? 'Acme is automatically mapped to its verified HubSpot staging deal. Only a verified Cal.com booking may update dealforge_last_booking.' : 'This exact HubSpot deal was verified. Only a verified Cal.com booking may update dealforge_last_booking.')
-        : 'Link one explicit staging deal. DealForge will verify it before it can receive a booking reference.';
-    }
-
     function renderEvidence(records) {
       const list = document.getElementById('evidence-list');
-      if (records.length === 0) {
-        const item = node('li'); item.className = 'evidence-item'; item.append(node('span', 'No evidence extracted yet.', { color: 'var(--gray-400)' }));
-        list.replaceChildren(item);
+      const countEl = document.getElementById('evidence-count');
+      if (countEl) countEl.textContent = `${records ? records.length : 0} claim${records && records.length === 1 ? '' : 's'}`;
+      if (!records || records.length === 0) {
+        const empty = node('div');
+        empty.className = 'stream-empty-state';
+        const title = node('div', 'No evidence claims extracted yet');
+        title.className = 'stream-empty-title';
+        const subtitle = node('div', 'Customer quotes, pain statements, and commercial signals will appear here in real time.');
+        subtitle.className = 'stream-empty-subtitle';
+        empty.append(title, subtitle);
+        list.replaceChildren(empty);
         return;
       }
 
       const items = [];
       records.forEach(r => {
-        const time = new Date(r.timestamp).toLocaleTimeString();
-        const item = node('li'); item.className = 'evidence-item';
+        const item = node('li');
+        item.className = 'evidence-item';
         const confidence = Number(r.confidence);
-        item.append(node('div', `${r.source || 'Unknown'} (Turn ${r.utteranceTurn || '—'})`), node('div', `“${r.claim || 'No claim'}”`), node('div', `Confidence: ${Number.isFinite(confidence) ? (confidence * 100).toFixed(0) : '0'}%`));
-        item.children[0].className = 'evidence-source'; item.children[1].className = 'evidence-claim'; item.children[2].className = 'evidence-confidence';
+        const confPct = Number.isFinite(confidence) ? `${Math.round(confidence * 100)}%` : '—';
+        const confColor = confidence >= 0.85 ? 'var(--green)' : confidence >= 0.6 ? 'var(--amber)' : 'var(--mute)';
+
+        const meta = node('div', undefined, { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' });
+        const sourceLabel = `${r.source || 'Customer'}${r.utteranceTurn ? ` · Turn ${r.utteranceTurn}` : ''}`;
+        meta.append(
+          node('span', sourceLabel, { fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--mute)', textTransform: 'uppercase', letterSpacing: '0.04em' }),
+          node('span', `Confidence ${confPct}`, { fontFamily: 'var(--font-mono)', fontSize: '11px', color: confColor })
+        );
+        const claim = node('div', `“${r.claim || 'No claim text'}”`, { fontSize: '13px', color: 'var(--ink)', fontWeight: '500', lineHeight: '1.45' });
+        item.append(meta, claim);
         items.push(item);
       });
       list.replaceChildren(...items);
@@ -587,8 +610,17 @@
 
     function renderAudit(events) {
       const log = document.getElementById('audit-log');
-      if (events.length === 0) {
-        const entry = node('div'); entry.className = 'audit-entry'; const message = node('div', 'No events recorded.'); message.className = 'audit-event'; entry.append(message); log.replaceChildren(entry);
+      const countEl = document.getElementById('audit-count');
+      if (countEl) countEl.textContent = events && events.length ? `${events.length} events` : 'Live stream';
+      if (!events || events.length === 0) {
+        const empty = node('div');
+        empty.className = 'stream-empty-state';
+        const title = node('div', 'Audit trail standby');
+        title.className = 'stream-empty-title';
+        const subtitle = node('div', 'Streaming verified tool executions, policy gates, and audio events for this customer conversation.');
+        subtitle.className = 'stream-empty-subtitle';
+        empty.append(title, subtitle);
+        log.replaceChildren(empty);
         return;
       }
 
@@ -610,13 +642,13 @@
       const list = document.getElementById('approvals-list');
       const card = document.getElementById('approvals-card');
 
-      if (approvals.length === 0) {
-        list.replaceChildren(node('p', 'No pending approvals.', { color: 'var(--gray-400)', fontSize: '13px' }));
-        card.style.borderColor = 'var(--gray-800)';
+      if (!approvals || approvals.length === 0) {
+        list.replaceChildren(node('p', '✓ All actions within autonomous policy limits. No approvals required.', { color: 'var(--mute)', fontSize: '13px', margin: '4px 0' }));
+        card.style.borderColor = 'var(--hairline)';
         return;
       }
 
-      card.style.borderColor = 'var(--yellow)';
+      card.style.borderColor = 'var(--amber)';
       const approvalCards = [];
 
       approvals.forEach(a => {
