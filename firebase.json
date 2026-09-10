@@ -6,6 +6,17 @@
   "hosting": {
     "public": "frontend/public",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      }
+    ],
     "rewrites": [
       { "source": "/api/**", "run": { "serviceId": "dealforge-core", "region": "us-central1" } },
       {

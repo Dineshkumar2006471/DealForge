@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="referrer" content="no-referrer"><title>Live AI Call — DealForge</title><link rel="icon" href="/favicon.png"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/css/style.css"></head>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="referrer" content="no-referrer"><title>Live AI Call — DealForge</title><link rel="icon" href="/favicon.png"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/css/style.css?v=2"></head>
 <body class="page-call">
   <main class="call-container"><div class="call-header"><h1 class="call-title">Live AI Negotiation</h1><div class="call-status" id="status-text" role="status">Ready to connect</div><p style="color:var(--mute);font-size:13px;max-width:420px;margin:12px auto 0;line-height:1.5">When you start, your browser will request microphone access. This link is single-use and may expire. Text transcript retained for 30 days; audio is not recorded.</p></div>
     <div class="orb-container"><div class="wave"></div><div class="wave"></div><div class="wave"></div><div class="orb-inner"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.8)" stroke-width="1.5"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg></div></div>
@@ -28,9 +28,9 @@
   </main>
 
   <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.20.2.js"></script>
-  <script src="/js/runtimeConfig.js"></script>
-  <script src="/js/backendClient.js"></script>
-  <script src="/js/agoraClient.js"></script>
+  <script src="/js/runtimeConfig.js?v=2"></script>
+  <script src="/js/backendClient.js?v=2"></script>
+  <script src="/js/agoraClient.js?v=2"></script>
   <script>
     const linkToken = new URLSearchParams(location.search).get('link');
     const callButton = document.getElementById('btn-call'), muteButton = document.getElementById('btn-mute'), status = document.getElementById('status-text'), errorText = document.getElementById('call-error'), hintText = document.getElementById('call-hint');
