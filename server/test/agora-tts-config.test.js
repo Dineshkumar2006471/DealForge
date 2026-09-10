@@ -43,7 +43,7 @@ test('Agora agent payload contains the complete documented ElevenLabs TTS contra
     },
   });
   assert.deepEqual(payload.properties.remote_rtc_uids, ['*']);
-  assert.equal(payload.properties.llm.vendor, 'custom');
+  assert.match(payload.properties.llm.url, /^https:\/\/service\.example\/chat\/completions\//);
   assert.equal(payload.properties.asr.vendor, 'deepgram');
   assert.equal(payload.properties.asr.language, 'en-US');
 });

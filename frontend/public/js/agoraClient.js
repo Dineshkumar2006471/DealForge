@@ -19,7 +19,7 @@ async function acquireLocalTrack() {
       localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({
         encoderConfig: 'speech_standard',
         AEC: true,
-        ANS: false,
+        ANS: true,
         AGC: true
       });
       console.log('[MIC_PERMISSION_GRANTED] Browser microphone permission granted.');
@@ -86,7 +86,7 @@ async function joinCall(appId, channel, token, uid, preAcquiredTrack = null) {
       localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({
         encoderConfig: 'speech_standard',
         AEC: true,
-        ANS: false,
+        ANS: true,
         AGC: true
       });
       console.log('[MIC_PERMISSION_GRANTED] Browser microphone permission granted during join.');
