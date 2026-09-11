@@ -87,7 +87,15 @@ function buildAgentStartPayload(session, webhookToken, nowSeconds = Math.floor(D
         language: 'en'
       }
     },
-    llm: { url: `${config.baseUrl}/chat/completions/${webhookToken}`, api_key: process.env.AGORA_LLM_WEBHOOK_SECRET, system_messages: [], params: { model: 'dealforge-sales-agent' } },
+    llm: {
+      credential_mode: 'byok',
+      vendor: 'custom',
+      style: 'openai',
+      url: `${config.baseUrl}/chat/completions/${webhookToken}`,
+      api_key: process.env.AGORA_LLM_WEBHOOK_SECRET,
+      system_messages: [],
+      params: { model: 'dealforge-sales-agent' }
+    },
     // This object is sent only from Cloud Run to Agora and is never logged or returned.
     tts: config.tts,
   }}};
