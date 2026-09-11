@@ -81,8 +81,14 @@ function buildAgentStartPayload(session, webhookToken, nowSeconds = Math.floor(D
     remote_rtc_uids: ['*'],
     idle_timeout: 120,
     asr: {
+      credential_mode: 'managed',
+      vendor: 'deepgram',
       language: 'en-US',
-      vendor: 'deepgram'
+      params: {
+        url: 'wss://api.deepgram.com/v1/listen',
+        model: 'nova-3',
+        language: 'en'
+      }
     },
     llm: { url: `${config.baseUrl}/chat/completions/${webhookToken}`, api_key: process.env.AGORA_LLM_WEBHOOK_SECRET, system_messages: [], params: { model: 'dealforge-sales-agent' } },
     // This object is sent only from Cloud Run to Agora and is never logged or returned.
