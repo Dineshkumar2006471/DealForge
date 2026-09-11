@@ -75,10 +75,7 @@ function buildAgentStartPayload(session, webhookToken, nowSeconds = Math.floor(D
   const token = RtcTokenBuilder.buildTokenWithUid(config.appId, config.certificate, session.opaqueAgoraChannel, agentUid, RtcRole.PUBLISHER, expiry);
   return { config, payload: { name: `dealforge-${session.sessionId}`, properties: {
     channel: session.opaqueAgoraChannel, token, agent_rtc_uid: String(agentUid),
-    // Conversational AI v2 supports one subscribed customer UID. A wildcard
-    // is not a reliable subscription target and can leave the agent detached
-    // from the customer's audio stream.
-    remote_rtc_uids: ['*'],
+    remote_rtc_uids: [String(session.customerUid)],
     idle_timeout: 120,
     asr: {
       credential_mode: 'managed',

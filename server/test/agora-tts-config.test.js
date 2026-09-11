@@ -42,7 +42,7 @@ test('Agora agent payload contains the complete documented ElevenLabs TTS contra
       model_id: 'eleven_flash_v2_5', voice_id: 'female-voice-id', sample_rate: 24000,
     },
   });
-  assert.deepEqual(payload.properties.remote_rtc_uids, ['*']);
+  assert.deepEqual(payload.properties.remote_rtc_uids, ['456789']);
   assert.match(payload.properties.llm.url, /^https:\/\/service\.example\/chat\/completions\//);
   assert.equal(payload.properties.asr.credential_mode, 'managed');
   assert.equal(payload.properties.asr.vendor, 'deepgram');
