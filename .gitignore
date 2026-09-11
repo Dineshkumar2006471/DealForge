@@ -16,3 +16,6 @@ node_modules/
 frontend/public/node_modules/
 test-results/
 *.wav
+scratch/
+recent_logs.json
+session_logs.json

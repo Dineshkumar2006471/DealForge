@@ -31,21 +31,171 @@
   <script src="/js/runtimeConfig.js?v=3"></script>
   <script src="/js/backendClient.js?v=3"></script>
   <script src="/js/agoraClient.js?v=3"></script>
+  <script src="/js/realtimeVoiceClient.js?v=4"></script>
+  <script src="/js/browserSpeechClient.js?v=4"></script>
   <script>
-    const linkToken = new URLSearchParams(location.search).get('link');
+    const urlParams = new URLSearchParams(location.search);
+    const linkToken = urlParams.get('token') || urlParams.get('link');
     const callButton = document.getElementById('btn-call'), muteButton = document.getElementById('btn-mute'), status = document.getElementById('status-text'), errorText = document.getElementById('call-error'), hintText = document.getElementById('call-hint');
-    const waves = document.querySelectorAll('.wave'); let call = null; let active = false; let isAgentSpeaking = false; let agentAudioTimer = null; let agentAudioObserved = false; let meetingRequestUnsubscribe = null; let meetingRequestPollingTimer = null; let meetingRequestId = null;
-    function setStatus(text, color) { status.textContent = text; status.style.color = color || 'var(--gray-400)'; }
-    function setButton(text, primary) { callButton.textContent = text; callButton.classList.toggle('btn-primary', primary); callButton.classList.toggle('btn-secondary', !primary); }
+    const waves = document.querySelectorAll('.wave');
+    let call = null;
+    let active = false;
+    let isAgentSpeaking = false;
+    let agentAudioTimer = null;
+    let agentAudioObserved = false;
+    let meetingRequestUnsubscribe = null;
+    let meetingRequestPollingTimer = null;
+    let meetingRequestId = null;
     let renewalTimer = null;
     let captionsUnsubscribe = null;
     let captionsPollingTimer = null;
     const orbElement = document.getElementById('call-orb');
+
+    // Explicit 5-State State Machine (Rule #8)
+    const CALL_STATES = {
+      IDLE: 'IDLE',
+      LISTENING: 'LISTENING',
+      PROCESSING: 'PROCESSING',
+      SPEAKING: 'SPEAKING',
+      ERROR: 'ERROR'
+    };
+    let currentState = CALL_STATES.IDLE;
+    let voiceClient = null;
+    let currentAudio = null;
+    let isTurnInFlight = false;
+    let localMessages = [];
+
     function setOrbState(state) {
       if (orbElement) orbElement.className = `orb-container state-${state}`;
     }
 
+    function transitionState(newState, detail = '') {
+      console.log(`[STATE] ${currentState} -> ${newState}`, detail || '');
+      currentState = newState;
+      switch (newState) {
+        case CALL_STATES.IDLE:
+          setOrbState('idle');
+          setStatus(detail || 'Ready to connect');
+          hintText.textContent = 'After the agent connects, start with: “We have 300 users.”';
+          break;
+        case CALL_STATES.LISTENING:
+          setOrbState('idle');
+          setStatus('Listening to your microphone…', 'var(--green)');
+          hintText.textContent = 'Speak naturally. Tell DealForge about your team, timeline, or pricing needs.';
+          break;
+        case CALL_STATES.PROCESSING:
+          setOrbState('processing');
+          setStatus('DealForge is thinking…', 'var(--amber)');
+          hintText.textContent = 'Evaluating commercial policy and next best action…';
+          break;
+        case CALL_STATES.SPEAKING:
+          setOrbState('agent-speaking');
+          setStatus('DealForge is speaking…', 'var(--amber)');
+          hintText.textContent = 'Listen to the response. You can speak when finished.';
+          break;
+        case CALL_STATES.ERROR:
+          setOrbState('idle');
+          setStatus(detail || 'Call error', 'var(--red)');
+          break;
+      }
+    }
+
+    function setStatus(text, color) { status.textContent = text; status.style.color = color || 'var(--gray-400)'; }
+    function setButton(text, primary) { callButton.textContent = text; callButton.classList.toggle('btn-primary', primary); callButton.classList.toggle('btn-secondary', !primary); }
+
+    function appendCaption(role, content) {
+      if (!content || !content.trim()) return;
+      localMessages.push({ role, content: content.trim() });
+      renderCaptions(localMessages);
+    }
+
+    function playAssistantAudio(audioBase64) {
+      return new Promise((resolve) => {
+        if (!audioBase64) return resolve();
+        try {
+          if (currentAudio) {
+            try { currentAudio.pause(); } catch (_) {}
+            currentAudio = null;
+          }
+          currentAudio = new Audio('data:audio/wav;base64,' + audioBase64);
+          transitionState(CALL_STATES.SPEAKING);
+          currentAudio.onended = () => {
+            currentAudio = null;
+            if (active) transitionState(CALL_STATES.LISTENING);
+            resolve();
+          };
+          currentAudio.onerror = (err) => {
+            console.error('Audio playback error:', err);
+            currentAudio = null;
+            if (active) transitionState(CALL_STATES.LISTENING);
+            resolve();
+          };
+          currentAudio.play().catch(err => {
+            console.warn('Audio play was interrupted or rejected:', err);
+            if (active) transitionState(CALL_STATES.LISTENING);
+            resolve();
+          });
+        } catch (e) {
+          console.error('Failed to create Audio object:', e);
+          if (active) transitionState(CALL_STATES.LISTENING);
+          resolve();
+        }
+      });
+    }
+
+    async function handleCustomerTurn(transcript) {
+      if (!active || !transcript || !transcript.trim() || isTurnInFlight) return;
+      isTurnInFlight = true;
+      transitionState(CALL_STATES.PROCESSING);
+
+      if (voiceClient && typeof voiceClient.setMuted === 'function') {
+        voiceClient.setMuted(true);
+      }
+
+      appendCaption('user', transcript);
+
+      try {
+        const turnResponse = await api(`/public/calls/${encodeURIComponent(linkToken)}/turn`, {
+          method: 'POST',
+          body: JSON.stringify({
+            sessionCredential: call.sessionCredential,
+            userText: transcript
+          })
+        });
+
+        if (turnResponse.assistantText) {
+          appendCaption('assistant', turnResponse.assistantText);
+        }
+        if (turnResponse.meetingRequest) {
+          renderMeetingRequest(turnResponse.meetingRequest);
+        }
+
+        if (turnResponse.audioBase64) {
+          await playAssistantAudio(turnResponse.audioBase64);
+        } else {
+          transitionState(CALL_STATES.LISTENING);
+        }
+      } catch (turnErr) {
+        console.error('Turn handling failed:', turnErr);
+        appendCaption('assistant', "I had trouble processing that. Could you repeat?");
+        transitionState(CALL_STATES.LISTENING);
+      } finally {
+        isTurnInFlight = false;
+        if (active && voiceClient && typeof voiceClient.setMuted === 'function') {
+          voiceClient.setMuted(false);
+        }
+      }
+    }
+
     async function cleanup() {
+      if (currentAudio) {
+        try { currentAudio.pause(); } catch (_) {}
+        currentAudio = null;
+      }
+      if (voiceClient) {
+        try { voiceClient.disconnect(); } catch (_) {}
+        voiceClient = null;
+      }
       if (renewalTimer) clearTimeout(renewalTimer); renewalTimer = null;
       if (agentAudioTimer) clearTimeout(agentAudioTimer); agentAudioTimer = null; agentAudioObserved = false;
       if (captionsUnsubscribe) { captionsUnsubscribe(); captionsUnsubscribe = null; }
@@ -53,7 +203,8 @@
       if (meetingRequestUnsubscribe) { meetingRequestUnsubscribe(); meetingRequestUnsubscribe = null; }
       if (meetingRequestPollingTimer) { clearInterval(meetingRequestPollingTimer); meetingRequestPollingTimer = null; }
       isAgentSpeaking = false;
-      setOrbState('idle');
+      isTurnInFlight = false;
+      transitionState(CALL_STATES.IDLE);
       try { await leaveCall(); } finally { muteButton.disabled = true; active = false; call = null; }
     }
     function scheduleRenewal(expiresAt) {
@@ -224,60 +375,64 @@
     document.getElementById('meeting-details-form').addEventListener('submit', submitMeetingDetails);
 
     async function start() {
-      if (!linkToken) { errorText.textContent = 'This call link is missing or invalid.'; setStatus('Call unavailable', 'var(--red)'); return; }
+      if (!linkToken) { errorText.textContent = 'This call link is missing or invalid.'; transitionState(CALL_STATES.ERROR, 'Call unavailable'); return; }
       let startupFailed = false;
-      callButton.disabled = true; errorText.textContent = ''; setStatus('Requesting microphone permission…');
+      callButton.disabled = true; errorText.textContent = ''; transitionState(CALL_STATES.PROCESSING, 'Requesting microphone permission…');
       try {
-        // 1. Explicitly acquire local microphone track inside the user gesture
-        let localTrack = null;
-        try {
-          localTrack = await acquireLocalTrack();
-          if (!localTrack) throw new Error('Microphone access is unavailable.');
-        } catch (micErr) {
-          console.error('[MIC_ERROR]', micErr);
-          throw new Error('Microphone access is unavailable.');
-        }
-
-        setStatus('Microphone ready — connecting…');
         const credentials = await joinCustomerCall(linkToken);
         call = credentials;
-        
-        // 2. Connect to Agora with pre-acquired track
-        setStatus('Joining secure audio channel…');
-        await joinCall(credentials.appId, credentials.channel, credentials.token, credentials.uid, localTrack);
-        
-        // 3. Set call active and begin listening/observing
+        const provider = credentials.voiceProvider || 'openai_realtime';
+
+        if (provider === 'openai_realtime') {
+          transitionState(CALL_STATES.PROCESSING, 'Connecting to OpenAI Realtime WebRTC…');
+          voiceClient = new RealtimeVoiceClient({
+            clientSecret: credentials.clientSecret,
+            model: credentials.model
+          });
+          await voiceClient.connect();
+        } else if (provider === 'browser_speech') {
+          transitionState(CALL_STATES.PROCESSING, 'Connecting browser speech recognition…');
+          voiceClient = new BrowserSpeechClient();
+          await voiceClient.connect();
+        } else if (provider === 'agora') {
+          let localTrack = null;
+          try {
+            localTrack = await acquireLocalTrack();
+            if (!localTrack) throw new Error('Microphone access is unavailable.');
+          } catch (micErr) {
+            console.error('[MIC_ERROR]', micErr);
+            throw new Error('Microphone access is unavailable.');
+          }
+          transitionState(CALL_STATES.PROCESSING, 'Joining Agora audio channel…');
+          await joinCall(credentials.appId, credentials.channel, credentials.token, credentials.uid, localTrack);
+          armAgentAudioTimeout();
+        }
+
         active = true;
         muteButton.disabled = false;
         setButton('End Call', false);
-        setStatus('Connected — requesting agent greeting', 'var(--amber)');
-        hintText.textContent = 'Preparing the spoken greeting…';
-        setOrbState('processing');
-        scheduleRenewal(credentials.expiresAt);
-        armAgentAudioTimeout();
+        if (credentials.expiresAt) scheduleRenewal(credentials.expiresAt);
         startCaptionFallback();
         startMeetingRequestFallback();
 
-        // Monitor local microphone volume to drive audio-reactive animation
-        let userSpeakingTimeout = null;
-        window.addEventListener('agora:local-volume', (e) => {
-          if (!active || isAgentSpeaking) return;
-          const level = e.detail?.level || 0;
-          if (level > 8) {
-            setOrbState('customer-speaking');
-            if (userSpeakingTimeout) clearTimeout(userSpeakingTimeout);
-            userSpeakingTimeout = setTimeout(() => {
-              if (!isAgentSpeaking && active) {
-                setOrbState('idle');
-              }
-            }, 800);
-          }
+        // Request greeting from server
+        const readyRes = await api(`/public/calls/${encodeURIComponent(linkToken)}/ready`, {
+          method: 'POST',
+          body: JSON.stringify({ sessionCredential: call.sessionCredential })
         });
 
-        // 4. Request the greeting only after RTC is published
-        await api(`/public/calls/${encodeURIComponent(linkToken)}/ready`, { method: 'POST', body: JSON.stringify({ sessionCredential: call.sessionCredential }) });
-        setStatus('Connected — waiting for agent audio', 'var(--amber)');
-        hintText.textContent = 'Wait for the spoken greeting before you begin. Then tell the agent about your team, timeline, or pricing needs.';
+        if (readyRes.greeting) {
+          appendCaption('assistant', readyRes.greeting);
+        }
+
+        if (readyRes.audioBase64) {
+          await playAssistantAudio(readyRes.audioBase64);
+        } else if (provider === 'agora') {
+          setStatus('Connected — waiting for agent audio', 'var(--amber)');
+          hintText.textContent = 'Wait for the spoken greeting before you begin. Then tell the agent about your team, timeline, or pricing needs.';
+        } else {
+          transitionState(CALL_STATES.LISTENING);
+        }
       } catch (error) {
         startupFailed = true;
         if (call?.sessionCredential) {
@@ -286,19 +441,61 @@
         await cleanup();
         const isMicError = error.message && error.message.toLowerCase().includes('microphone');
         errorText.textContent = isMicError ? 'Microphone access is unavailable.' : (error.message || 'Unable to start the call. Ask your manager for a new link.');
-        setStatus(isMicError ? 'Microphone access is unavailable' : 'Connection failed', 'var(--red)');
+        transitionState(CALL_STATES.ERROR, isMicError ? 'Microphone access is unavailable' : 'Connection failed');
         setButton(isMicError ? 'Retry with Microphone' : 'Request a new link', false);
         callButton.disabled = !isMicError;
       }
       finally { if (!startupFailed) callButton.disabled = false; }
     }
-    async function end() { callButton.disabled = true; setStatus('Disconnecting…'); try { const result = await api(`/public/calls/${encodeURIComponent(linkToken)}/stop`, { method: 'POST', body: JSON.stringify({ sessionCredential: call.sessionCredential }) }); await cleanup(); setButton('Call ended', false); callButton.disabled = true; setStatus(result.agentStopped ? 'Call ended' : 'Disconnected — agent cleanup pending', result.agentStopped ? undefined : 'var(--amber)'); } catch (error) { errorText.textContent = error.message || 'Unable to confirm call termination.'; setStatus('Termination needs attention', 'var(--red)'); callButton.disabled = false; } }
+
+    async function end() {
+      callButton.disabled = true;
+      setStatus('Disconnecting…');
+      try {
+        const result = await api(`/public/calls/${encodeURIComponent(linkToken)}/stop`, { method: 'POST', body: JSON.stringify({ sessionCredential: call.sessionCredential }) });
+        await cleanup();
+        setButton('Call ended', false);
+        callButton.disabled = true;
+        setStatus(result.agentStopped ? 'Call ended' : 'Disconnected — agent cleanup pending', result.agentStopped ? undefined : 'var(--amber)');
+      } catch (error) {
+        errorText.textContent = error.message || 'Unable to confirm call termination.';
+        setStatus('Termination needs attention', 'var(--red)');
+        callButton.disabled = false;
+      }
+    }
+
     callButton.addEventListener('click', () => active ? end() : start());
     muteButton.addEventListener('click', () => {
-      const muted = toggleMute();
+      let muted = false;
+      if (voiceClient && typeof voiceClient.toggleMute === 'function') {
+        muted = voiceClient.toggleMute();
+      } else {
+        muted = toggleMute();
+      }
       muteButton.textContent = muted ? 'Unmute' : 'Mute';
-      setOrbState(muted ? 'muted' : (isAgentSpeaking ? 'agent-speaking' : 'idle'));
+      setOrbState(muted ? 'muted' : (currentState === CALL_STATES.SPEAKING ? 'agent-speaking' : 'idle'));
     });
+
+    // Voice client event listeners
+    window.addEventListener('voice:turn-completed', (e) => {
+      const transcript = e.detail?.transcript;
+      if (transcript) handleCustomerTurn(transcript);
+    });
+    window.addEventListener('voice:speech-started', () => {
+      if (currentState === CALL_STATES.LISTENING) {
+        setOrbState('customer-speaking');
+      }
+    });
+    window.addEventListener('voice:speech-stopped', () => {
+      if (currentState === CALL_STATES.LISTENING) {
+        setOrbState('idle');
+      }
+    });
+    window.addEventListener('voice:error', (e) => {
+      console.warn('Voice provider error event:', e.detail?.error);
+    });
+
+    // Agora agent events (preserved for Agora provider)
     window.addEventListener('agora:agent-speaking', () => {
       isAgentSpeaking = true;
       setOrbState('agent-speaking');
@@ -312,13 +509,13 @@
       agentAudioObserved = true; if (agentAudioTimer) clearTimeout(agentAudioTimer); agentAudioTimer = null;
       recordAudioActivity('AGENT_AUDIO_PUBLISHED'); recordAudioActivity('CUSTOMER_AUDIO_PLAYBACK_STARTED');
       setStatus('Agent audio live', 'var(--green)'); hintText.textContent = 'You are live. Tell the agent about your team, timeline, or pricing needs.';
-      setOrbState('idle');
+      transitionState(CALL_STATES.LISTENING);
     });
     window.addEventListener('agora:agent-audio-failed', async () => {
       if (!active) return;
       recordAudioActivity('CUSTOMER_AUDIO_PLAYBACK_FAILED');
       errorText.textContent = 'The agent audio could not play in this browser. The call was safely stopped.';
-      setStatus('Audio playback failed', 'var(--red)');
+      transitionState(CALL_STATES.ERROR, 'Audio playback failed');
       try { await api(`/public/calls/${encodeURIComponent(linkToken)}/fail`, { method: 'POST', body: JSON.stringify({ sessionCredential: call.sessionCredential }) }); } catch (_) {}
       await cleanup(); setButton('Request a new link', false); callButton.disabled = true;
     });

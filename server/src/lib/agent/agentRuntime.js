@@ -12,30 +12,28 @@ const { claimTurnReceipt } = require('./turnReceipts');
 require('../tools/calculateDiscount'); require('../tools/updateDealState'); require('../tools/checkProductAvailability'); require('../tools/bookMeeting'); require('../tools/requestMeetingDetails'); require('../tools/escalateToHuman');
 require('../integrations/hubspot');
 
-async function handleChatCompletion(requestBody, res, session) {
+async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-${uuidv4()}` } = {}) {
   const context = { organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, turnNumber: (await getTurnNumber(session.sessionId)) + 1 };
   let history = await getHistory(session.sessionId);
   if (!await getDeal(context.dealId, context.organizationId, context.sessionId)) throw new Error('Bound deal not found');
-  const chatId = `chatcmpl-${uuidv4()}`;
-  const userText = currentUserText(requestBody.messages);
 
   // Agora sends lifecycle and empty ASR turns around joins, TTS, and reconnects.
   // The RTC-ready Speak request owns the only greeting. An empty lifecycle turn is
   // never a customer prompt, and must never wake Gemini or create a second greeting.
-  if (!userText) {
-    await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_EMPTY_TURN_IGNORED, trigger: 'Ignored empty Agora lifecycle turn', actionResult: { verified: true } });
-    writeNoopSseReply(res, chatId);
-    return;
+  if (!userText || !userText.trim()) {
+    await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_EMPTY_TURN_IGNORED, trigger: 'Ignored empty customer turn', actionResult: { verified: true } });
+    if (res) writeNoopSseReply(res, chatId);
+    return { empty: true, content: '' };
   }
 
   const receipt = await claimTurnReceipt(session.sessionId, userText);
   if (!receipt.claimed) {
-    await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_DUPLICATE_TURN_IGNORED, trigger: 'Ignored replayed Agora customer turn', actionResult: { verified: true } });
-    writeNoopSseReply(res, chatId);
-    return;
+    await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_DUPLICATE_TURN_IGNORED, trigger: 'Ignored replayed customer turn', actionResult: { verified: true } });
+    if (res) writeNoopSseReply(res, chatId);
+    return { duplicate: true, content: '' };
   }
 
-  await addMessage(session.sessionId, { role: 'user', content: userText });
+  await addMessage(session.sessionId, { role: 'user', content: userText.trim() });
   // A percentage discount request is a high-value policy boundary. Route it
   // deterministically instead of hoping the generative model elects to call a
   // tool. This makes the manager approval demonstration reliable and preserves
@@ -50,9 +48,9 @@ async function handleChatCompletion(requestBody, res, session) {
         ? 'I cannot approve that request, but I can explore a more suitable commercial package with you.'
         : `I can confirm a ${requestedDiscount}% discount for this negotiation.`;
     await addMessage(session.sessionId, { role: 'assistant', content: spoken });
-    await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_RESPONSE_COMPLETED, trigger: 'Deterministic discount-policy response streamed to Agora', actionResult: { verified: true, requestedDiscount } });
-    writeSseReply(res, chatId, spoken);
-    return;
+    await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_RESPONSE_COMPLETED, trigger: 'Deterministic discount-policy response completed', actionResult: { verified: true, requestedDiscount } });
+    if (res) writeSseReply(res, chatId, spoken);
+    return { content: spoken, chatId, requestedDiscount };
   }
   for (const approval of await claimApprovedApprovals(context)) {
     const executed = await executeTool(approval.exactToolName, approval.exactValidatedArguments, { ...context, approvedReplay: { approvalId: approval.approvalId, toolName: approval.exactToolName, args: approval.exactValidatedArguments } });
@@ -67,7 +65,7 @@ async function handleChatCompletion(requestBody, res, session) {
   const tools = getToolDefinitions(); history = await getHistory(session.sessionId);
   let content = ''; let calls = []; let finishReason; let hasSpokenContent = false;
   try {
-    writeInterruptableMetadata(res, chatId, true);
+    if (res) writeInterruptableMetadata(res, chatId, true);
     // Buffer the first model pass. A tool-using pass is provisional: speaking
     // it before verification can produce two answers for a single customer
     // turn (the provisional answer, then the verified follow-up).
@@ -106,7 +104,7 @@ async function handleChatCompletion(requestBody, res, session) {
         if (followUpFinish !== 'tool_calls' || !followUpCalls.length) {
           // Model returned final text — stream it to the customer
           content = followUpContent;
-          if (content) {
+          if (content && res) {
             hasSpokenContent = true;
             res.write(`data: ${JSON.stringify({ id: chatId, object: 'chat.completion.chunk', choices: [{ index: 0, delta: { role: 'assistant', content }, finish_reason: null }] })}\n\n`);
           }
@@ -127,30 +125,47 @@ async function handleChatCompletion(requestBody, res, session) {
           const choice = chunk.choices?.[0];
           if (choice?.delta?.content) {
             content += choice.delta.content;
-            hasSpokenContent = true;
-            res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+            if (res) {
+              hasSpokenContent = true;
+              res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+            }
           }
         }
       }
     } else {
-      for (const chunk of initialTextChunks) {
-        hasSpokenContent = true;
-        res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+      if (res) {
+        for (const chunk of initialTextChunks) {
+          hasSpokenContent = true;
+          res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+        }
       }
     }
     if (content) await addMessage(session.sessionId, { role: 'assistant', content });
-    await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_RESPONSE_COMPLETED, trigger: 'Gemini response streamed to Agora', actionResult: { verified: true, hasContent: Boolean(content) } });
-    writeTerminalSseReply(res, chatId);
+    await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_RESPONSE_COMPLETED, trigger: 'Response completed', actionResult: { verified: true, hasContent: Boolean(content) } });
+    if (res) writeTerminalSseReply(res, chatId);
+    return { content, chatId };
   } catch (error) {
     console.error('Agent runtime error:', error.message);
     await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_RESPONSE_FAILED, trigger: 'Gemini/runtime response failed', actionResult: { verified: false, error: String(error.message).slice(0, 200) } }).catch(() => {});
-    if (!res.writableEnded) {
+    if (res && !res.writableEnded) {
       // Never append a spoken apology after a customer has already received
       // part of an answer. That is the source of repeated/conflicting agent
       // speech during provider stream failures.
       if (hasSpokenContent) writeTerminalSseReply(res, chatId);
       else writeSafeFallback(res, chatId);
     }
+    throw error;
+  }
+}
+
+async function handleChatCompletion(requestBody, res, session) {
+  const chatId = `chatcmpl-${uuidv4()}`;
+  const userText = currentUserText(requestBody.messages);
+  try {
+    await executeCustomerTurn(session, userText, { res, chatId });
+  } catch (err) {
+    console.error(`Chat completions error for verified session ${session.sessionId}:`, err.message);
+    if (!res.writableEnded) writeSafeFallback(res, chatId);
   }
 }
 
@@ -231,4 +246,4 @@ function writeInterruptableMetadata(res, chatId, interruptable) {
   })}\n\n`);
 }
 
-module.exports = { handleChatCompletion, writeSafeFallback, writeSseReply, writeNoopSseReply, writeInterruptableMetadata, currentUserText, extractTextContent, explicitDiscountRequest, currentModelMessages };
+module.exports = { executeCustomerTurn, handleChatCompletion, writeSafeFallback, writeSseReply, writeNoopSseReply, writeInterruptableMetadata, currentUserText, extractTextContent, explicitDiscountRequest, currentModelMessages };

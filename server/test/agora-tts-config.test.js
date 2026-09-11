@@ -42,14 +42,27 @@ test('Agora agent payload contains the complete documented ElevenLabs TTS contra
       model_id: 'eleven_flash_v2_5', voice_id: 'female-voice-id', sample_rate: 24000,
     },
   });
-  assert.deepEqual(payload.properties.remote_rtc_uids, ['456789']);
+  assert.deepEqual(payload.properties.remote_rtc_uids, ['*']);
   assert.match(payload.properties.llm.url, /^https:\/\/service\.example\/chat\/completions\//);
-  assert.equal(payload.properties.asr.credential_mode, 'managed');
-  assert.equal(payload.properties.asr.vendor, 'deepgram');
-  assert.equal(payload.properties.asr.language, 'en-US');
-  assert.equal(payload.properties.asr.params.url, 'wss://api.deepgram.com/v1/listen');
-  assert.equal(payload.properties.asr.params.model, 'nova-3');
-  assert.equal(payload.properties.asr.params.language, 'en');
+  assert.deepEqual(payload.properties.asr, {
+    vendor: 'deepgram',
+    language: 'en-US',
+  });
+  assert.equal(payload.properties.asr.params, undefined);
+});
+
+test('Agora agent payload contains minimal proven Deepgram ASR configuration without nested params', () => {
+  configure();
+  const { payload } = buildAgentStartPayload({
+    sessionId: 'session-asr-test', opaqueAgoraChannel: 'df_channel', customerUid: 999111,
+    expiresAt: new Date(Date.now() + 60_000).toISOString(),
+  }, 'per-session-webhook-token');
+  assert.deepEqual(payload.properties.asr, {
+    vendor: 'deepgram',
+    language: 'en-US',
+  });
+  assert.equal(payload.properties.asr.params, undefined, 'params must not be present in ASR configuration');
+  assert.equal(payload.properties.asr.credential_mode, undefined, 'credential_mode must not be present');
 });
 
 test('Agora agent payload correctly configures Microsoft TTS', () => {

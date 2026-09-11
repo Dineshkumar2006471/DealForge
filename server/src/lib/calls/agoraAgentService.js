@@ -75,17 +75,11 @@ function buildAgentStartPayload(session, webhookToken, nowSeconds = Math.floor(D
   const token = RtcTokenBuilder.buildTokenWithUid(config.appId, config.certificate, session.opaqueAgoraChannel, agentUid, RtcRole.PUBLISHER, expiry);
   return { config, payload: { name: `dealforge-${session.sessionId}`, properties: {
     channel: session.opaqueAgoraChannel, token, agent_rtc_uid: String(agentUid),
-    remote_rtc_uids: [String(session.customerUid)],
+    remote_rtc_uids: ['*'],
     idle_timeout: 120,
     asr: {
-      credential_mode: 'managed',
       vendor: 'deepgram',
-      language: 'en-US',
-      params: {
-        url: 'wss://api.deepgram.com/v1/listen',
-        model: 'nova-3',
-        language: 'en'
-      }
+      language: 'en-US'
     },
     llm: {
       credential_mode: 'byok',

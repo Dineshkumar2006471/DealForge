@@ -15,9 +15,57 @@ const { addMessage, getHistory } = require('../lib/agent/conversationHistory');
 
 router.post('/calls/:linkToken/join', joinRateLimit, async (req, res, next) => {
   try {
+    const voiceProvider = process.env.VOICE_PROVIDER || 'openai_realtime';
     const { session, refreshToken } = await redeemLink(req.params.linkToken);
     const doc = await require('../lib/calls/callSessions').sessionRef(session.sessionId).get();
     const stored = doc.data();
+
+    if (voiceProvider === 'openai_realtime') {
+      let realtime;
+      try {
+        const { createRealtimeSession } = require('../lib/calls/openAiRealtimeService');
+        realtime = await createRealtimeSession();
+      } catch (realtimeErr) {
+        await restoreForRetry(stored.sessionId).catch(() => {});
+        throw realtimeErr;
+      }
+      await require('../lib/calls/callSessions').markActive(stored.sessionId, 'openai_realtime');
+      await consumeLink(stored.sessionId);
+      await writeAuditEvent({
+        organizationId: stored.organizationId,
+        dealId: stored.dealId,
+        sessionId: stored.sessionId,
+        eventType: EVENT_TYPES.CALL_STARTED,
+        trigger: 'Customer joined verified call link (openai_realtime)'
+      });
+      return res.json({
+        voiceProvider: 'openai_realtime',
+        clientSecret: realtime.clientSecret,
+        expiresAt: realtime.expiresAt,
+        model: realtime.model,
+        sessionId: stored.sessionId,
+        sessionCredential: refreshToken
+      });
+    }
+
+    if (voiceProvider === 'browser_speech') {
+      await require('../lib/calls/callSessions').markActive(stored.sessionId, 'browser_speech');
+      await consumeLink(stored.sessionId);
+      await writeAuditEvent({
+        organizationId: stored.organizationId,
+        dealId: stored.dealId,
+        sessionId: stored.sessionId,
+        eventType: EVENT_TYPES.CALL_STARTED,
+        trigger: 'Customer joined verified call link (browser_speech)'
+      });
+      return res.json({
+        voiceProvider: 'browser_speech',
+        sessionId: stored.sessionId,
+        sessionCredential: refreshToken
+      });
+    }
+
+    // Default to Agora provider if voiceProvider === 'agora'
     let agentId;
     try {
       agentId = await startAgent(stored, webhookTokenFor(stored.sessionId));
@@ -33,9 +81,9 @@ router.post('/calls/:linkToken/join', joinRateLimit, async (req, res, next) => {
     const activeDoc = await require('../lib/calls/callSessions').sessionRef(stored.sessionId).get();
     const activeSession = activeDoc.data();
     const credentials = rtcCredentials(activeSession);
-    await writeAuditEvent({ organizationId: activeSession.organizationId, dealId: activeSession.dealId, sessionId: activeSession.sessionId, eventType: EVENT_TYPES.CALL_STARTED, trigger: 'Customer joined verified call link' });
+    await writeAuditEvent({ organizationId: activeSession.organizationId, dealId: activeSession.dealId, sessionId: activeSession.sessionId, eventType: EVENT_TYPES.CALL_STARTED, trigger: 'Customer joined verified call link (agora)' });
     
-    res.json({ ...credentials, sessionId: activeSession.sessionId, agentId, sessionCredential: refreshToken });
+    res.json({ ...credentials, voiceProvider: 'agora', sessionId: activeSession.sessionId, agentId, sessionCredential: refreshToken });
   } catch (error) { next(error); }
 });
 async function activeSessionFromCredential(req) {
@@ -84,10 +132,60 @@ router.post('/calls/:linkToken/ready', async (req, res, next) => {
     if (shouldSpeak) {
       const greeting = "Hello, I'm the DealForge sales assistant. I'm ready to help with your team, timeline, or pricing needs.";
       await addMessage(session.sessionId, { role: 'assistant', content: greeting });
-      await speakAgent(session, greeting, { priority: 'INTERRUPT', interruptable: false });
-      await writeAuditEvent({ organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, eventType: EVENT_TYPES.AGENT_GREETING_REQUESTED, trigger: 'Customer RTC ready; Agora greeting requested', actionResult: { accepted: true } });
+      const isAgoraAgent = session.agentId && !['openai_realtime', 'browser_speech'].includes(session.agentId);
+      if (isAgoraAgent) {
+        await speakAgent(session, greeting, { priority: 'INTERRUPT', interruptable: false });
+      }
+      await writeAuditEvent({ organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, eventType: EVENT_TYPES.AGENT_GREETING_REQUESTED, trigger: 'Customer voice ready; greeting requested', actionResult: { accepted: true, provider: isAgoraAgent ? 'agora' : session.agentId } });
+
+      let audioBase64 = null;
+      if (!isAgoraAgent) {
+        try {
+          const { synthesizeSpeech } = require('../lib/tts/sarvamTtsService');
+          const ttsResult = await synthesizeSpeech(greeting, { codec: 'wav' });
+          audioBase64 = ttsResult.audioBase64;
+        } catch (ttsErr) {
+          console.warn('Greeting Sarvam synthesis warning:', ttsErr.message);
+        }
+      }
+      return res.status(202).json({ status: 'GREETING_REQUESTED', greeting, audioBase64 });
     }
-    res.status(202).json({ status: shouldSpeak ? 'GREETING_REQUESTED' : 'ALREADY_READY' });
+    res.status(202).json({ status: 'ALREADY_READY' });
+  } catch (error) { next(error); }
+});
+
+router.post('/calls/:linkToken/turn', async (req, res, next) => {
+  try {
+    const session = await activeSessionFromCredential(req);
+    const userText = typeof req.body?.userText === 'string' ? req.body.userText.trim() : '';
+    if (!userText) {
+      return res.status(400).json({ error: 'userText is required' });
+    }
+
+    const { executeCustomerTurn } = require('../lib/agent/agentRuntime');
+    const result = await executeCustomerTurn(session, userText);
+    const assistantText = result.content || '';
+
+    let audioBase64 = null;
+    if (assistantText) {
+      try {
+        const { synthesizeSpeech } = require('../lib/tts/sarvamTtsService');
+        const ttsRes = await synthesizeSpeech(assistantText, { codec: 'wav' });
+        audioBase64 = ttsRes.audioBase64;
+      } catch (err) {
+        console.error('Sarvam TTS error for customer turn:', err.message);
+      }
+    }
+
+    const request = await getLatestMeetingRequest(session.sessionId).catch(() => null);
+
+    res.json({
+      sessionId: session.sessionId,
+      userText,
+      assistantText,
+      audioBase64,
+      meetingRequest: request
+    });
   } catch (error) { next(error); }
 });
 router.post('/calls/:linkToken/meeting-requests/:requestId/slots', async (req, res, next) => {
@@ -108,7 +206,10 @@ router.post('/calls/:linkToken/meeting-requests/:requestId/book', async (req, re
       ? `Your meeting is confirmed for the selected time.${crm?.verified ? ' I also updated our CRM.' : ''}`
       : 'I could not complete that booking. Please choose another available time or try again later.';
     await addMessage(session.sessionId, { role: 'assistant', content: spoken });
-    await speakAgent(session, spoken, { priority: 'APPEND', interruptable: true }).catch(error => console.warn('Verified meeting outcome could not be spoken:', error.message));
+    const isAgoraAgent = session.agentId && !['openai_realtime', 'browser_speech'].includes(session.agentId);
+    if (isAgoraAgent) {
+      await speakAgent(session, spoken, { priority: 'APPEND', interruptable: true }).catch(error => console.warn('Verified meeting outcome could not be spoken:', error.message));
+    }
     res.status(outcome.booked ? 201 : 409).json({ ...outcome, spoken });
   } catch (error) { next(error); }
 });
@@ -116,9 +217,12 @@ router.post('/calls/:linkToken/stop', async (req, res, next) => {
   try {
     const session = await activeSessionFromCredential(req);
     let agentStopped = true;
-    try { await require('../lib/calls/agoraAgentService').stopAgent(session); } catch (_) { agentStopped = false; }
+    const isAgoraAgent = session.agentId && !['openai_realtime', 'browser_speech'].includes(session.agentId);
+    if (isAgoraAgent) {
+      try { await require('../lib/calls/agoraAgentService').stopAgent(session); } catch (_) { agentStopped = false; }
+    }
     await endSession(session.sessionId);
-    await writeAuditEvent({ organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, eventType: EVENT_TYPES.CALL_ENDED, trigger: agentStopped ? 'Customer left call' : 'Customer left; Agora cleanup pending', actionResult: { agentStopped } });
+    await writeAuditEvent({ organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, eventType: EVENT_TYPES.CALL_ENDED, trigger: agentStopped ? 'Customer left call' : 'Customer left; agent cleanup pending', actionResult: { agentStopped } });
     try { await runPostCallAutopilot(session); } catch (autopilotError) { console.error('Post-call autopilot failed:', autopilotError.message); }
     res.status(agentStopped ? 200 : 202).json({ sessionId: session.sessionId, status: agentStopped ? 'ENDED' : 'ENDED_WITH_AGENT_CLEANUP_ERROR', agentStopped });
   } catch (error) { next(error); }
@@ -127,8 +231,12 @@ router.post('/calls/:linkToken/fail', async (req, res, next) => {
   try {
     const session = await activeSessionFromCredential(req);
     const { markFailed } = require('../lib/calls/callSessions');
-    try { await require('../lib/calls/agoraAgentService').stopAgent(session); } finally { await markFailed(session.sessionId, 'Customer RTC startup failed'); }
-    await writeAuditEvent({ organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, eventType: EVENT_TYPES.CALL_FAILED, trigger: 'Customer RTC startup failed' });
+    const isAgoraAgent = session.agentId && !['openai_realtime', 'browser_speech'].includes(session.agentId);
+    if (isAgoraAgent) {
+      try { await require('../lib/calls/agoraAgentService').stopAgent(session); } catch (_) {}
+    }
+    await markFailed(session.sessionId, 'Customer voice startup failed');
+    await writeAuditEvent({ organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, eventType: EVENT_TYPES.CALL_FAILED, trigger: 'Customer voice startup failed' });
     res.json({ sessionId: session.sessionId, status: 'FAILED' });
   } catch (error) { next(error); }
 });

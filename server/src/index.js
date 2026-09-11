@@ -20,12 +20,18 @@ if (missingVars.length > 0) {
 }
 
 const app = createApp();
+const voiceProvider = process.env.VOICE_PROVIDER || 'openai_realtime';
+if (voiceProvider === 'openai_realtime' && !process.env.OPENAI_API_KEY) {
+  console.warn('⚠️ WARNING: OPENAI_API_KEY is not set. openai_realtime sessions will fail unless configured or falling back to browser_speech.');
+}
 
 // --- Start ---
 app.listen(PORT, () => {
   console.log(`\n🔥 DealForge Core running on port ${PORT}`);
   console.log(`   Health: http://localhost:${PORT}/health`);
+  console.log(`   Voice:  ${voiceProvider}`);
   console.log(`   LLM:    POST /chat/completions/:sessionWebhookToken`);
+  console.log(`   Turn:   POST /api/public/calls/:linkToken/turn`);
   console.log(`   Manager: POST /api/manager/call-links`);
   console.log(`   Env:    ${process.env.NODE_ENV || 'development'}`);
   console.log(`   Model:  ${process.env.GEMINI_MODEL || 'not configured'}\n`);
