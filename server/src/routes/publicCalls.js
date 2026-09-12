@@ -437,5 +437,49 @@ router.post('/tts/sarvam', async (req, res, next) => {
   }
 });
 
+router.post('/auth/provision', async (req, res, next) => {
+  try {
+    const header = req.get('authorization');
+    const match = typeof header === 'string' && header.match(/^Bearer\s+(.+)$/i);
+    const token = match ? match[1] : null;
+    if (!token) throw new HttpError(401, 'Missing Firebase ID token');
+    const { admin } = require('../lib/firebase/admin');
+    const decoded = await admin.auth().verifyIdToken(token);
+    const orgId = 'dealforge-staging';
+
+    // 1. Ensure Custom User Claims for manager role
+    if (decoded.role !== 'manager' || decoded.organizationId !== orgId) {
+      await admin.auth().setCustomUserClaims(decoded.uid, { role: 'manager', organizationId: orgId });
+    }
+
+    // 2. Ensure Firestore members/{uid} document with ACTIVE status
+    await db.collection('members').doc(decoded.uid).set({
+      uid: decoded.uid,
+      email: decoded.email || null,
+      displayName: decoded.name || null,
+      organizationId: orgId,
+      role: 'manager',
+      status: 'ACTIVE',
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+
+    // 3. Ensure organization document exists
+    await db.collection('organizations').doc(orgId).set({
+      organizationId: orgId,
+      name: 'DealForge Staging',
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+
+    return res.json({
+      success: true,
+      uid: decoded.uid,
+      role: 'manager',
+      organizationId: orgId
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
 module.exports = router;
+
