@@ -81,13 +81,15 @@ async function updateDealWithEvidence({ organizationId, dealId, sessionId, field
     updatedAt: timestamp
   };
   await db.runTransaction(async tx => {
-    const deal = await tx.get(dealRef); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found');
-    tx.update(dealRef, fieldUpdate);
+    const deal = await tx.get(dealRef);
+    if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found');
+    let parent = null;
     if (sessionId) {
-      const parent = await tx.get(parentRef);
-      if (parent.exists && parent.data().organizationId === organizationId) {
-        tx.update(parentRef, fieldUpdate);
-      }
+      parent = await tx.get(parentRef);
+    }
+    tx.update(dealRef, fieldUpdate);
+    if (parent && parent.exists && parent.data().organizationId === organizationId) {
+      tx.update(parentRef, fieldUpdate);
     }
     tx.create(db.collection('evidence').doc(evidenceId), { evidenceId, organizationId, dealId, sessionId, claim: `${field} = ${value}`, utteranceTurn: evidenceTurn, confidence, source: structuredSource, status, dealStateField: field, timestamp });
     tx.create(db.collection('auditEvents').doc(auditId), { organizationId, dealId, sessionId, eventType: 'DEAL_STATE_UPDATED', trigger: `${field} updated from verified evidence`, evidence: [{ evidenceId, confidence, status }], timestamp });
@@ -117,12 +119,13 @@ async function updateMEDDIC(dealId, pillar, status, confidence, evidenceTurn, or
   await db.runTransaction(async tx => {
     const deal = await tx.get(ref);
     if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found');
-    tx.update(ref, meddicUpdate);
+    let parent = null;
     if (sessionId) {
-      const parent = await tx.get(parentRef);
-      if (parent.exists && parent.data().organizationId === organizationId) {
-        tx.update(parentRef, meddicUpdate);
-      }
+      parent = await tx.get(parentRef);
+    }
+    tx.update(ref, meddicUpdate);
+    if (parent && parent.exists && parent.data().organizationId === organizationId) {
+      tx.update(parentRef, meddicUpdate);
     }
   });
 }

@@ -198,6 +198,7 @@ async function extractAndApplyEvidence(userText, context) {
   const signals = extractEvidenceSignals(userText);
   if (!signals.length) return [];
 
+  const applied = [];
   const turnId = context.turnId || `turn_${context.turnNumber || 0}`;
   for (const signal of signals) {
     if (signal.type === 'field') {

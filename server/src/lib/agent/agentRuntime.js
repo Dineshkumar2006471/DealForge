@@ -69,6 +69,21 @@ async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-
     if (res) writeSseReply(res, chatId, spoken);
     return { content: spoken, chatId, requestedDiscount, receiptId: receipt.receiptId, metrics: { evidenceMs: tEvidenceEnd - tEvidenceStart, reasoningMs: 0, toolsMs: 10 } };
   }
+
+  const isMeeting = explicitMeetingRequest(userText);
+  if (isMeeting) {
+    await executeTool('request_meeting_details', { meeting_type: 'technical_review' }, context);
+    const spoken = "I've opened a secure form for your contact details and available times.";
+    await addMessage(session.sessionId, { role: 'assistant', content: spoken });
+    await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_RESPONSE_COMPLETED, trigger: 'Deterministic meeting request completed', actionResult: { verified: true, meetingType: 'technical_review' } });
+    try {
+      const { refreshAutonomy } = require('./autonomyService');
+      await refreshAutonomy(context);
+    } catch (_) {}
+    if (res) writeSseReply(res, chatId, spoken);
+    return { content: spoken, chatId, receiptId: receipt.receiptId, metrics: { evidenceMs: tEvidenceEnd - tEvidenceStart, reasoningMs: 0, toolsMs: 10 } };
+  }
+
   for (const approval of await claimApprovedApprovals(context)) {
     const executed = await executeTool(approval.exactToolName, approval.exactValidatedArguments, { ...context, approvedReplay: { approvalId: approval.approvalId, toolName: approval.exactToolName, args: approval.exactValidatedArguments } });
     if (executed.approved) {
@@ -219,6 +234,10 @@ function explicitDiscountRequest(text) {
   if (!match) return null;
   const value = Number(match[1]);
   return Number.isFinite(value) && value >= 0 && value <= 100 ? value : null;
+}
+
+function explicitMeetingRequest(text) {
+  return /(?:schedule|book|set up)\s*(?:a\s*)?(?:review|meeting|call|demo|follow-up)/i.test(String(text || ''));
 }
 
 async function currentModelMessages(context) {
