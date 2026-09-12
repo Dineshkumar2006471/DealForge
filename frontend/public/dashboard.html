@@ -85,14 +85,18 @@
 
       <section class="workspace-controls bento-card" style="grid-column: 1 / -1; margin-bottom: 0; padding: 16px 18px;">
         <div><div class="workspace-eyebrow">Account: <span id="workspace-account-label">Loading…</span></div><div class="workspace-subtitle">Each customer link starts a separate negotiation. Account data is not merged into customer conversations.</div></div>
-        <div class="workspace-actions"><a id="btn-resume-call" href="#" class="btn-secondary">Create customer call link</a><div class="conversation-selector"><label for="conversation-session">Customer conversation</label><select id="conversation-session" class="form-input" aria-describedby="conversation-scope"><option>Loading conversations…</option></select></div></div>
+        <div class="workspace-actions">
+          <button id="btn-reset-demo" class="btn-secondary" style="border-color: var(--amber); color: var(--amber);" title="Reset all demo session data to start clean">Reset Demo</button>
+          <a id="btn-resume-call" href="#" class="btn-secondary">Create customer call link</a>
+          <div class="conversation-selector"><label for="conversation-session">Customer conversation</label><select id="conversation-session" class="form-input" aria-describedby="conversation-scope"><option>Loading conversations…</option></select></div>
+        </div>
         <span id="call-link-status" class="workspace-link-status" role="status"></span>
       </section>
 
       <div id="conversation-scope" class="bento-card" style="grid-column: 1 / -1; margin-bottom: 0; padding: 13px 18px; font-size: 13px; color: var(--mute);" role="status">Loading customer conversations…</div>
 
-      <!-- HERO TERMINAL -->
-      <div class="hero-terminal-card" style="grid-column: 1 / -1;">
+      <!-- TOP BAR: Company | Deal | Stage | Value | Close Confidence -->
+      <section class="hero-terminal-card" style="grid-column: 1 / -1; margin-bottom: 0;">
         <div class="hero-terminal-header">
           <div class="hero-terminal-title">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
@@ -103,10 +107,14 @@
             <div class="pill-badge" style="background: rgba(247, 165, 1, 0.1); color: var(--amber); border: 1px solid var(--amber);" id="deal-stage">Loading...</div>
           </div>
         </div>
-        <div class="deal-summary-grid" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; margin-top: 8px;">
+        <div class="deal-summary-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; margin-top: 8px;">
+          <div>
+            <div style="font-family: var(--font-mono); color: var(--mute); font-size: 11px; text-transform: uppercase; margin-bottom: 4px;">Company</div>
+            <div class="viz-value-xl" style="font-size: 28px;" id="deal-company">Loading…</div>
+          </div>
           <div>
             <div style="font-family: var(--font-mono); color: var(--mute); font-size: 11px; text-transform: uppercase; margin-bottom: 4px;">Annual commercial value (INR)</div>
-            <div class="viz-value-xl" id="deal-arr">$0</div>
+            <div class="viz-value-xl" id="deal-arr">₹0</div>
           </div>
           <div>
             <div style="font-family: var(--font-mono); color: var(--mute); font-size: 11px; text-transform: uppercase; margin-bottom: 4px;">Close Confidence</div>
@@ -119,65 +127,28 @@
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- LEFT COLUMN -->
-      <div class="dashboard-col">
-
-        <!-- MEDDIC Panel -->
-        <div class="bento-card">
+      <!-- ROW 1 (3-col): MEDDIC | NEXT BEST ACTION | RISK -->
+      <div class="dashboard-row-3">
+        <!-- MEDDIC Qualification -->
+        <div class="bento-card" id="meddic-card">
           <div class="bento-header">
             <h3>MEDDIC Qualification</h3>
             <span style="font-family: var(--font-mono); font-size: 12px; color: var(--mute);" id="meddic-score">0/6</span>
           </div>
-          <div class="meddic-grid" id="meddic-grid" style="display: flex; flex-direction: column; gap: 12px;">
-            <!-- Injected via JS -->
-          </div>
+          <div class="meddic-grid" id="meddic-grid" style="display: flex; flex-direction: column; gap: 12px;"></div>
         </div>
 
-        <!-- Deal State Fields -->
-        <div class="bento-card">
+        <!-- Next Best Action & Sentiment -->
+        <div class="bento-card" id="action-card">
           <div class="bento-header">
-            <h3>Deal State</h3>
-            <span style="font-family: var(--font-mono); font-size: 11px; color: var(--mute);">EXTRACTED PARAMETERS</span>
+            <h3 style="font-size: 16px;">Action Plan & Authority</h3>
+            <span id="action-authority" class="pill-badge">OBSERVE</span>
           </div>
-          <div id="deal-state-fields" style="display: flex; flex-direction: column; gap: 12px;">
-            <!-- Injected via JS -->
-            <div style="color: var(--mute); font-size: 13px;">Loading deal state...</div>
-          </div>
-        </div>
-
-        <!-- Evidence Provenance (Fixed Height) -->
-        <div class="bento-card bento-card-fixed" id="decision-provenance-card">
-          <div class="bento-header">
-            <h3>Decision Provenance</h3>
-            <span style="font-family: var(--font-mono); font-size: 12px; color: var(--mute);" id="evidence-count">0 claims</span>
-          </div>
-          <ul class="evidence-list card-scroll-body" id="evidence-list">
-            <li class="evidence-item">
-              <span style="color: var(--mute);">Loading evidence...</span>
-            </li>
-          </ul>
-        </div>
-      </div>
-
-      <!-- RIGHT COLUMN -->
-      <div class="dashboard-col">
-
-        <!-- Autonomous Action Plan & Sentiment -->
-        <div style="display: grid; grid-template-columns: 1.35fr 1fr; gap: var(--sp-6);">
-          <div class="bento-card" style="margin-bottom: 0;">
-            <div class="bento-header">
-              <h3 style="font-size: 16px;">Action Plan</h3>
-              <span id="action-authority" class="pill-badge">OBSERVE</span>
-            </div>
-            <div id="autonomy-plan" style="font-size: 13px; color: var(--mute); line-height: 1.5;">Awaiting verified deal state.</div>
-          </div>
-
-          <div class="bento-card" style="margin-bottom: 0;">
-            <div class="bento-header">
-              <h3 style="font-size: 16px;">Sentiment</h3>
-            </div>
+          <div id="autonomy-plan" style="font-size: 13px; color: var(--mute); line-height: 1.5; margin-bottom: 16px;">Awaiting verified deal state.</div>
+          <div style="border-top: 1px dashed var(--hairline); padding-top: 12px;">
+            <div style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--mute); margin-bottom: 6px;">Buyer Sentiment</div>
             <div id="sentiment-display" style="display: flex; align-items: center; gap: 12px;">
               <div style="font-size: 32px; line-height: 1;" id="sentiment-value">—</div>
               <div>
@@ -189,7 +160,7 @@
         </div>
 
         <!-- Risk Analysis -->
-        <div class="bento-card">
+        <div class="bento-card" id="risk-card">
           <div class="bento-header">
             <h3>Risk Analysis</h3>
             <span style="font-family: var(--font-mono); font-size: 12px; color: var(--mute);" id="risk-count">Live monitor</span>
@@ -198,7 +169,107 @@
             <div style="color: var(--mute); font-size: 13px;">Analyzing risks...</div>
           </div>
         </div>
+      </div>
 
+      <!-- ROW 2 (3-col): MEETING | CRM | COMMERCIAL -->
+      <div class="dashboard-row-3">
+        <!-- Cal.com Meeting Card -->
+        <div class="bento-card" id="meeting-card">
+          <div class="bento-header">
+            <h3>Meeting Scheduling</h3>
+            <span id="meeting-status" class="pill-badge">NOT REQUESTED</span>
+          </div>
+          <div id="meeting-details" style="display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--hairline); padding-bottom: 6px;">
+              <span style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--mute);">Attendee</span>
+              <span id="meeting-attendee-name" style="font-weight: 500; color: var(--ink);">—</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--hairline); padding-bottom: 6px;">
+              <span style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--mute);">Scheduled Time</span>
+              <span id="meeting-scheduled-time" style="font-weight: 500; color: var(--ink);">—</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--hairline); padding-bottom: 6px;">
+              <span style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--mute);">Booking ID</span>
+              <span id="meeting-booking-id" style="font-family: var(--font-mono); font-size: 12px; color: var(--mute);">—</span>
+            </div>
+            <div style="margin-top: 4px;">
+              <a id="meeting-calcom-link" href="#" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="display: none; padding: 6px 12px; font-size: 11px; text-align: center; justify-content: center;">Open in Cal.com ↗</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- HubSpot CRM Card -->
+        <div class="bento-card" id="hubspot-card">
+          <div class="bento-header">
+            <h3>HubSpot CRM</h3>
+            <span id="hubspot-status" class="pill-badge">NOT CONFIGURED</span>
+          </div>
+          <div id="hubspot-details" style="display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--hairline); padding-bottom: 6px;">
+              <span style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--mute);">Linked Deal ID</span>
+              <span id="hubspot-deal-id" style="font-family: var(--font-mono); font-size: 12px; color: var(--ink);">—</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--hairline); padding-bottom: 6px;">
+              <span style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--mute);">CRM Sync</span>
+              <span id="hubspot-sync-status" style="font-weight: 500; color: var(--mute);">Standby</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--hairline); padding-bottom: 6px;">
+              <span style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--mute);">Last Synced</span>
+              <span id="hubspot-last-sync" style="font-size: 12px; color: var(--mute);">—</span>
+            </div>
+            <div style="margin-top: 4px;">
+              <a id="hubspot-deal-link" href="#" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="display: none; padding: 6px 12px; font-size: 11px; text-align: center; justify-content: center;">Open in HubSpot ↗</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Commercial / Extracted Deal State & Discount Ledger -->
+        <div class="bento-card" id="commercial-card">
+          <div class="bento-header">
+            <h3>Extracted Parameters</h3>
+            <span style="font-family: var(--font-mono); font-size: 11px; color: var(--mute);">PROVENANCE</span>
+          </div>
+          <div id="deal-state-fields" style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="color: var(--mute); font-size: 13px;">Loading deal state...</div>
+          </div>
+          <div style="margin-top: 14px; border-top: 1px dashed var(--hairline); padding-top: 12px;">
+            <div style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--mute); margin-bottom: 6px;">Discount Ledger</div>
+            <div id="discount-ledger">
+              <p style="color: var(--mute); font-size: 13px;">No discount negotiations recorded.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ROW 3 (2-col): DECISION PROVENANCE | AUDIT TIMELINE -->
+      <div class="dashboard-row-2">
+        <!-- Evidence Provenance -->
+        <div class="bento-card bento-card-fixed" id="decision-provenance-card">
+          <div class="bento-header">
+            <h3>Decision Provenance</h3>
+            <span style="font-family: var(--font-mono); font-size: 12px; color: var(--mute);" id="evidence-count">0 claims</span>
+          </div>
+          <ul class="evidence-list card-scroll-body" id="evidence-list">
+            <li class="evidence-item">
+              <span style="color: var(--mute);">Loading evidence...</span>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Audit Timeline (Fixes #audit-log and #audit-count) -->
+        <div class="bento-card bento-card-fixed" id="audit-card">
+          <div class="bento-header">
+            <h3>Audit Timeline</h3>
+            <span style="font-family: var(--font-mono); font-size: 12px; color: var(--mute);" id="audit-count">Live stream</span>
+          </div>
+          <div id="audit-log" class="audit-log card-scroll-body" style="height: 320px; overflow-y: auto;">
+            <!-- Rendered by renderAudit -->
+          </div>
+        </div>
+      </div>
+
+      <!-- ROW 4 (2-col): PENDING APPROVALS | CONVERSATION TRANSCRIPT -->
+      <div class="dashboard-row-2">
         <!-- Approvals Queue -->
         <div class="bento-card" id="approvals-card">
           <div class="bento-header" style="border-bottom-color: rgba(247, 165, 1, 0.2);">
@@ -212,13 +283,14 @@
           </div>
         </div>
 
-        <!-- Discount Ledger -->
-        <div class="bento-card">
+        <!-- Customer Conversation / Transcript Stream -->
+        <div class="bento-card bento-card-fixed" id="transcript-card">
           <div class="bento-header">
-            <h3>Discount Ledger</h3>
+            <h3>Customer Conversation / Transcript</h3>
+            <span style="font-family: var(--font-mono); font-size: 12px; color: var(--mute);" id="transcript-count">0 turns</span>
           </div>
-          <div id="discount-ledger">
-            <p style="color: var(--mute); font-size: 13px;">No discount negotiations recorded.</p>
+          <div id="transcript-list" class="card-scroll-body" style="height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+            <div class="stream-empty-state"><div class="stream-empty-title">Transcript standby</div><div class="stream-empty-subtitle">Live negotiation turns will stream here in real time.</div></div>
           </div>
         </div>
       </div>
@@ -274,6 +346,29 @@
       catch (error) { const status = document.getElementById('call-link-status'); status.textContent = error.message; status.style.color = 'var(--red)'; }
     });
 
+    const btnReset = document.getElementById('btn-reset-demo');
+    if (btnReset) {
+      btnReset.addEventListener('click', async event => {
+        event.preventDefault();
+        if (!window.confirm('Reset this demo conversation? A fresh call session and clean state will be initialized.')) return;
+        btnReset.disabled = true;
+        btnReset.textContent = 'Resetting…';
+        try {
+          const res = await resetDemo(dealId);
+          btnReset.textContent = 'Reset Demo';
+          btnReset.disabled = false;
+          showCallLink({ sessionId: res.sessionId, callUrl: res.callUrl, expiresAt: new Date(Date.now() + 3600000).toISOString() });
+          await selectConversation(res.sessionId);
+        } catch (error) {
+          btnReset.textContent = 'Reset Demo';
+          btnReset.disabled = false;
+          const status = document.getElementById('call-link-status');
+          status.textContent = 'Reset failed: ' + (error.message || error);
+          status.style.color = 'var(--red)';
+        }
+      });
+    }
+
     // Auth observer
     firebase.auth().onAuthStateChanged(async (user) => {
       if (user) {
@@ -293,6 +388,11 @@
     let evidenceUnsubscribe = null;
     let auditUnsubscribe = null;
     let approvalsUnsubscribe = null;
+    let meetingsUnsubscribe = null;
+    let hubspotOpUnsubscribe = null;
+    let messagesUnsubscribe = null;
+    let currentDealData = null;
+    let currentHubspotOp = null;
 
     function updateConversationUrl() {
       const url = new URL(window.location.href);
@@ -320,14 +420,15 @@
     }
 
     function clearConversationListeners() {
-      [evidenceUnsubscribe, auditUnsubscribe, approvalsUnsubscribe].forEach(unsubscribe => { if (typeof unsubscribe === 'function') unsubscribe(); });
+      [evidenceUnsubscribe, auditUnsubscribe, approvalsUnsubscribe, meetingsUnsubscribe, hubspotOpUnsubscribe, messagesUnsubscribe].forEach(unsubscribe => { if (typeof unsubscribe === 'function') unsubscribe(); });
       evidenceUnsubscribe = null; auditUnsubscribe = null; approvalsUnsubscribe = null;
+      meetingsUnsubscribe = null; hubspotOpUnsubscribe = null; messagesUnsubscribe = null;
       if (typeof window.__dealforgeSessionStateUnsubscribe === 'function') window.__dealforgeSessionStateUnsubscribe();
       window.__dealforgeSessionStateUnsubscribe = null;
     }
 
     function renderEmptyConversation() {
-      renderEvidence([]); renderAudit([]); renderApprovals([]);
+      renderEvidence([]); renderAudit([]); renderApprovals([]); renderMeetingCard(null); renderHubSpotCard(currentDealData, null); renderTranscript([]);
     }
 
     function attachConversationListeners() {
@@ -374,6 +475,40 @@
         .where('sessionId', '==', selectedSessionId)
         .where('status', '==', 'PENDING')
         .onSnapshot(snapshot => renderApprovals(snapshot.docs.map(d => ({ id: d.id, ...d.data() }))), err => console.warn('Approvals listen note:', err.message));
+
+      meetingsUnsubscribe = db.collection('meetings')
+        .where('organizationId', '==', window.managerOrganizationId)
+        .where('dealId', '==', dealId)
+        .where('sessionId', '==', selectedSessionId)
+        .limit(1)
+        .onSnapshot(snapshot => {
+          if (!snapshot.empty) renderMeetingCard(snapshot.docs[0].data());
+          else {
+            db.collection('callSessions').doc(selectedSessionId).collection('meetingRequests').limit(1).get()
+              .then(mrSnap => {
+                if (!mrSnap.empty) renderMeetingCard(mrSnap.docs[0].data());
+                else renderMeetingCard(null);
+              })
+              .catch(() => renderMeetingCard(null));
+          }
+        }, err => console.warn('Meetings listen note:', err.message));
+
+      hubspotOpUnsubscribe = db.collection('externalOperations')
+        .where('organizationId', '==', window.managerOrganizationId)
+        .where('sessionId', '==', selectedSessionId)
+        .where('provider', '==', 'hubspot')
+        .limit(1)
+        .onSnapshot(snapshot => {
+          currentHubspotOp = !snapshot.empty ? snapshot.docs[0].data() : null;
+          renderHubSpotCard(currentDealData, currentHubspotOp);
+        }, err => console.warn('HubSpot op listen note:', err.message));
+
+      messagesUnsubscribe = db.collection('callSessions').doc(selectedSessionId).collection('messages')
+        .orderBy('sequence', 'asc')
+        .limit(50)
+        .onSnapshot(snapshot => {
+          renderTranscript(snapshot.docs.map(d => d.data()));
+        }, err => console.warn('Messages listen note:', err.message));
     }
 
     async function selectConversation(sessionId) {
@@ -398,9 +533,11 @@
       dealUnsubscribe = db.collection('deals').doc(dealId)
         .onSnapshot(doc => {
           if (doc.exists) {
-            const company = doc.data().company?.value || doc.data().name || 'Unknown';
+            currentDealData = doc.data();
+            const company = currentDealData.company?.value || currentDealData.name || 'Unknown';
             document.getElementById('deal-company').textContent = company;
             document.getElementById('workspace-account-label').textContent = company;
+            renderHubSpotCard(currentDealData, currentHubspotOp);
           } else {
             document.getElementById('deal-company').textContent = 'Unable to load deal data. Retry.';
             document.getElementById('workspace-account-label').textContent = 'Deal not found';
@@ -478,12 +615,23 @@
       fields.forEach(f => {
         const field = data[f.key];
         const val = field?.value || '—';
-        const conf = field?.confidence ? `${(field.confidence * 100).toFixed(0)}%` : '—';
+        const conf = field?.confidence ? `${Math.round(field.confidence * 100)}%` : '—';
         const confColor = (field?.confidence >= 0.85) ? 'var(--green)' : (field?.confidence >= 0.60) ? 'var(--amber)' : 'var(--mute)';
+        const badge = createStatusBadge(field?.status, field?.confidence);
+
         const row = node('div', undefined, { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--hairline)' });
         const left = node('div');
-        left.append(node('div', f.label, { fontFamily: 'var(--font-mono)', fontSize: '11px', textTransform: 'uppercase', color: 'var(--mute)' }), node('div', val, { fontSize: '15px', fontWeight: '500', color: 'var(--ink)', marginTop: '2px' }));
-        row.append(left, node('div', conf, { fontFamily: 'var(--font-mono)', fontSize: '12px', color: confColor }));
+        const labelRow = node('div', undefined, { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' });
+        labelRow.append(node('span', f.label, { fontFamily: 'var(--font-mono)', fontSize: '11px', textTransform: 'uppercase', color: 'var(--mute)' }), badge);
+        left.append(labelRow, node('div', val, { fontSize: '14px', fontWeight: '500', color: 'var(--ink)' }));
+
+        const right = node('div', undefined, { textAlign: 'right' });
+        right.append(node('div', conf, { fontFamily: 'var(--font-mono)', fontSize: '12px', color: confColor }));
+        if (field?.source) {
+          const srcText = typeof field.source === 'object' ? `${field.source.type || 'turn'}${field.source.turnId ? ` · ${field.source.turnId}` : ''}` : String(field.source);
+          right.append(node('div', srcText, { fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--mute)', textTransform: 'uppercase' }));
+        }
+        row.append(left, right);
         stateNodes.push(row);
       });
       stateFields.replaceChildren(...(stateNodes.length ? stateNodes : [node('div', 'No fields extracted yet.', { color: 'var(--mute)', fontSize: '13px' })]));
@@ -610,6 +758,135 @@
         const entry = node('div'); entry.className = 'audit-entry'; const timestamp = node('div', time); timestamp.className = 'audit-time'; entry.append(timestamp, event); entries.push(entry);
       });
       log.replaceChildren(...entries);
+    }
+
+    function createStatusBadge(status, confidence) {
+      const badge = document.createElement('span');
+      badge.className = 'status-badge';
+      const conf = Number(confidence) || 0;
+      const s = (status || (conf >= 0.85 ? 'confirmed' : conf >= 0.60 ? 'likely' : 'needs_confirmation')).toLowerCase();
+      if (conf > 0) {
+        if (s === 'confirmed') {
+          badge.classList.add('status-confirmed');
+          badge.textContent = '✓ CONFIRMED';
+        } else if (s === 'likely') {
+          badge.classList.add('status-likely');
+          badge.textContent = '◐ LIKELY';
+        } else {
+          badge.classList.add('status-needs-confirmation');
+          badge.textContent = '? NEEDS CONFIRMATION';
+        }
+      } else {
+        badge.classList.add('status-not-provided');
+        badge.textContent = '— NOT PROVIDED';
+      }
+      return badge;
+    }
+
+    function renderMeetingCard(meeting) {
+      const statusEl = document.getElementById('meeting-status');
+      const attendeeEl = document.getElementById('meeting-attendee-name');
+      const timeEl = document.getElementById('meeting-scheduled-time');
+      const bookingEl = document.getElementById('meeting-booking-id');
+      const linkEl = document.getElementById('meeting-calcom-link');
+      if (!meeting) {
+        if (statusEl) { statusEl.textContent = 'NOT REQUESTED'; statusEl.style.color = 'var(--mute)'; }
+        if (attendeeEl) attendeeEl.textContent = '—';
+        if (timeEl) timeEl.textContent = '—';
+        if (bookingEl) bookingEl.textContent = '—';
+        if (linkEl) linkEl.style.display = 'none';
+        return;
+      }
+      const st = meeting.status || (meeting.booked ? 'BOOKED' : 'DETAILS REQUIRED');
+      if (statusEl) {
+        statusEl.textContent = String(st).replace(/_/g, ' ');
+        statusEl.style.color = st === 'BOOKED' ? 'var(--green)' : 'var(--amber)';
+      }
+      if (attendeeEl) attendeeEl.textContent = meeting.attendee?.name || meeting.attendee?.email || meeting.attendee || '—';
+      const start = meeting.start || meeting.selectedSlot || meeting.preferredDate;
+      if (timeEl) timeEl.textContent = start ? new Date(start).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+      if (bookingEl) bookingEl.textContent = meeting.bookingId ? `ID: ${meeting.bookingId}` : (meeting.requestId || '—');
+      if (linkEl) {
+        if (meeting.meetingUrl) {
+          linkEl.href = meeting.meetingUrl;
+          linkEl.style.display = 'inline-flex';
+        } else {
+          linkEl.style.display = 'none';
+        }
+      }
+    }
+
+    function renderHubSpotCard(dealData, opData) {
+      const statusEl = document.getElementById('hubspot-status');
+      const dealIdEl = document.getElementById('hubspot-deal-id');
+      const syncStatusEl = document.getElementById('hubspot-sync-status');
+      const lastSyncEl = document.getElementById('hubspot-last-sync');
+      const linkEl = document.getElementById('hubspot-deal-link');
+
+      const hs = dealData?.integrations?.hubspot;
+      if (!hs || !hs.dealId) {
+        if (statusEl) { statusEl.textContent = 'NOT LINKED'; statusEl.style.color = 'var(--mute)'; }
+        if (dealIdEl) dealIdEl.textContent = '—';
+        if (syncStatusEl) syncStatusEl.textContent = 'No linked CRM deal';
+        if (lastSyncEl) lastSyncEl.textContent = '—';
+        if (linkEl) linkEl.style.display = 'none';
+        return;
+      }
+
+      if (dealIdEl) dealIdEl.textContent = hs.dealId;
+      const isSynced = opData?.status === 'SUCCEEDED';
+      if (statusEl) {
+        statusEl.textContent = isSynced ? 'SYNCED' : opData?.status === 'FAILED' ? 'SYNC FAILED' : 'LINKED';
+        statusEl.style.color = isSynced ? 'var(--green)' : opData?.status === 'FAILED' ? 'var(--red)' : 'var(--amber)';
+      }
+      if (syncStatusEl) syncStatusEl.textContent = isSynced ? '✓ Booking synced to CRM' : 'Link verified';
+      if (lastSyncEl) lastSyncEl.textContent = opData?.completedAt ? new Date(opData.completedAt).toLocaleTimeString() : (hs.linkedAt ? new Date(hs.linkedAt).toLocaleTimeString() : '—');
+      if (linkEl) {
+        linkEl.href = `https://app.hubspot.com/contacts/deals/${encodeURIComponent(hs.dealId)}`;
+        linkEl.style.display = 'inline-flex';
+      }
+    }
+
+    function renderTranscript(messages) {
+      const list = document.getElementById('transcript-list');
+      const countEl = document.getElementById('transcript-count');
+      if (countEl) countEl.textContent = `${messages ? messages.length : 0} turn${messages && messages.length === 1 ? '' : 's'}`;
+      if (!messages || messages.length === 0) {
+        const empty = node('div'); empty.className = 'stream-empty-state';
+        const title = node('div', 'Transcript standby'); title.className = 'stream-empty-title';
+        const subtitle = node('div', 'Live negotiation turns will stream here in real time.'); subtitle.className = 'stream-empty-subtitle';
+        empty.append(title, subtitle);
+        list.replaceChildren(empty);
+        return;
+      }
+      const nodes = messages.map(entry => {
+        const m = entry.message || entry;
+        const isAssistant = m.role === 'assistant';
+        const row = node('div', undefined, {
+          padding: '8px 12px',
+          borderRadius: '8px',
+          background: isAssistant ? 'rgba(247, 165, 1, 0.08)' : 'var(--canvas)',
+          border: isAssistant ? '1px solid rgba(247, 165, 1, 0.2)' : '1px solid var(--hairline)',
+          alignSelf: isAssistant ? 'flex-start' : 'flex-end',
+          maxWidth: '85%'
+        });
+        const header = node('div', isAssistant ? 'DEALFORGE' : 'CUSTOMER', {
+          fontFamily: 'var(--font-mono)',
+          fontSize: '10px',
+          fontWeight: '700',
+          color: isAssistant ? 'var(--amber)' : 'var(--mute)',
+          marginBottom: '4px'
+        });
+        const body = node('div', m.content || (m.tool_calls ? '[Executing tool...]' : ''), {
+          fontSize: '13px',
+          color: 'var(--ink)',
+          lineHeight: '1.4'
+        });
+        row.append(header, body);
+        return row;
+      });
+      list.replaceChildren(...nodes);
+      list.scrollTop = list.scrollHeight;
     }
 
     function renderApprovals(approvals) {
