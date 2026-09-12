@@ -202,7 +202,9 @@ router.post('/calls/:linkToken/turn', async (req, res, next) => {
       meetingRequest: request,
       duplicate: Boolean(result.duplicate),
       metrics: {
-        reasoningMs: result.metrics?.reasoningMs || 0,
+        evidenceMs: result.metrics?.evidenceMs || 0,
+        reasoningMs: result.metrics?.geminiTotalMs || result.metrics?.reasoningMs || 0,
+        geminiFirstTokenMs: result.metrics?.geminiFirstTokenMs || 0,
         toolsMs: result.metrics?.toolsMs || 0,
         ttsMs: ttsLatency,
         totalBackendMs

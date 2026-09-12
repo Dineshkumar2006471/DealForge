@@ -11,9 +11,8 @@ const { EVENT_TYPES } = require('../audit/eventTypes');
 const { claimTurnReceipt } = require('./turnReceipts');
 require('../tools/calculateDiscount'); require('../tools/updateDealState'); require('../tools/checkProductAvailability'); require('../tools/bookMeeting'); require('../tools/requestMeetingDetails'); require('../tools/escalateToHuman');
 require('../integrations/hubspot');
-
 async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-${uuidv4()}`, turnId = null } = {}) {
-  const context = { organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, turnNumber: (await getTurnNumber(session.sessionId)) + 1 };
+  const context = { organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, turnNumber: (await getTurnNumber(session.sessionId)) + 1, turnId: turnId || `turn_${Date.now()}` };
   let history = await getHistory(session.sessionId);
   if (!await getDeal(context.dealId, context.organizationId, context.sessionId)) throw new Error('Bound deal not found');
 
@@ -39,12 +38,14 @@ async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-
   await addMessage(session.sessionId, { role: 'user', content: userText.trim() });
 
   // Deterministic conversation evidence extraction (MEDDIC and Deal State)
+  const tEvidenceStart = Date.now();
   try {
     const { extractAndApplyEvidence } = require('../evidence/evidenceExtractor');
     await extractAndApplyEvidence(userText, context);
   } catch (extractErr) {
     console.warn('Evidence extraction note:', extractErr.message);
   }
+  const tEvidenceEnd = Date.now();
 
   // A percentage discount request is a high-value policy boundary. Route it
   // deterministically instead of hoping the generative model elects to call a
@@ -66,7 +67,7 @@ async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-
       await refreshAutonomy(context);
     } catch (_) {}
     if (res) writeSseReply(res, chatId, spoken);
-    return { content: spoken, chatId, requestedDiscount, receiptId: receipt.receiptId, metrics: { reasoningMs: 0, toolsMs: 10 } };
+    return { content: spoken, chatId, requestedDiscount, receiptId: receipt.receiptId, metrics: { evidenceMs: tEvidenceEnd - tEvidenceStart, reasoningMs: 0, toolsMs: 10 } };
   }
   for (const approval of await claimApprovedApprovals(context)) {
     const executed = await executeTool(approval.exactToolName, approval.exactValidatedArguments, { ...context, approvedReplay: { approvalId: approval.approvalId, toolName: approval.exactToolName, args: approval.exactValidatedArguments } });
@@ -80,15 +81,18 @@ async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-
   }
   const tools = getToolDefinitions(); history = await getHistory(session.sessionId);
   let content = ''; let calls = []; let finishReason; let hasSpokenContent = false;
+  let tGeminiStart = 0, tGeminiFirstToken = 0, tToolsStart = 0, tToolsEnd = 0;
   try {
     if (res) writeInterruptableMetadata(res, chatId, true);
     // Buffer the first model pass. A tool-using pass is provisional: speaking
     // it before verification can produce two answers for a single customer
     // turn (the provisional answer, then the verified follow-up).
     const initialTextChunks = [];
+    tGeminiStart = Date.now();
     for await (const chunk of generateResponse(await currentModelMessages(context), tools, context)) {
       const choice = chunk.choices?.[0]; if (!choice) continue;
       if (choice.delta?.content) {
+        if (!tGeminiFirstToken) tGeminiFirstToken = Date.now();
         content += choice.delta.content;
         initialTextChunks.push(chunk);
       }
@@ -101,6 +105,7 @@ async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-
       // not an executed or verified answer.
       content = '';
       await addMessage(session.sessionId, { role: 'assistant', tool_calls: calls, content: null });
+      tToolsStart = Date.now();
       for (const call of calls) {
         let args; try { args = JSON.parse(call.function.arguments || '{}'); } catch { args = {}; }
         const { result } = await executeTool(call.function.name, args, context);
@@ -162,8 +167,17 @@ async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-
       const { refreshAutonomy } = require('./autonomyService');
       await refreshAutonomy(context);
     } catch (_) {}
+    tToolsEnd = tToolsEnd || Date.now();
+    const tTurnEnd = Date.now();
+    const metrics = {
+      evidenceMs: tEvidenceEnd - tEvidenceStart,
+      geminiFirstTokenMs: tGeminiFirstToken ? tGeminiFirstToken - tGeminiStart : 0,
+      geminiTotalMs: tGeminiStart ? tTurnEnd - tGeminiStart : 0,
+      toolsMs: tToolsStart ? (tToolsEnd - tToolsStart) : 0,
+      totalMs: tTurnEnd - tEvidenceStart
+    };
     if (res) writeTerminalSseReply(res, chatId);
-    return { content, chatId, receiptId: receipt.receiptId };
+    return { content, chatId, receiptId: receipt.receiptId, metrics };
   } catch (error) {
     console.error('Agent runtime error:', error.message);
     await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_RESPONSE_FAILED, trigger: 'Gemini/runtime response failed', actionResult: { verified: false, error: String(error.message).slice(0, 200) } }).catch(() => {});

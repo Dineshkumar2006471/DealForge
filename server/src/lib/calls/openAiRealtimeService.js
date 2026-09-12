@@ -5,11 +5,11 @@ const { HttpError } = require('../security/auth');
  * Never exposes the primary OPENAI_API_KEY to the client.
  *
  * @param {object} [options]
- * @param {string} [options.model='gpt-4o-realtime-preview']
+ * @param {string} [options.model] - defaults to OPENAI_REALTIME_MODEL env var or 'gpt-4o-mini-realtime-preview'
  * @returns {Promise<{ clientSecret: string, expiresAt: number, model: string }>}
  */
 async function createRealtimeSession({
-  model = process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime-mini'
+  model = process.env.OPENAI_REALTIME_MODEL || 'gpt-4o-mini-realtime-preview'
 } = {}) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {

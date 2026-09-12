@@ -493,7 +493,9 @@
         muteButton.disabled = false;
         setButton('End Call', false);
         if (credentials.expiresAt) scheduleRenewal(credentials.expiresAt);
-        startCaptionFallback();
+        // Live transcript deltas handle captions for openai_realtime and browser_speech.
+        // Only Agora needs the 2.5s polling fallback since it has no client-side transcript events.
+        if (provider === 'agora') startCaptionFallback();
         startMeetingRequestFallback();
 
         // Request greeting from server

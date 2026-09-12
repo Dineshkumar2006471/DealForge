@@ -7,7 +7,8 @@
  */
 
 class RealtimeVoiceClient {
-  constructor({ clientSecret, model = 'gpt-4o-realtime-preview' }) {
+  constructor({ clientSecret, model }) {
+    if (!model) throw new Error('RealtimeVoiceClient requires a model from the server credential response');
     this.clientSecret = clientSecret;
     this.model = model;
     this.peerConnection = null;
