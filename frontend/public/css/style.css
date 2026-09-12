@@ -426,6 +426,12 @@ h1, h2, h3, h4, .headline-xl, .headline-lg, .headline-md {
   line-height: 1;
   color: var(--ink);
 }
+.viz-value-xl.company-title {
+  font-size: 22px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
 
 .tag-list { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 

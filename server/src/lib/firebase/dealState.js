@@ -83,6 +83,10 @@ async function updateDealWithEvidence({ organizationId, dealId, sessionId, field
   await db.runTransaction(async tx => {
     const deal = await tx.get(dealRef);
     if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found');
+    const existing = deal.data();
+    if (field === 'company' && existing.company?.value && existing.company.value !== 'Unknown' && existing.company.status === 'confirmed' && value !== existing.company.value) {
+      return; // Preserve the confirmed company name
+    }
     let parent = null;
     if (sessionId) {
       parent = await tx.get(parentRef);

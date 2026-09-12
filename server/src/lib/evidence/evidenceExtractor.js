@@ -17,10 +17,12 @@ function extractEvidenceSignals(text) {
   const signals = [];
 
   // 1. Company Name
-  const companyMatch = normalized.match(/(?:we're|we are|from|company is|at)\s+([A-Z][A-Za-z0-9\s]{2,30}?)(?:\.|,|\s+we\b|\s+and\b|$)/i);
+  const companyMatch = normalized.match(/(?:we're|we are|from|company is)\s+([A-Z][A-Za-z0-9\s]{2,30}?)(?:\.|,|\s+we\b|\s+and\b|$)/i);
   if (companyMatch) {
     const raw = companyMatch[1].trim();
-    if (!/^(a|an|the|looking|trying|having|experiencing)$/i.test(raw)) {
+    const nonCompanyVerbs = /^(a|an|the|looking|trying|having|experiencing|evaluating|considering|testing|using|reviewing|planning|ready|hoping|interested|scheduling|schedule|review|meeting|pending)\b/i;
+    const nonCompanyKeywords = /(salesforce|hubspot|gong|outreach|tomorrow|review|meeting|discount|evaluating|pending)/i;
+    if (!nonCompanyVerbs.test(raw) && !nonCompanyKeywords.test(raw)) {
       signals.push({
         type: 'field',
         field: 'company',
