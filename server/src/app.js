@@ -16,6 +16,7 @@ function createApp() {
   app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'dealforge-core', timestamp: new Date().toISOString() }));
   app.use('/chat/completions', chat);
   app.use('/api/manager', manager);
+  app.use('/api/manager', require('./routes/demoReset'));
   app.use('/api/public', createRateLimit({ scope: 'public-call', limit: 300, windowMs: 60_000 }), publicCalls);
   app.use((error, _req, res, _next) => {
     const status = error instanceof HttpError ? error.status : error.name === 'ZodError' ? 400 : 500;

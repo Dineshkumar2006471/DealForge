@@ -41,3 +41,4 @@ function linkHubspotDeal(dealId, hubspotDealId) { return api(`/manager/deals/${e
 function setHubspotBookingSync(dealId, enabled) { return api(`/manager/deals/${encodeURIComponent(dealId)}/integrations/hubspot/booking-sync`, { method: 'POST', body: JSON.stringify({ enabled }) }, true); }
 function findMeetingSlots(linkToken, requestId, payload) { return api(`/public/calls/${encodeURIComponent(linkToken)}/meeting-requests/${encodeURIComponent(requestId)}/slots`, { method: 'POST', body: JSON.stringify(payload) }); }
 function bookMeetingSlot(linkToken, requestId, payload) { return api(`/public/calls/${encodeURIComponent(linkToken)}/meeting-requests/${encodeURIComponent(requestId)}/book`, { method: 'POST', body: JSON.stringify(payload) }); }
+function resetDemo(dealId) { return api('/manager/demo-reset', { method: 'POST', body: JSON.stringify({ dealId }) }, true); }
