@@ -157,12 +157,12 @@ router.post('/calls/:linkToken/ready', async (req, res, next) => {
 router.post('/calls/:linkToken/turn', async (req, res, next) => {
   const s0 = Date.now();
   try {
-    const session = await activeSessionFromCredential(req);
-    const s1 = Date.now();
     const userText = typeof req.body?.userText === 'string' ? req.body.userText.trim() : '';
     if (!userText) {
       return res.status(400).json({ error: 'userText is required' });
     }
+    const session = await activeSessionFromCredential(req);
+    const s1 = Date.now();
     const turnId = typeof req.body?.turnId === 'string' ? req.body.turnId.trim() : null;
     const wantsStream = req.headers.accept?.includes('text/event-stream') || req.body?.stream === true || req.query?.stream === 'true';
 
