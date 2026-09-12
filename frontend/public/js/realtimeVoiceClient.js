@@ -55,42 +55,38 @@ class RealtimeVoiceClient {
     const offer = await this.peerConnection.createOffer();
     await this.peerConnection.setLocalDescription(offer);
 
-    // 5. Send offer to OpenAI Realtime endpoint using ephemeral clientSecret
-    let answerSdp = null;
+    // 5. Send offer to OpenAI Realtime GA calls endpoint using ephemeral clientSecret
+    const response = await fetch('https://api.openai.com/v1/realtime/calls', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.clientSecret}`,
+        'Content-Type': 'application/sdp'
+      },
+      body: offer.sdp
+    });
 
-    // Try standard GA calls endpoint first
-    try {
-      const response = await fetch('https://api.openai.com/v1/realtime/calls', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.clientSecret}`,
-          'Content-Type': 'application/sdp'
-        },
-        body: offer.sdp
-      });
-      if (response.ok) {
-        answerSdp = await response.text();
+    if (!response.ok) {
+      let errorDetails = '';
+      try {
+        const errJson = await response.json();
+        errorDetails = errJson.error?.message || errJson.error?.code || JSON.stringify(errJson);
+      } catch (_) {
+        try {
+          errorDetails = await response.text();
+        } catch (__) {
+          errorDetails = response.statusText;
+        }
       }
-    } catch (e) {
-      console.warn('POST /v1/realtime/calls not available, trying preview endpoint...', e);
+      console.error('[RealtimeVoiceClient] WebRTC SDP negotiation failed:', {
+        endpoint: '/v1/realtime/calls',
+        status: response.status,
+        model: this.model,
+        error: errorDetails
+      });
+      throw new Error(`OpenAI Realtime WebRTC connection failed (${response.status}): ${errorDetails || response.statusText}`);
     }
 
-    // Fallback to preview endpoint with model query param
-    if (!answerSdp) {
-      const response = await fetch(`https://api.openai.com/v1/realtime?model=${encodeURIComponent(this.model)}`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.clientSecret}`,
-          'Content-Type': 'application/sdp'
-        },
-        body: offer.sdp
-      });
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`OpenAI Realtime WebRTC connection failed (${response.status}): ${errorText}`);
-      }
-      answerSdp = await response.text();
-    }
+    const answerSdp = await response.text();
 
     // 6. Set remote description with OpenAI SDP answer
     await this.peerConnection.setRemoteDescription({
