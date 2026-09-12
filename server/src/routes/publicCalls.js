@@ -161,30 +161,52 @@ router.post('/calls/:linkToken/turn', async (req, res, next) => {
     if (!userText) {
       return res.status(400).json({ error: 'userText is required' });
     }
+    const turnId = typeof req.body?.turnId === 'string' ? req.body.turnId.trim() : null;
 
+    const tServerStart = Date.now();
     const { executeCustomerTurn } = require('../lib/agent/agentRuntime');
-    const result = await executeCustomerTurn(session, userText);
+    const result = await executeCustomerTurn(session, userText, { turnId });
     const assistantText = result.content || '';
 
-    let audioBase64 = null;
-    if (assistantText) {
+    let audioBase64 = result.audioBase64 || null;
+    let ttsLatency = 0;
+    if (assistantText && !audioBase64) {
       try {
         const { synthesizeSpeech } = require('../lib/tts/sarvamTtsService');
+        const ttsStart = Date.now();
         const ttsRes = await synthesizeSpeech(assistantText, { codec: 'wav' });
+        ttsLatency = Date.now() - ttsStart;
         audioBase64 = ttsRes.audioBase64;
       } catch (err) {
         console.error('Sarvam TTS error for customer turn:', err.message);
       }
     }
 
+    if (result.receiptId || turnId) {
+      const { attachTurnResponse } = require('../lib/agent/turnReceipts');
+      await attachTurnResponse(session.sessionId, result.receiptId, turnId, {
+        assistantText,
+        audioBase64
+      });
+    }
+
     const request = await getLatestMeetingRequest(session.sessionId).catch(() => null);
+    const totalBackendMs = Date.now() - tServerStart;
 
     res.json({
       sessionId: session.sessionId,
+      turnId,
       userText,
       assistantText,
       audioBase64,
-      meetingRequest: request
+      meetingRequest: request,
+      duplicate: Boolean(result.duplicate),
+      metrics: {
+        reasoningMs: result.metrics?.reasoningMs || 0,
+        toolsMs: result.metrics?.toolsMs || 0,
+        ttsMs: ttsLatency,
+        totalBackendMs
+      }
     });
   } catch (error) { next(error); }
 });

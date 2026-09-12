@@ -67,9 +67,17 @@ async function updateDealWithEvidence({ organizationId, dealId, sessionId, field
   if (confidence < CONFIDENCE_THRESHOLDS.REJECT) return { updated: false, reason: `Confidence ${confidence} below reject threshold ${CONFIDENCE_THRESHOLDS.REJECT}` };
   if (confidence < CONFIDENCE_THRESHOLDS.ACCEPT) return { updated: false, reason: `Confidence ${confidence} in clarify range — ask clarifying question`, needsClarification: true };
   const timestamp = new Date().toISOString(); const evidenceId = uuidv4(); const auditId = uuidv4(); const dealRef = stateRef(dealId, sessionId);
+  const parentRef = db.collection('deals').doc(dealId);
+  const fieldUpdate = { [`${field}.value`]: value, [`${field}.confidence`]: confidence, [`${field}.source`]: source, [`${field}.evidence_turn`]: evidenceTurn, [`${field}.last_updated`]: timestamp, updatedAt: timestamp };
   await db.runTransaction(async tx => {
     const deal = await tx.get(dealRef); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found');
-    tx.update(dealRef, { [`${field}.value`]: value, [`${field}.confidence`]: confidence, [`${field}.source`]: source, [`${field}.evidence_turn`]: evidenceTurn, [`${field}.last_updated`]: timestamp, updatedAt: timestamp });
+    tx.update(dealRef, fieldUpdate);
+    if (sessionId) {
+      const parent = await tx.get(parentRef);
+      if (parent.exists && parent.data().organizationId === organizationId) {
+        tx.update(parentRef, fieldUpdate);
+      }
+    }
     tx.create(db.collection('evidence').doc(evidenceId), { evidenceId, organizationId, dealId, sessionId, claim: `${field} = ${value}`, utteranceTurn: evidenceTurn, confidence, source, dealStateField: field, timestamp });
     tx.create(db.collection('auditEvents').doc(auditId), { organizationId, dealId, sessionId, eventType: 'DEAL_STATE_UPDATED', trigger: `${field} updated from verified evidence`, evidence: [{ evidenceId, confidence }], timestamp });
   });
@@ -79,14 +87,31 @@ async function updateDealWithEvidence({ organizationId, dealId, sessionId, field
 /**
  * Update MEDDIC status for a specific pillar.
  */
-async function updateMEDDIC(dealId, pillar, status, confidence, evidenceTurn, organizationId, sessionId = null) {
+async function updateMEDDIC(dealId, pillar, status, confidence, evidenceTurn, organizationId, sessionId = null, extra = {}) {
   const now = new Date().toISOString();
-  const ref = stateRef(dealId, sessionId); await db.runTransaction(async tx => { const deal = await tx.get(ref); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found'); tx.update(ref, {
+  const ref = stateRef(dealId, sessionId);
+  const parentRef = db.collection('deals').doc(dealId);
+  const meddicUpdate = {
     [`meddic.${pillar}.status`]: status,
     [`meddic.${pillar}.confidence`]: confidence,
     [`meddic.${pillar}.evidence_turn`]: evidenceTurn,
+    [`meddic.${pillar}.lastUpdated`]: now,
     updatedAt: now,
-  }); });
+  };
+  if (extra.value !== undefined) meddicUpdate[`meddic.${pillar}.value`] = extra.value;
+  if (extra.source) meddicUpdate[`meddic.${pillar}.source`] = extra.source;
+
+  await db.runTransaction(async tx => {
+    const deal = await tx.get(ref);
+    if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found');
+    tx.update(ref, meddicUpdate);
+    if (sessionId) {
+      const parent = await tx.get(parentRef);
+      if (parent.exists && parent.data().organizationId === organizationId) {
+        tx.update(parentRef, meddicUpdate);
+      }
+    }
+  });
 }
 
 /**

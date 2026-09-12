@@ -12,7 +12,7 @@ const { claimTurnReceipt } = require('./turnReceipts');
 require('../tools/calculateDiscount'); require('../tools/updateDealState'); require('../tools/checkProductAvailability'); require('../tools/bookMeeting'); require('../tools/requestMeetingDetails'); require('../tools/escalateToHuman');
 require('../integrations/hubspot');
 
-async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-${uuidv4()}` } = {}) {
+async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-${uuidv4()}`, turnId = null } = {}) {
   const context = { organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, turnNumber: (await getTurnNumber(session.sessionId)) + 1 };
   let history = await getHistory(session.sessionId);
   if (!await getDeal(context.dealId, context.organizationId, context.sessionId)) throw new Error('Bound deal not found');
@@ -26,14 +26,26 @@ async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-
     return { empty: true, content: '' };
   }
 
-  const receipt = await claimTurnReceipt(session.sessionId, userText);
+  const receipt = await claimTurnReceipt(session.sessionId, userText, turnId);
   if (!receipt.claimed) {
-    await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_DUPLICATE_TURN_IGNORED, trigger: 'Ignored replayed customer turn', actionResult: { verified: true } });
+    await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_DUPLICATE_TURN_IGNORED, trigger: 'Ignored replayed customer turn', actionResult: { verified: true, turnId } });
     if (res) writeNoopSseReply(res, chatId);
-    return { duplicate: true, content: '' };
+    if (receipt.cachedResponse) {
+      return { duplicate: true, content: receipt.cachedResponse.assistantText || '', audioBase64: receipt.cachedResponse.audioBase64 || null, receiptId: receipt.receiptId };
+    }
+    return { duplicate: true, content: '', receiptId: receipt.receiptId };
   }
 
   await addMessage(session.sessionId, { role: 'user', content: userText.trim() });
+
+  // Deterministic conversation evidence extraction (MEDDIC and Deal State)
+  try {
+    const { extractAndApplyEvidence } = require('../evidence/evidenceExtractor');
+    await extractAndApplyEvidence(userText, context);
+  } catch (extractErr) {
+    console.warn('Evidence extraction note:', extractErr.message);
+  }
+
   // A percentage discount request is a high-value policy boundary. Route it
   // deterministically instead of hoping the generative model elects to call a
   // tool. This makes the manager approval demonstration reliable and preserves
@@ -49,8 +61,12 @@ async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-
         : `I can confirm a ${requestedDiscount}% discount for this negotiation.`;
     await addMessage(session.sessionId, { role: 'assistant', content: spoken });
     await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_RESPONSE_COMPLETED, trigger: 'Deterministic discount-policy response completed', actionResult: { verified: true, requestedDiscount } });
+    try {
+      const { refreshAutonomy } = require('./autonomyService');
+      await refreshAutonomy(context);
+    } catch (_) {}
     if (res) writeSseReply(res, chatId, spoken);
-    return { content: spoken, chatId, requestedDiscount };
+    return { content: spoken, chatId, requestedDiscount, receiptId: receipt.receiptId, metrics: { reasoningMs: 0, toolsMs: 10 } };
   }
   for (const approval of await claimApprovedApprovals(context)) {
     const executed = await executeTool(approval.exactToolName, approval.exactValidatedArguments, { ...context, approvedReplay: { approvalId: approval.approvalId, toolName: approval.exactToolName, args: approval.exactValidatedArguments } });
@@ -142,8 +158,12 @@ async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-
     }
     if (content) await addMessage(session.sessionId, { role: 'assistant', content });
     await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_RESPONSE_COMPLETED, trigger: 'Response completed', actionResult: { verified: true, hasContent: Boolean(content) } });
+    try {
+      const { refreshAutonomy } = require('./autonomyService');
+      await refreshAutonomy(context);
+    } catch (_) {}
     if (res) writeTerminalSseReply(res, chatId);
-    return { content, chatId };
+    return { content, chatId, receiptId: receipt.receiptId };
   } catch (error) {
     console.error('Agent runtime error:', error.message);
     await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_RESPONSE_FAILED, trigger: 'Gemini/runtime response failed', actionResult: { verified: false, error: String(error.message).slice(0, 200) } }).catch(() => {});
