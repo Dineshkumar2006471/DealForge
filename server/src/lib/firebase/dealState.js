@@ -63,12 +63,23 @@ async function updateDealField(dealId, field, value, confidence, source, evidenc
   return { updated: true, reason: `Field ${field} updated with confidence ${confidence}` };
 }
 
-async function updateDealWithEvidence({ organizationId, dealId, sessionId, field, value, confidence, source, evidenceTurn }) {
+async function updateDealWithEvidence({ organizationId, dealId, sessionId, field, value, confidence, source, evidenceTurn, turnId }) {
   if (confidence < CONFIDENCE_THRESHOLDS.REJECT) return { updated: false, reason: `Confidence ${confidence} below reject threshold ${CONFIDENCE_THRESHOLDS.REJECT}` };
   if (confidence < CONFIDENCE_THRESHOLDS.ACCEPT) return { updated: false, reason: `Confidence ${confidence} in clarify range — ask clarifying question`, needsClarification: true };
   const timestamp = new Date().toISOString(); const evidenceId = uuidv4(); const auditId = uuidv4(); const dealRef = stateRef(dealId, sessionId);
   const parentRef = db.collection('deals').doc(dealId);
-  const fieldUpdate = { [`${field}.value`]: value, [`${field}.confidence`]: confidence, [`${field}.source`]: source, [`${field}.evidence_turn`]: evidenceTurn, [`${field}.last_updated`]: timestamp, updatedAt: timestamp };
+  // Derive status from confidence: ≥ 0.85 → confirmed, ≥ 0.60 → likely, < 0.60 → needs_confirmation
+  const status = confidence >= CONFIDENCE_THRESHOLDS.ACCEPT ? 'confirmed' : confidence >= CONFIDENCE_THRESHOLDS.CLARIFY ? 'likely' : 'needs_confirmation';
+  // Structured source object with type and turnId
+  const structuredSource = typeof source === 'object' ? source : { type: source || 'customer_utterance', turnId: turnId || `turn_${evidenceTurn}` };
+  const fieldUpdate = {
+    [`${field}.value`]: value,
+    [`${field}.status`]: status,
+    [`${field}.confidence`]: confidence,
+    [`${field}.source`]: structuredSource,
+    [`${field}.updatedAt`]: timestamp,
+    updatedAt: timestamp
+  };
   await db.runTransaction(async tx => {
     const deal = await tx.get(dealRef); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found');
     tx.update(dealRef, fieldUpdate);
@@ -78,10 +89,10 @@ async function updateDealWithEvidence({ organizationId, dealId, sessionId, field
         tx.update(parentRef, fieldUpdate);
       }
     }
-    tx.create(db.collection('evidence').doc(evidenceId), { evidenceId, organizationId, dealId, sessionId, claim: `${field} = ${value}`, utteranceTurn: evidenceTurn, confidence, source, dealStateField: field, timestamp });
-    tx.create(db.collection('auditEvents').doc(auditId), { organizationId, dealId, sessionId, eventType: 'DEAL_STATE_UPDATED', trigger: `${field} updated from verified evidence`, evidence: [{ evidenceId, confidence }], timestamp });
+    tx.create(db.collection('evidence').doc(evidenceId), { evidenceId, organizationId, dealId, sessionId, claim: `${field} = ${value}`, utteranceTurn: evidenceTurn, confidence, source: structuredSource, status, dealStateField: field, timestamp });
+    tx.create(db.collection('auditEvents').doc(auditId), { organizationId, dealId, sessionId, eventType: 'DEAL_STATE_UPDATED', trigger: `${field} updated from verified evidence`, evidence: [{ evidenceId, confidence, status }], timestamp });
   });
-  return { updated: true, evidenceId, reason: `Field ${field} updated with confidence ${confidence}` };
+  return { updated: true, evidenceId, status, reason: `Field ${field} updated with confidence ${confidence} (${status})` };
 }
 
 /**
@@ -91,15 +102,17 @@ async function updateMEDDIC(dealId, pillar, status, confidence, evidenceTurn, or
   const now = new Date().toISOString();
   const ref = stateRef(dealId, sessionId);
   const parentRef = db.collection('deals').doc(dealId);
+  // Derive status from confidence if not explicitly provided
+  const derivedStatus = status || (confidence >= CONFIDENCE_THRESHOLDS.ACCEPT ? 'confirmed' : confidence >= CONFIDENCE_THRESHOLDS.CLARIFY ? 'likely' : 'needs_confirmation');
+  const structuredSource = extra.source && typeof extra.source === 'object' ? extra.source : { type: extra.source || 'customer_turn', turnId: extra.turnId || `turn_${evidenceTurn}` };
   const meddicUpdate = {
-    [`meddic.${pillar}.status`]: status,
+    [`meddic.${pillar}.status`]: derivedStatus,
     [`meddic.${pillar}.confidence`]: confidence,
-    [`meddic.${pillar}.evidence_turn`]: evidenceTurn,
-    [`meddic.${pillar}.lastUpdated`]: now,
+    [`meddic.${pillar}.source`]: structuredSource,
+    [`meddic.${pillar}.updatedAt`]: now,
     updatedAt: now,
   };
   if (extra.value !== undefined) meddicUpdate[`meddic.${pillar}.value`] = extra.value;
-  if (extra.source) meddicUpdate[`meddic.${pillar}.source`] = extra.source;
 
   await db.runTransaction(async tx => {
     const deal = await tx.get(ref);
