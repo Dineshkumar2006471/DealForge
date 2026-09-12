@@ -94,6 +94,30 @@ async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-
       await addMessage(session.sessionId, { role: 'system', content: `[SYSTEM] The approved operation could not execute and remains retryable.` });
     }
   }
+
+  // Low-latency Moss semantic retrieval (Section 11-14)
+  const tMossStart = Date.now();
+  let retrievedDocs = [];
+  let mossLatencyMs = 0;
+  let mossIndex = 'none';
+  let mossCacheHit = false;
+  try {
+    const { retrieveRelevantContext } = require('../retrieval/mossRetriever');
+    const retrieval = await retrieveRelevantContext({
+      organizationId: context.organizationId,
+      dealId: context.dealId,
+      sessionId: context.sessionId,
+      userText
+    });
+    retrievedDocs = retrieval.results || [];
+    mossLatencyMs = retrieval.latencyMs || (Date.now() - tMossStart);
+    mossIndex = retrieval.index || 'none';
+    mossCacheHit = Boolean(retrieval.cacheHit);
+  } catch (mossErr) {
+    console.warn('Moss retrieval note:', mossErr.message);
+  }
+  context.retrievedDocs = retrievedDocs;
+
   const tools = getToolDefinitions(); history = await getHistory(session.sessionId);
   let content = ''; let calls = []; let finishReason; let hasSpokenContent = false;
   let tGeminiStart = 0, tGeminiFirstToken = 0, tToolsStart = 0, tToolsEnd = 0;
@@ -189,8 +213,24 @@ async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-
       geminiFirstTokenMs: tGeminiFirstToken ? tGeminiFirstToken - tGeminiStart : 0,
       geminiTotalMs: tGeminiStart ? tTurnEnd - tGeminiStart : 0,
       toolsMs: tToolsStart ? (tToolsEnd - tToolsStart) : 0,
-      totalMs: tTurnEnd - tEvidenceStart
+      totalMs: tTurnEnd - tEvidenceStart,
+      mossLatencyMs,
+      mossIndex,
+      mossCacheHit,
+      mossResultCount: retrievedDocs.length
     };
+
+    // Non-blocking asynchronous Moss deal context sync (Firestore remains source of truth)
+    setImmediate(async () => {
+      try {
+        const { syncDealContext } = require('../retrieval/mossIndexer');
+        const latestDeal = await getDeal(context.dealId, context.organizationId, context.sessionId);
+        if (latestDeal) {
+          await syncDealContext(context.dealId, latestDeal);
+        }
+      } catch (_) {}
+    });
+
     if (res) writeTerminalSseReply(res, chatId);
     return { content, chatId, receiptId: receipt.receiptId, metrics };
   } catch (error) {
@@ -249,7 +289,7 @@ async function currentModelMessages(context) {
   if (!deal) throw new Error('Bound deal not found');
   const resolvedApprovals = approvalSnapshot.docs.map(doc => doc.data()).filter(approval => ['APPROVED', 'REJECTED', 'EXPIRED'].includes(approval.status));
   return [
-    { role: 'system', content: buildSystemPrompt({ deal, negotiationMemory: (deal.negotiationMemory || []).slice(-10), resolvedApprovals }) },
+    { role: 'system', content: buildSystemPrompt({ deal, negotiationMemory: (deal.negotiationMemory || []).slice(-10), resolvedApprovals, retrievedDocs: context.retrievedDocs || [] }) },
     ...history.filter(message => message.role !== 'system'),
   ];
 }
