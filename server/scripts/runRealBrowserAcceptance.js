@@ -314,14 +314,10 @@ async function main() {
   console.log(`  Evidence Claims: ${evidenceCount}`);
   console.log(`  Audit Stream   : ${auditCount}`);
 
-  // Verify Row 4: Pending Approvals
+  // Verify Pending Approvals (Top Tier)
   const approvalsText = await dashPage.locator('#approvals-list').textContent();
-  console.log('✓ Row 4 Approvals:');
+  console.log('✓ Top Tier Pending Approvals:');
   console.log(`  Approvals State: ${approvalsText.trim().replace(/\s+/g, ' ')}`);
-
-  // Verify Row 4: Transcript
-  const transcriptCount = await dashPage.locator('#transcript-count').textContent();
-  console.log(`✓ Row 4 Transcript Count: ${transcriptCount}`);
 
   // 8. Verify Structured Deal State in Firestore
   console.log('\n[Stage 9] Verifying Structured Deal State & Provenance Shape...');

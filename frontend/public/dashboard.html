@@ -129,6 +129,20 @@
         </div>
       </section>
 
+      <!-- PENDING APPROVALS ACTION BANNER (TOP TIER VISIBILITY) -->
+      <section class="bento-card" id="approvals-card" style="grid-column: 1 / -1; margin-bottom: 0; padding: 14px 20px; border-left: 4px solid var(--green); transition: all 0.25s ease;">
+        <div class="bento-header" style="margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid rgba(247, 165, 1, 0.15); display: flex; justify-content: space-between; align-items: center;">
+          <h3 style="color: var(--amber); display: flex; align-items: center; gap: 8px; font-size: 14px; margin: 0;">
+            <div class="pulse-indicator"></div>
+            Pending Approvals & Commercial Exceptions
+          </h3>
+          <span style="font-family: var(--font-mono); font-size: 11px; color: var(--mute); text-transform: uppercase;">Executive Authority Gate</span>
+        </div>
+        <div id="approvals-list">
+          <p style="color: var(--mute); font-size: 13px; margin: 0;">✓ All actions within autonomous policy limits. No approvals required.</p>
+        </div>
+      </section>
+
       <!-- ROW 1 (3-col): MEDDIC | NEXT BEST ACTION | RISK -->
       <div class="dashboard-row-3">
         <!-- MEDDIC Qualification -->
@@ -171,71 +185,91 @@
         </div>
       </div>
 
-      <!-- ROW 2 (3-col): MEETING | CRM | COMMERCIAL -->
+      <!-- ROW 2 (3-col): MEETING | CRM | COMMERCIAL (UNIFORM FIXED HEIGHT) -->
       <div class="dashboard-row-3">
         <!-- Cal.com Meeting Card -->
-        <div class="bento-card" id="meeting-card">
+        <div class="bento-card bento-card-fixed" id="meeting-card">
           <div class="bento-header">
             <h3>Meeting Scheduling</h3>
             <span id="meeting-status" class="pill-badge">NOT REQUESTED</span>
           </div>
-          <div id="meeting-details" style="display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
-            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--hairline); padding-bottom: 6px;">
-              <span style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--mute);">Attendee</span>
-              <span id="meeting-attendee-name" style="font-weight: 500; color: var(--ink);">—</span>
+          <div id="meeting-details" class="card-scroll-body" style="display: flex; flex-direction: column; justify-content: space-between;">
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--hairline); padding-bottom: 6px;">
+                <span style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--mute);">Attendee</span>
+                <span id="meeting-attendee-name" style="font-weight: 500; color: var(--ink);">—</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--hairline); padding-bottom: 6px;">
+                <span style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--mute);">Scheduled Time</span>
+                <span id="meeting-scheduled-time" style="font-weight: 500; color: var(--ink);">—</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--hairline); padding-bottom: 6px;">
+                <span style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--mute);">Booking ID</span>
+                <span id="meeting-booking-id" style="font-family: var(--font-mono); font-size: 12px; color: var(--mute);">—</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--hairline); padding-bottom: 6px;">
+                <span style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--mute);">Integration</span>
+                <span style="font-family: var(--font-mono); font-size: 11px; color: var(--mute);">Cal.com v2 API</span>
+              </div>
+              <div style="font-size: 12px; color: var(--mute); line-height: 1.45; padding-top: 4px;">
+                Automated scheduling triggered when a qualified buyer requests executive review.
+              </div>
             </div>
-            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--hairline); padding-bottom: 6px;">
-              <span style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--mute);">Scheduled Time</span>
-              <span id="meeting-scheduled-time" style="font-weight: 500; color: var(--ink);">—</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--hairline); padding-bottom: 6px;">
-              <span style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--mute);">Booking ID</span>
-              <span id="meeting-booking-id" style="font-family: var(--font-mono); font-size: 12px; color: var(--mute);">—</span>
-            </div>
-            <div style="margin-top: 4px;">
-              <a id="meeting-calcom-link" href="#" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="display: none; padding: 6px 12px; font-size: 11px; text-align: center; justify-content: center;">Open in Cal.com ↗</a>
+            <div style="margin-top: 10px; padding-top: 6px;">
+              <a id="meeting-calcom-link" href="#" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="display: none; width: 100%; padding: 8px 12px; font-size: 11px; text-align: center; justify-content: center;">Open in Cal.com ↗</a>
             </div>
           </div>
         </div>
 
         <!-- HubSpot CRM Card -->
-        <div class="bento-card" id="hubspot-card">
+        <div class="bento-card bento-card-fixed" id="hubspot-card">
           <div class="bento-header">
             <h3>HubSpot CRM</h3>
             <span id="hubspot-status" class="pill-badge">NOT CONFIGURED</span>
           </div>
-          <div id="hubspot-details" style="display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
-            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--hairline); padding-bottom: 6px;">
-              <span style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--mute);">Linked Deal ID</span>
-              <span id="hubspot-deal-id" style="font-family: var(--font-mono); font-size: 12px; color: var(--ink);">—</span>
+          <div id="hubspot-details" class="card-scroll-body" style="display: flex; flex-direction: column; justify-content: space-between;">
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--hairline); padding-bottom: 6px;">
+                <span style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--mute);">Linked Deal ID</span>
+                <span id="hubspot-deal-id" style="font-family: var(--font-mono); font-size: 12px; color: var(--ink);">—</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--hairline); padding-bottom: 6px;">
+                <span style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--mute);">CRM Sync</span>
+                <span id="hubspot-sync-status" style="font-weight: 500; color: var(--mute);">Standby</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--hairline); padding-bottom: 6px;">
+                <span style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--mute);">Last Synced</span>
+                <span id="hubspot-last-sync" style="font-size: 12px; color: var(--mute);">—</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--hairline); padding-bottom: 6px;">
+                <span style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--mute);">Pipeline Stage</span>
+                <span style="font-family: var(--font-mono); font-size: 11px; color: var(--green);">presentationscheduled</span>
+              </div>
+              <div style="font-size: 12px; color: var(--mute); line-height: 1.45; padding-top: 4px;">
+                Bidirectional CRM sync. Updates deal stage, notes, and meeting confirmation automatically.
+              </div>
             </div>
-            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--hairline); padding-bottom: 6px;">
-              <span style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--mute);">CRM Sync</span>
-              <span id="hubspot-sync-status" style="font-weight: 500; color: var(--mute);">Standby</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--hairline); padding-bottom: 6px;">
-              <span style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--mute);">Last Synced</span>
-              <span id="hubspot-last-sync" style="font-size: 12px; color: var(--mute);">—</span>
-            </div>
-            <div style="margin-top: 4px;">
-              <a id="hubspot-deal-link" href="#" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="display: none; padding: 6px 12px; font-size: 11px; text-align: center; justify-content: center;">Open in HubSpot ↗</a>
+            <div style="margin-top: 10px; padding-top: 6px;">
+              <a id="hubspot-deal-link" href="#" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="display: none; width: 100%; padding: 8px 12px; font-size: 11px; text-align: center; justify-content: center;">Open in HubSpot ↗</a>
             </div>
           </div>
         </div>
 
         <!-- Commercial / Extracted Deal State & Discount Ledger -->
-        <div class="bento-card" id="commercial-card">
+        <div class="bento-card bento-card-fixed" id="commercial-card">
           <div class="bento-header">
             <h3>Extracted Parameters</h3>
             <span style="font-family: var(--font-mono); font-size: 11px; color: var(--mute);">PROVENANCE</span>
           </div>
-          <div id="deal-state-fields" style="display: flex; flex-direction: column; gap: 8px;">
-            <div style="color: var(--mute); font-size: 13px;">Loading deal state...</div>
-          </div>
-          <div style="margin-top: 14px; border-top: 1px dashed var(--hairline); padding-top: 12px;">
-            <div style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--mute); margin-bottom: 6px;">Discount Ledger</div>
-            <div id="discount-ledger">
-              <p style="color: var(--mute); font-size: 13px;">No discount negotiations recorded.</p>
+          <div class="card-scroll-body" style="padding-right: 6px;">
+            <div id="deal-state-fields" style="display: flex; flex-direction: column; gap: 8px;">
+              <div style="color: var(--mute); font-size: 13px;">Loading deal state...</div>
+            </div>
+            <div style="margin-top: 14px; border-top: 1px dashed var(--hairline); padding-top: 12px;">
+              <div style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--mute); margin-bottom: 6px;">Discount Ledger</div>
+              <div id="discount-ledger">
+                <p style="color: var(--mute); font-size: 13px;">No discount negotiations recorded.</p>
+              </div>
             </div>
           </div>
         </div>
@@ -268,32 +302,6 @@
         </div>
       </div>
 
-      <!-- ROW 4 (2-col): PENDING APPROVALS | CONVERSATION TRANSCRIPT -->
-      <div class="dashboard-row-2">
-        <!-- Approvals Queue -->
-        <div class="bento-card" id="approvals-card">
-          <div class="bento-header" style="border-bottom-color: rgba(247, 165, 1, 0.2);">
-            <h3 style="color: var(--amber); display: flex; align-items: center; gap: 8px;">
-              <div class="pulse-indicator"></div>
-              Pending Approvals
-            </h3>
-          </div>
-          <div id="approvals-list">
-            <p style="color: var(--mute); font-size: 13px;">No pending approvals.</p>
-          </div>
-        </div>
-
-        <!-- Customer Conversation / Transcript Stream -->
-        <div class="bento-card bento-card-fixed" id="transcript-card">
-          <div class="bento-header">
-            <h3>Customer Conversation / Transcript</h3>
-            <span style="font-family: var(--font-mono); font-size: 12px; color: var(--mute);" id="transcript-count">0 turns</span>
-          </div>
-          <div id="transcript-list" class="card-scroll-body" style="height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
-            <div class="stream-empty-state"><div class="stream-empty-title">Transcript standby</div><div class="stream-empty-subtitle">Live negotiation turns will stream here in real time.</div></div>
-          </div>
-        </div>
-      </div>
     </main>
   </div>
 
@@ -851,6 +859,7 @@
       const list = document.getElementById('transcript-list');
       const countEl = document.getElementById('transcript-count');
       if (countEl) countEl.textContent = `${messages ? messages.length : 0} turn${messages && messages.length === 1 ? '' : 's'}`;
+      if (!list) return;
       if (!messages || messages.length === 0) {
         const empty = node('div'); empty.className = 'stream-empty-state';
         const title = node('div', 'Transcript standby'); title.className = 'stream-empty-title';
@@ -892,31 +901,66 @@
     function renderApprovals(approvals) {
       const list = document.getElementById('approvals-list');
       const card = document.getElementById('approvals-card');
+      if (!list || !card) return;
 
       if (!approvals || approvals.length === 0) {
-        list.replaceChildren(node('p', '✓ All actions within autonomous policy limits. No approvals required.', { color: 'var(--mute)', fontSize: '13px', margin: '4px 0' }));
+        list.replaceChildren(node('p', '✓ All actions within autonomous policy limits. No approvals required.', { color: 'var(--mute)', fontSize: '13px', margin: '2px 0' }));
         card.style.borderColor = 'var(--hairline)';
+        card.style.borderLeft = '4px solid var(--green)';
+        card.style.background = 'var(--surface)';
         return;
       }
 
       card.style.borderColor = 'var(--amber)';
+      card.style.borderLeft = '4px solid var(--amber)';
+      card.style.background = 'rgba(247, 165, 1, 0.04)';
       const approvalCards = [];
 
       approvals.forEach(a => {
-        const item = node('div', undefined, { background: 'var(--surface-dark)', border: '1px solid var(--hairline)', borderRadius: '8px', padding: '12px', marginBottom: '12px', color: 'var(--surface)' });
-        const heading = node('div', undefined, { display: 'flex', justifyContent: 'space-between', marginBottom: '8px' });
-        heading.append(node('strong', a.exactToolName || 'Approval', { color: 'var(--amber)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }));
-        const amount = node('span', `${a.exactValidatedArguments?.requested_pct ?? ''}%`, { color: 'var(--amber)' }); amount.className = 'viz-mono-bar fill'; heading.append(amount);
-        const reason = node('p', a.policyReason || 'Approval required by policy.', { fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginBottom: '12px' });
-        const actions = node('div', undefined, { display: 'flex', gap: '8px' });
-        ['APPROVED', 'REJECTED'].forEach(decision => {
-          const button = node('button', decision === 'APPROVED' ? 'Approve' : 'Reject', { flex: '1', padding: '6px' });
-          button.className = decision === 'APPROVED' ? 'btn-primary' : 'btn-secondary';
-          Object.assign(button.style, decision === 'APPROVED' ? { background: 'var(--green)' } : { borderColor: 'var(--red)', color: 'var(--red)', background: 'transparent' });
-          button.addEventListener('click', () => submitApproval(a.id, decision));
-          actions.append(button);
+        const item = node('div', undefined, {
+          background: 'var(--surface)',
+          border: '1px solid rgba(247, 165, 1, 0.3)',
+          borderRadius: '8px',
+          padding: '14px 18px',
+          marginBottom: '8px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '16px',
+          flexWrap: 'wrap'
         });
-        item.append(heading, reason, actions);
+        const left = node('div', undefined, { flex: '1', minWidth: '280px' });
+        const heading = node('div', undefined, { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' });
+        heading.append(
+          node('strong', a.exactToolName ? a.exactToolName.replace(/_/g, ' ') : 'Discount Exception', { color: 'var(--amber)', fontFamily: 'var(--font-mono)', fontSize: '12px', textTransform: 'uppercase' }),
+          node('span', `${a.exactValidatedArguments?.requested_pct ?? ''}% Requested`, {
+            background: 'rgba(247, 165, 1, 0.15)',
+            color: 'var(--amber)',
+            padding: '2px 8px',
+            borderRadius: '4px',
+            fontFamily: 'var(--font-mono)',
+            fontSize: '11px',
+            fontWeight: '600'
+          })
+        );
+        const reason = node('p', a.policyReason || 'Customer requested commercial discount exceeding autonomous policy limit (18%). Manager approval required.', { fontSize: '13px', color: 'var(--ink)', margin: 0, lineHeight: '1.4' });
+        left.append(heading, reason);
+
+        const actions = node('div', undefined, { display: 'flex', gap: '8px', alignItems: 'center' });
+        const approveBtn = node('button', 'Approve Concession', { padding: '8px 16px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' });
+        approveBtn.className = 'btn-primary';
+        approveBtn.style.background = 'var(--green)';
+        approveBtn.style.borderColor = 'var(--green)';
+        approveBtn.addEventListener('click', () => submitApproval(a.id, 'APPROVED'));
+
+        const rejectBtn = node('button', 'Reject Concession', { padding: '8px 16px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' });
+        rejectBtn.className = 'btn-secondary';
+        rejectBtn.style.color = 'var(--red)';
+        rejectBtn.style.borderColor = 'var(--red)';
+        rejectBtn.addEventListener('click', () => submitApproval(a.id, 'REJECTED'));
+
+        actions.append(approveBtn, rejectBtn);
+        item.append(left, actions);
         approvalCards.push(item);
       });
       list.replaceChildren(...approvalCards);
