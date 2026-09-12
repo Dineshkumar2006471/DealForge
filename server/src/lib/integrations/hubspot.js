@@ -110,14 +110,36 @@ async function syncToHubspot(args, context = {}) {
   if (!deal) return { verified: false, externalStatus: 'NOT_FOUND', error: 'Server-bound deal was not found.' };
   const hubspotDealId = deal.integrations?.hubspot?.dealId;
   if (!hubspotDealId) return { verified: false, externalStatus: 'NOT_LINKED', error: 'This DealForge deal is not linked to a HubSpot deal. No CRM record was changed.' };
+  const { generateOperationId, claimOperation, completeOperation, failOperation } = require('../firebase/operationLedger');
+  const opId = generateOperationId(context.sessionId || dealId, 'hubspot', 'sync', JSON.stringify(args?.fields || {}));
+  const claim = await claimOperation({
+    operationId: opId,
+    organizationId: context.organizationId,
+    dealId,
+    sessionId: context.sessionId,
+    provider: 'hubspot',
+    action: 'sync_to_hubspot',
+    idempotencyKey: opId
+  }).catch(() => null);
+
+  if (claim?.cached) {
+    return claim.operation.result;
+  }
+
   try {
     const properties = normalizeProperties(args?.fields);
     await request(`/crm/v3/objects/deals/${encodeURIComponent(hubspotDealId)}`, { method: 'PATCH', body: { properties } });
     const verified = await request(`/crm/v3/objects/deals/${encodeURIComponent(hubspotDealId)}?properties=${encodeURIComponent(Object.keys(properties).join(','))}`);
     const matches = Object.entries(properties).every(([key, value]) => String(verified.properties?.[key] ?? '') === value);
-    if (!matches) return { verified: false, externalStatus: 'VERIFY_FAILED', error: 'HubSpot did not return the requested values after update.' };
-    return { verified: true, externalStatus: 'SYNCED', hubspotDealId: String(hubspotDealId), syncedFields: Object.keys(properties) };
+    if (!matches) {
+      if (claim) await failOperation(opId, 'HubSpot did not return the requested values after update');
+      return { verified: false, externalStatus: 'VERIFY_FAILED', error: 'HubSpot did not return the requested values after update.' };
+    }
+    const result = { verified: true, externalStatus: 'SYNCED', hubspotDealId: String(hubspotDealId), syncedFields: Object.keys(properties) };
+    if (claim) await completeOperation(opId, { externalRecordId: String(hubspotDealId), result });
+    return result;
   } catch (error) {
+    if (claim) await failOperation(opId, error);
     return { verified: false, externalStatus: 'SYNC_FAILED', error: error.message };
   }
 }

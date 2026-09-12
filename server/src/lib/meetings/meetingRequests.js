@@ -54,15 +54,47 @@ async function confirmMeeting(session, requestId, slotStart) {
   if (!request.attendee || !Array.isArray(request.availableSlots)) throw new HttpError(409, 'Meeting details must be submitted before booking');
   const selected = request.availableSlots.find(slot => slot?.start === slotStart);
   if (!selected) throw new HttpError(400, 'Choose one of the verified available slots');
+
+  // External-operation ledger: prevent duplicate Cal.com bookings on retry
+  const { generateOperationId, claimOperation, completeOperation, failOperation } = require('../firebase/operationLedger');
+  const opId = generateOperationId(session.sessionId, 'calcom', 'booking', `${requestId}:${slotStart}`);
+  const claim = await claimOperation({
+    operationId: opId,
+    organizationId: session.organizationId,
+    dealId: session.dealId,
+    sessionId: session.sessionId,
+    provider: 'calcom',
+    action: 'booking',
+    requestId,
+    idempotencyKey: opId
+  });
+
+  // If already succeeded, return cached result without calling Cal.com again
+  if (claim.cached) {
+    return { booked: true, verified: true, result: claim.operation.result };
+  }
+
   await ref.update({ status: 'BOOKING', selectedSlot: slotStart, updatedAt: now() });
-  const result = await bookMeeting({ meeting_type: request.meetingType, preferred_date: slotStart, attendee: request.attendee }, { organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, turnNumber: 0 });
+
+  let result;
+  try {
+    result = await bookMeeting({ meeting_type: request.meetingType, preferred_date: slotStart, attendee: request.attendee }, { organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, turnNumber: 0 });
+  } catch (bookingErr) {
+    await failOperation(opId, bookingErr);
+    await ref.set({ status: 'BOOKING_FAILED', result: { error: bookingErr.message }, updatedAt: now() }, { merge: true });
+    return { booked: false, verified: false, result: { error: bookingErr.message } };
+  }
+
   if (!result.booked || !result.verified) {
+    await failOperation(opId, result.error || 'Booking not confirmed');
     await ref.set({ status: 'BOOKING_FAILED', result, updatedAt: now() }, { merge: true });
     return { booked: false, verified: false, result };
   }
+
   const meetingId = `calcom-${result.bookingId}`;
   await db.collection('meetings').doc(meetingId).set({ meetingId, organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, requestId, provider: 'calcom', bookingId: result.bookingId, start: slotStart, meetingType: request.meetingType, attendee: request.attendee, meetingUrl: result.meetingUrl || null, status: 'BOOKED', verified: true, createdAt: now() }, { merge: true });
   const crm = await syncBookingToHubspot({ organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, booking: { bookingId: result.bookingId, start: slotStart, meetingUrl: result.meetingUrl || null } });
+  await completeOperation(opId, { externalRecordId: result.bookingId, externalUrl: result.meetingUrl || null, result: { ...result, crm } });
   await ref.set({ status: 'BOOKED', result: { ...result, crm }, updatedAt: now() }, { merge: true });
   return { booked: true, verified: true, result: { ...result, crm } };
 }
