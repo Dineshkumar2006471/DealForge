@@ -106,20 +106,24 @@ class RealtimeVoiceClient {
 
     this.dataChannel.onopen = () => {
       console.log('[RealtimeVoiceClient] WebRTC DataChannel opened');
-      // Send session.update to ensure Server VAD and Whisper transcription are locked in
+      // Send GA-compliant session.update to ensure Server VAD and Whisper transcription are active
       this.sendClientEvent({
         type: 'session.update',
         session: {
-          modalities: ['audio', 'text'],
-          turn_detection: {
-            type: 'server_vad',
-            threshold: 0.5,
-            prefix_padding_ms: 300,
-            silence_duration_ms: 500,
-            create_response: false // Crucial: DealForge Core controls assistant responses
-          },
-          input_audio_transcription: {
-            model: 'whisper-1'
+          type: 'realtime',
+          audio: {
+            input: {
+              transcription: {
+                model: 'whisper-1'
+              },
+              turn_detection: {
+                type: 'server_vad',
+                threshold: 0.5,
+                prefix_padding_ms: 300,
+                silence_duration_ms: 500,
+                create_response: false
+              }
+            }
           }
         }
       });
