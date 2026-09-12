@@ -58,7 +58,12 @@ async function verifyHubspotDeal(hubspotDealId) {
   if (!/^\d+$/.test(String(hubspotDealId || ''))) throw new Error('HubSpot deal ID must be numeric');
   const deal = await request(`/crm/v3/objects/deals/${encodeURIComponent(String(hubspotDealId))}?properties=dealname`);
   if (!deal?.id) throw new Error('HubSpot did not return the requested deal');
-  return { hubspotDealId: String(deal.id), dealName: String(deal.properties?.dealname || '') };
+  return {
+    hubspotDealId: String(deal.id),
+    dealName: String(deal.properties?.dealname || ''),
+    portalId: '247292821',
+    dealUrl: deal.url || `https://app-na2.hubspot.com/contacts/247292821/record/0-3/${deal.id}`
+  };
 }
 
 async function verifyBookingProperty() {

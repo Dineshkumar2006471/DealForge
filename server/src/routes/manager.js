@@ -41,6 +41,8 @@ router.post('/call-links', async (req, res, next) => {
         const verified = await verifyHubspotDeal('346165296872');
         await deal.ref.update({
           'integrations.hubspot.dealId': verified.hubspotDealId,
+          'integrations.hubspot.portalId': verified.portalId || '247292821',
+          'integrations.hubspot.dealUrl': verified.dealUrl,
           'integrations.hubspot.linkedAt': new Date().toISOString(),
           'integrations.hubspot.linkedBy': 'dealforge_acme_bootstrap',
           'integrations.hubspot.bookingSyncEnabled': true,
@@ -128,6 +130,8 @@ router.post('/deals/:dealId/integrations/hubspot/link', async (req, res, next) =
     const verified = await verifyHubspotDeal(hubspotDealId);
     await deal.ref.update({
       'integrations.hubspot.dealId': verified.hubspotDealId,
+      'integrations.hubspot.portalId': verified.portalId || '247292821',
+      'integrations.hubspot.dealUrl': verified.dealUrl,
       'integrations.hubspot.linkedAt': new Date().toISOString(),
       'integrations.hubspot.linkedBy': req.manager.uid,
       'integrations.hubspot.bookingSyncEnabled': false,

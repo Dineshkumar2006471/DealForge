@@ -63,7 +63,7 @@
     <header class="topbar">
       <div class="topbar-left">
         <div>
-          <div class="topbar-title">Deal Workspace: <span id="deal-company">Loading...</span></div>
+          <div class="topbar-title">Deal Workspace: <span id="topbar-deal-company">Loading...</span></div>
         </div>
       </div>
       <div class="topbar-right">
@@ -130,7 +130,7 @@
       </section>
 
       <!-- PENDING APPROVALS ACTION BANNER (TOP TIER VISIBILITY) -->
-      <section class="bento-card" id="approvals-card" style="grid-column: 1 / -1; margin-bottom: 0; padding: 14px 20px; border-left: 4px solid var(--green); transition: all 0.25s ease;">
+      <section class="bento-card" id="approvals-card" style="grid-column: 1 / -1; margin-bottom: 0; padding: 14px 20px; border: 1.5px solid var(--green); background: rgba(47, 122, 79, 0.04); transition: all 0.25s ease;">
         <div class="bento-header" style="margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid rgba(247, 165, 1, 0.15); display: flex; justify-content: space-between; align-items: center;">
           <h3 style="color: var(--amber); display: flex; align-items: center; gap: 8px; font-size: 14px; margin: 0;">
             <div class="pulse-indicator"></div>
@@ -542,24 +542,43 @@
         .onSnapshot(doc => {
           if (doc.exists) {
             currentDealData = doc.data();
-            const company = currentDealData.company?.value || currentDealData.name || 'Unknown';
-            document.getElementById('deal-company').textContent = company;
+            const activeSession = callSessions.find(s => s.sessionId === selectedSessionId);
+            const company = (currentDealData.company?.value && currentDealData.company.value !== 'Pending' && currentDealData.company.value !== 'Loading...')
+              ? currentDealData.company.value
+              : (activeSession?.customerLabel || currentDealData.name || 'Customer');
+            const compEl = document.getElementById('deal-company');
+            if (compEl) compEl.textContent = company;
+            const topbarCompEl = document.getElementById('topbar-deal-company');
+            if (topbarCompEl) topbarCompEl.textContent = company;
             document.getElementById('workspace-account-label').textContent = company;
             renderHubSpotCard(currentDealData, currentHubspotOp);
           } else {
-            document.getElementById('deal-company').textContent = 'Unable to load deal data. Retry.';
+            const compEl = document.getElementById('deal-company');
+            if (compEl) compEl.textContent = 'Unable to load deal data. Retry.';
+            const topbarCompEl = document.getElementById('topbar-deal-company');
+            if (topbarCompEl) topbarCompEl.textContent = 'Unable to load deal data. Retry.';
             document.getElementById('workspace-account-label').textContent = 'Deal not found';
           }
         }, err => {
           console.error('Deal listen error:', err);
-          document.getElementById('deal-company').textContent = 'Unable to load deal data. Retry.';
+          const compEl = document.getElementById('deal-company');
+          if (compEl) compEl.textContent = 'Unable to load deal data. Retry.';
+          const topbarCompEl = document.getElementById('topbar-deal-company');
+          if (topbarCompEl) topbarCompEl.textContent = 'Unable to load deal data. Retry.';
           document.getElementById('workspace-account-label').textContent = 'Unable to load deal data. Retry.';
         });
       await selectConversation(selectedSessionId);
     }
 
     function renderDealState(data) {
-      document.getElementById('deal-company').innerText = data.company?.value || 'Unknown';
+      const activeSession = callSessions.find(s => s.sessionId === selectedSessionId);
+      const resolvedCompany = (data.company?.value && data.company.value !== 'Pending' && data.company.value !== 'Loading...')
+        ? data.company.value
+        : (activeSession?.customerLabel || currentDealData?.company?.value || currentDealData?.name || 'Customer');
+      const compEl = document.getElementById('deal-company');
+      if (compEl) compEl.innerText = resolvedCompany;
+      const topbarCompEl = document.getElementById('topbar-deal-company');
+      if (topbarCompEl) topbarCompEl.innerText = resolvedCompany;
       document.getElementById('deal-stage').innerText = data.conversationStage || 'UNKNOWN';
       const formatInr = value => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(value) || 0);
       document.getElementById('deal-arr').innerText = formatInr(data.listPrice || data.arr);
@@ -850,7 +869,12 @@
       if (syncStatusEl) syncStatusEl.textContent = isSynced ? '✓ Booking synced to CRM' : 'Link verified';
       if (lastSyncEl) lastSyncEl.textContent = opData?.completedAt ? new Date(opData.completedAt).toLocaleTimeString() : (hs.linkedAt ? new Date(hs.linkedAt).toLocaleTimeString() : '—');
       if (linkEl) {
-        linkEl.href = `https://app.hubspot.com/contacts/deals/${encodeURIComponent(hs.dealId)}`;
+        const portalId = hs.portalId || '247292821';
+        const uiDomain = hs.uiDomain || 'app-na2.hubspot.com';
+        const dealUrl = hs.dealUrl || hs.url || `https://${uiDomain}/contacts/${portalId}/record/0-3/${encodeURIComponent(hs.dealId)}`;
+        linkEl.href = dealUrl;
+        linkEl.target = '_blank';
+        linkEl.rel = 'noopener noreferrer';
         linkEl.style.display = 'inline-flex';
       }
     }
@@ -905,14 +929,12 @@
 
       if (!approvals || approvals.length === 0) {
         list.replaceChildren(node('p', '✓ All actions within autonomous policy limits. No approvals required.', { color: 'var(--mute)', fontSize: '13px', margin: '2px 0' }));
-        card.style.borderColor = 'var(--hairline)';
-        card.style.borderLeft = '4px solid var(--green)';
-        card.style.background = 'var(--surface)';
+        card.style.border = '1.5px solid var(--green)';
+        card.style.background = 'rgba(47, 122, 79, 0.04)';
         return;
       }
 
-      card.style.borderColor = 'var(--amber)';
-      card.style.borderLeft = '4px solid var(--amber)';
+      card.style.border = '2px solid var(--amber)';
       card.style.background = 'rgba(247, 165, 1, 0.04)';
       const approvalCards = [];
 
