@@ -7,7 +7,8 @@
  */
 
 class RealtimeVoiceClient {
-  constructor({ clientSecret, model = 'gpt-4o-realtime-preview' }) {
+  constructor({ clientSecret, model }) {
+    if (!model) throw new Error('RealtimeVoiceClient requires a model from the server credential response');
     this.clientSecret = clientSecret;
     this.model = model;
     this.peerConnection = null;
@@ -17,6 +18,9 @@ class RealtimeVoiceClient {
     this.connected = false;
     this.muted = false;
     this.activeTranscript = '';
+    this.t0 = 0;
+    this.t1 = 0;
+    this.t2 = 0;
   }
 
   async connect(existingTrack = null) {
@@ -54,42 +58,38 @@ class RealtimeVoiceClient {
     const offer = await this.peerConnection.createOffer();
     await this.peerConnection.setLocalDescription(offer);
 
-    // 5. Send offer to OpenAI Realtime endpoint using ephemeral clientSecret
-    let answerSdp = null;
+    // 5. Send offer to OpenAI Realtime GA calls endpoint using ephemeral clientSecret
+    const response = await fetch('https://api.openai.com/v1/realtime/calls', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.clientSecret}`,
+        'Content-Type': 'application/sdp'
+      },
+      body: offer.sdp
+    });
 
-    // Try standard GA calls endpoint first
-    try {
-      const response = await fetch('https://api.openai.com/v1/realtime/calls', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.clientSecret}`,
-          'Content-Type': 'application/sdp'
-        },
-        body: offer.sdp
-      });
-      if (response.ok) {
-        answerSdp = await response.text();
+    if (!response.ok) {
+      let errorDetails = '';
+      try {
+        const errJson = await response.json();
+        errorDetails = errJson.error?.message || errJson.error?.code || JSON.stringify(errJson);
+      } catch (_) {
+        try {
+          errorDetails = await response.text();
+        } catch (__) {
+          errorDetails = response.statusText;
+        }
       }
-    } catch (e) {
-      console.warn('POST /v1/realtime/calls not available, trying preview endpoint...', e);
+      console.error('[RealtimeVoiceClient] WebRTC SDP negotiation failed:', {
+        endpoint: '/v1/realtime/calls',
+        status: response.status,
+        model: this.model,
+        error: errorDetails
+      });
+      throw new Error(`OpenAI Realtime WebRTC connection failed (${response.status}): ${errorDetails || response.statusText}`);
     }
 
-    // Fallback to preview endpoint with model query param
-    if (!answerSdp) {
-      const response = await fetch(`https://api.openai.com/v1/realtime?model=${encodeURIComponent(this.model)}`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.clientSecret}`,
-          'Content-Type': 'application/sdp'
-        },
-        body: offer.sdp
-      });
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`OpenAI Realtime WebRTC connection failed (${response.status}): ${errorText}`);
-      }
-      answerSdp = await response.text();
-    }
+    const answerSdp = await response.text();
 
     // 6. Set remote description with OpenAI SDP answer
     await this.peerConnection.setRemoteDescription({
@@ -106,20 +106,24 @@ class RealtimeVoiceClient {
 
     this.dataChannel.onopen = () => {
       console.log('[RealtimeVoiceClient] WebRTC DataChannel opened');
-      // Send session.update to ensure Server VAD and Whisper transcription are locked in
+      // Send GA-compliant session.update to ensure Server VAD and Whisper transcription are active
       this.sendClientEvent({
         type: 'session.update',
         session: {
-          modalities: ['audio', 'text'],
-          turn_detection: {
-            type: 'server_vad',
-            threshold: 0.5,
-            prefix_padding_ms: 300,
-            silence_duration_ms: 500,
-            create_response: false // Crucial: DealForge Core controls assistant responses
-          },
-          input_audio_transcription: {
-            model: 'whisper-1'
+          type: 'realtime',
+          audio: {
+            input: {
+              transcription: {
+                model: 'whisper-1'
+              },
+              turn_detection: {
+                type: 'server_vad',
+                threshold: 0.5,
+                prefix_padding_ms: 300,
+                silence_duration_ms: 500,
+                create_response: false
+              }
+            }
           }
         }
       });
@@ -148,30 +152,46 @@ class RealtimeVoiceClient {
     switch (event.type) {
       case 'input_audio_buffer.speech_started':
         console.log('[RealtimeVoiceClient] Speech started');
+        this.t0 = performance.now();
+        this.t2 = 0;
         this.activeTranscript = '';
-        window.dispatchEvent(new CustomEvent('voice:speech-started'));
+        window.dispatchEvent(new CustomEvent('voice:speech-started', { detail: { t0: this.t0 } }));
         break;
 
       case 'input_audio_buffer.speech_stopped':
         console.log('[RealtimeVoiceClient] Speech stopped');
-        window.dispatchEvent(new CustomEvent('voice:speech-stopped'));
+        this.t1 = performance.now();
+        window.dispatchEvent(new CustomEvent('voice:speech-stopped', { detail: { t1: this.t1 } }));
         break;
 
       case 'conversation.item.input_audio_transcription.delta':
+        if (!this.t2) this.t2 = performance.now();
         if (event.delta) {
           this.activeTranscript += event.delta;
-          window.dispatchEvent(new CustomEvent('voice:transcript-delta', { detail: { delta: event.delta, text: this.activeTranscript } }));
+          window.dispatchEvent(new CustomEvent('voice:transcript-delta', { detail: { delta: event.delta, text: this.activeTranscript, t2: this.t2 } }));
         }
         break;
 
-      case 'conversation.item.input_audio_transcription.completed':
+      case 'conversation.item.input_audio_transcription.completed': {
+        const t3 = performance.now();
         console.log('[RealtimeVoiceClient] Transcription completed:', event.transcript);
         const finalTranscript = (event.transcript || this.activeTranscript || '').trim();
         if (finalTranscript) {
-          window.dispatchEvent(new CustomEvent('voice:turn-completed', { detail: { transcript: finalTranscript } }));
+          window.dispatchEvent(new CustomEvent('voice:turn-completed', {
+            detail: {
+              transcript: finalTranscript,
+              clientTimestamps: {
+                t0: this.t0,
+                t1: this.t1,
+                t2: this.t2 || t3,
+                t3
+              }
+            }
+          }));
         }
         this.activeTranscript = '';
         break;
+      }
 
       case 'error':
         console.error('[RealtimeVoiceClient] Server error event:', event.error);

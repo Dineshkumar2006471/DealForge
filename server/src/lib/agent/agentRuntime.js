@@ -11,9 +11,8 @@ const { EVENT_TYPES } = require('../audit/eventTypes');
 const { claimTurnReceipt } = require('./turnReceipts');
 require('../tools/calculateDiscount'); require('../tools/updateDealState'); require('../tools/checkProductAvailability'); require('../tools/bookMeeting'); require('../tools/requestMeetingDetails'); require('../tools/escalateToHuman');
 require('../integrations/hubspot');
-
-async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-${uuidv4()}` } = {}) {
-  const context = { organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, turnNumber: (await getTurnNumber(session.sessionId)) + 1 };
+async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-${uuidv4()}`, turnId = null } = {}) {
+  const context = { organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, turnNumber: (await getTurnNumber(session.sessionId)) + 1, turnId: turnId || `turn_${Date.now()}` };
   let history = await getHistory(session.sessionId);
   if (!await getDeal(context.dealId, context.organizationId, context.sessionId)) throw new Error('Bound deal not found');
 
@@ -26,14 +25,28 @@ async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-
     return { empty: true, content: '' };
   }
 
-  const receipt = await claimTurnReceipt(session.sessionId, userText);
+  const receipt = await claimTurnReceipt(session.sessionId, userText, turnId);
   if (!receipt.claimed) {
-    await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_DUPLICATE_TURN_IGNORED, trigger: 'Ignored replayed customer turn', actionResult: { verified: true } });
+    await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_DUPLICATE_TURN_IGNORED, trigger: 'Ignored replayed customer turn', actionResult: { verified: true, turnId } });
     if (res) writeNoopSseReply(res, chatId);
-    return { duplicate: true, content: '' };
+    if (receipt.cachedResponse) {
+      return { duplicate: true, content: receipt.cachedResponse.assistantText || '', audioBase64: receipt.cachedResponse.audioBase64 || null, receiptId: receipt.receiptId };
+    }
+    return { duplicate: true, content: '', receiptId: receipt.receiptId };
   }
 
   await addMessage(session.sessionId, { role: 'user', content: userText.trim() });
+
+  // Deterministic conversation evidence extraction (MEDDIC and Deal State)
+  const tEvidenceStart = Date.now();
+  try {
+    const { extractAndApplyEvidence } = require('../evidence/evidenceExtractor');
+    await extractAndApplyEvidence(userText, context);
+  } catch (extractErr) {
+    console.warn('Evidence extraction note:', extractErr.message);
+  }
+  const tEvidenceEnd = Date.now();
+
   // A percentage discount request is a high-value policy boundary. Route it
   // deterministically instead of hoping the generative model elects to call a
   // tool. This makes the manager approval demonstration reliable and preserves
@@ -49,9 +62,28 @@ async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-
         : `I can confirm a ${requestedDiscount}% discount for this negotiation.`;
     await addMessage(session.sessionId, { role: 'assistant', content: spoken });
     await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_RESPONSE_COMPLETED, trigger: 'Deterministic discount-policy response completed', actionResult: { verified: true, requestedDiscount } });
+    try {
+      const { refreshAutonomy } = require('./autonomyService');
+      await refreshAutonomy(context);
+    } catch (_) {}
     if (res) writeSseReply(res, chatId, spoken);
-    return { content: spoken, chatId, requestedDiscount };
+    return { content: spoken, chatId, requestedDiscount, receiptId: receipt.receiptId, metrics: { evidenceMs: tEvidenceEnd - tEvidenceStart, reasoningMs: 0, toolsMs: 10 } };
   }
+
+  const isMeeting = explicitMeetingRequest(userText);
+  if (isMeeting) {
+    await executeTool('request_meeting_details', { meeting_type: 'technical_review' }, context);
+    const spoken = "I've opened a secure form for your contact details and available times.";
+    await addMessage(session.sessionId, { role: 'assistant', content: spoken });
+    await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_RESPONSE_COMPLETED, trigger: 'Deterministic meeting request completed', actionResult: { verified: true, meetingType: 'technical_review' } });
+    try {
+      const { refreshAutonomy } = require('./autonomyService');
+      await refreshAutonomy(context);
+    } catch (_) {}
+    if (res) writeSseReply(res, chatId, spoken);
+    return { content: spoken, chatId, receiptId: receipt.receiptId, metrics: { evidenceMs: tEvidenceEnd - tEvidenceStart, reasoningMs: 0, toolsMs: 10 } };
+  }
+
   for (const approval of await claimApprovedApprovals(context)) {
     const executed = await executeTool(approval.exactToolName, approval.exactValidatedArguments, { ...context, approvedReplay: { approvalId: approval.approvalId, toolName: approval.exactToolName, args: approval.exactValidatedArguments } });
     if (executed.approved) {
@@ -62,17 +94,44 @@ async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-
       await addMessage(session.sessionId, { role: 'system', content: `[SYSTEM] The approved operation could not execute and remains retryable.` });
     }
   }
+
+  // Low-latency Moss semantic retrieval (Section 11-14)
+  const tMossStart = Date.now();
+  let retrievedDocs = [];
+  let mossLatencyMs = 0;
+  let mossIndex = 'none';
+  let mossCacheHit = false;
+  try {
+    const { retrieveRelevantContext } = require('../retrieval/mossRetriever');
+    const retrieval = await retrieveRelevantContext({
+      organizationId: context.organizationId,
+      dealId: context.dealId,
+      sessionId: context.sessionId,
+      userText
+    });
+    retrievedDocs = retrieval.results || [];
+    mossLatencyMs = retrieval.latencyMs || (Date.now() - tMossStart);
+    mossIndex = retrieval.index || 'none';
+    mossCacheHit = Boolean(retrieval.cacheHit);
+  } catch (mossErr) {
+    console.warn('Moss retrieval note:', mossErr.message);
+  }
+  context.retrievedDocs = retrievedDocs;
+
   const tools = getToolDefinitions(); history = await getHistory(session.sessionId);
   let content = ''; let calls = []; let finishReason; let hasSpokenContent = false;
+  let tGeminiStart = 0, tGeminiFirstToken = 0, tToolsStart = 0, tToolsEnd = 0;
   try {
     if (res) writeInterruptableMetadata(res, chatId, true);
     // Buffer the first model pass. A tool-using pass is provisional: speaking
     // it before verification can produce two answers for a single customer
     // turn (the provisional answer, then the verified follow-up).
     const initialTextChunks = [];
+    tGeminiStart = Date.now();
     for await (const chunk of generateResponse(await currentModelMessages(context), tools, context)) {
       const choice = chunk.choices?.[0]; if (!choice) continue;
       if (choice.delta?.content) {
+        if (!tGeminiFirstToken) tGeminiFirstToken = Date.now();
         content += choice.delta.content;
         initialTextChunks.push(chunk);
       }
@@ -85,6 +144,7 @@ async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-
       // not an executed or verified answer.
       content = '';
       await addMessage(session.sessionId, { role: 'assistant', tool_calls: calls, content: null });
+      tToolsStart = Date.now();
       for (const call of calls) {
         let args; try { args = JSON.parse(call.function.arguments || '{}'); } catch { args = {}; }
         const { result } = await executeTool(call.function.name, args, context);
@@ -142,8 +202,37 @@ async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-
     }
     if (content) await addMessage(session.sessionId, { role: 'assistant', content });
     await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_RESPONSE_COMPLETED, trigger: 'Response completed', actionResult: { verified: true, hasContent: Boolean(content) } });
+    try {
+      const { refreshAutonomy } = require('./autonomyService');
+      await refreshAutonomy(context);
+    } catch (_) {}
+    tToolsEnd = tToolsEnd || Date.now();
+    const tTurnEnd = Date.now();
+    const metrics = {
+      evidenceMs: tEvidenceEnd - tEvidenceStart,
+      geminiFirstTokenMs: tGeminiFirstToken ? tGeminiFirstToken - tGeminiStart : 0,
+      geminiTotalMs: tGeminiStart ? tTurnEnd - tGeminiStart : 0,
+      toolsMs: tToolsStart ? (tToolsEnd - tToolsStart) : 0,
+      totalMs: tTurnEnd - tEvidenceStart,
+      mossLatencyMs,
+      mossIndex,
+      mossCacheHit,
+      mossResultCount: retrievedDocs.length
+    };
+
+    // Non-blocking asynchronous Moss deal context sync (Firestore remains source of truth)
+    setImmediate(async () => {
+      try {
+        const { syncDealContext } = require('../retrieval/mossIndexer');
+        const latestDeal = await getDeal(context.dealId, context.organizationId, context.sessionId);
+        if (latestDeal) {
+          await syncDealContext(context.dealId, latestDeal);
+        }
+      } catch (_) {}
+    });
+
     if (res) writeTerminalSseReply(res, chatId);
-    return { content, chatId };
+    return { content, chatId, receiptId: receipt.receiptId, metrics };
   } catch (error) {
     console.error('Agent runtime error:', error.message);
     await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_RESPONSE_FAILED, trigger: 'Gemini/runtime response failed', actionResult: { verified: false, error: String(error.message).slice(0, 200) } }).catch(() => {});
@@ -187,6 +276,10 @@ function explicitDiscountRequest(text) {
   return Number.isFinite(value) && value >= 0 && value <= 100 ? value : null;
 }
 
+function explicitMeetingRequest(text) {
+  return /(?:schedule|book|set up)\s*(?:a\s*)?(?:review|meeting|call|demo|follow-up)/i.test(String(text || ''));
+}
+
 async function currentModelMessages(context) {
   const [deal, history, approvalSnapshot] = await Promise.all([
     getDeal(context.dealId, context.organizationId, context.sessionId),
@@ -196,7 +289,7 @@ async function currentModelMessages(context) {
   if (!deal) throw new Error('Bound deal not found');
   const resolvedApprovals = approvalSnapshot.docs.map(doc => doc.data()).filter(approval => ['APPROVED', 'REJECTED', 'EXPIRED'].includes(approval.status));
   return [
-    { role: 'system', content: buildSystemPrompt({ deal, negotiationMemory: (deal.negotiationMemory || []).slice(-10), resolvedApprovals }) },
+    { role: 'system', content: buildSystemPrompt({ deal, negotiationMemory: (deal.negotiationMemory || []).slice(-10), resolvedApprovals, retrievedDocs: context.retrievedDocs || [] }) },
     ...history.filter(message => message.role !== 'system'),
   ];
 }

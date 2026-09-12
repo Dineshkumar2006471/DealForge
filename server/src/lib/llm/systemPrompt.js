@@ -113,6 +113,14 @@ function buildSystemPrompt(dealContext = {}) {
     prompt += `\n\n## CURRENT VERIFIED DEAL STATE\n${JSON.stringify(verifiedState)}\nUse this only as current context; do not repeat questions already answered.`;
   }
 
+  if (dealContext.retrievedDocs && dealContext.retrievedDocs.length > 0) {
+    prompt += '\n\n## RETRIEVED KNOWLEDGE & CONTEXT (MOSS RETRIEVAL LAYER)\n';
+    for (const doc of dealContext.retrievedDocs) {
+      const cleanSnippet = (doc.text || '').replace(/\s+/g, ' ').trim().slice(0, 250);
+      prompt += `- [${doc.title || doc.id}]: ${cleanSnippet}\n`;
+    }
+  }
+
   if (dealContext.resolvedApprovals && dealContext.resolvedApprovals.length > 0) {
     prompt += '\n\n## RESOLVED APPROVALS (from your manager)\n';
     for (const approval of dealContext.resolvedApprovals) {

@@ -38,7 +38,16 @@ async function createCallSession({ organizationId, dealId, managerId, customerLa
   const parent = deal.data();
   state.organizationId = organizationId;
   state.dealId = dealId;
-  state.company = parent.company || state.company;
+  const companyValue = (parent.company?.value && parent.company.value !== 'Pending' && parent.company.value !== 'Loading...')
+    ? parent.company.value
+    : (customerLabel || parent.name || 'Customer');
+  state.company = {
+    value: companyValue,
+    confidence: parent.company?.confidence ?? 1.0,
+    source: parent.company?.source || 'customer_label',
+    evidence_turn: parent.company?.evidence_turn ?? null,
+    last_updated: now(),
+  };
   state.owner = parent.owner || null;
   state.integrations = parent.integrations || {};
   state.arr = Number(parent.arr) || (String(parent.company?.value || '').toLowerCase().includes('acme') ? 1200000 : 0);

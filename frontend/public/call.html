@@ -31,7 +31,7 @@
   <script src="/js/runtimeConfig.js?v=3"></script>
   <script src="/js/backendClient.js?v=3"></script>
   <script src="/js/agoraClient.js?v=3"></script>
-  <script src="/js/realtimeVoiceClient.js?v=4"></script>
+  <script src="/js/realtimeVoiceClient.js?v=6"></script>
   <script src="/js/browserSpeechClient.js?v=4"></script>
   <script>
     const urlParams = new URLSearchParams(location.search);
@@ -64,6 +64,9 @@
     let currentAudio = null;
     let isTurnInFlight = false;
     let localMessages = [];
+    let tSpeechStarted = 0;
+    let tSpeechStopped = 0;
+    let tTranscriptCompleted = 0;
 
     function setOrbState(state) {
       if (orbElement) orbElement.className = `orb-container state-${state}`;
@@ -109,6 +112,136 @@
       renderCaptions(localMessages);
     }
 
+    function updateLiveInterimCaption(text) {
+      if (!text || !text.trim()) {
+        clearLiveInterimCaption();
+        return;
+      }
+      const list = document.getElementById('captions-list');
+      const statusEl = document.getElementById('captions-status');
+      if (statusEl) statusEl.style.display = 'none';
+
+      let interim = document.getElementById('live-interim-caption');
+      if (!interim) {
+        interim = document.createElement('div');
+        interim.id = 'live-interim-caption';
+        interim.style.padding = '8px';
+        interim.style.borderRadius = '8px';
+        interim.style.background = 'rgba(255, 255, 255, 0.05)';
+        interim.style.border = '1px dashed var(--hairline)';
+        interim.style.marginLeft = 'auto';
+        interim.style.maxWidth = '85%';
+        interim.style.opacity = '0.85';
+
+        const header = document.createElement('div');
+        header.style.fontSize = '11px';
+        header.style.fontFamily = 'var(--font-mono)';
+        header.style.textTransform = 'uppercase';
+        header.style.color = 'var(--mute)';
+        header.style.marginBottom = '4px';
+        header.textContent = 'Customer (Speaking…)';
+
+        const body = document.createElement('div');
+        body.className = 'interim-text';
+        body.style.fontSize = '14px';
+        body.style.fontStyle = 'italic';
+        body.style.color = 'var(--ink)';
+
+        interim.append(header, body);
+        list.appendChild(interim);
+      }
+      const body = interim.querySelector('.interim-text');
+      if (body) body.textContent = text;
+      const container = document.getElementById('live-captions');
+      if (container) container.scrollTop = container.scrollHeight;
+    }
+
+    function clearLiveInterimCaption() {
+      const interim = document.getElementById('live-interim-caption');
+      if (interim) interim.remove();
+    }
+
+    // Web Audio API Streaming Audio Player for progressive zero-gap chunk playback
+    class StreamingAudioQueuePlayer {
+      constructor() {
+        this.audioCtx = null;
+        this.nextStartTime = 0;
+        this.activeSources = [];
+        this.isPlaying = false;
+        this.onPlaybackStarted = null;
+        this.onPlaybackEnded = null;
+      }
+
+      ensureAudioContext() {
+        if (!this.audioCtx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextClass) {
+            this.audioCtx = new AudioContextClass({ sampleRate: 24000 });
+          }
+        }
+        if (this.audioCtx && this.audioCtx.state === 'suspended') {
+          this.audioCtx.resume().catch(() => {});
+        }
+        return this.audioCtx;
+      }
+
+      async enqueueChunk(base64Audio, contentType = 'audio/mp3') {
+        const ctx = this.ensureAudioContext();
+        if (!ctx || !base64Audio) return;
+
+        try {
+          const binaryStr = atob(base64Audio);
+          const len = binaryStr.length;
+          const bytes = new Uint8Array(len);
+          for (let i = 0; i < len; i++) {
+            bytes[i] = binaryStr.charCodeAt(i);
+          }
+
+          const audioBuffer = await ctx.decodeAudioData(bytes.buffer.slice(0));
+          const source = ctx.createBufferSource();
+          source.buffer = audioBuffer;
+          source.connect(ctx.destination);
+
+          const now = ctx.currentTime;
+          const startTime = Math.max(now, this.nextStartTime);
+          source.start(startTime);
+          this.nextStartTime = startTime + audioBuffer.duration;
+          this.activeSources.push(source);
+
+          if (!this.isPlaying) {
+            this.isPlaying = true;
+            if (typeof this.onPlaybackStarted === 'function') {
+              this.onPlaybackStarted();
+            }
+          }
+
+          source.onended = () => {
+            const idx = this.activeSources.indexOf(source);
+            if (idx !== -1) this.activeSources.splice(idx, 1);
+            if (this.activeSources.length === 0 && ctx.currentTime >= this.nextStartTime - 0.05) {
+              this.isPlaying = false;
+              if (typeof this.onPlaybackEnded === 'function') {
+                this.onPlaybackEnded();
+              }
+            }
+          };
+        } catch (err) {
+          console.warn('[StreamingAudioPlayer] Chunk decode error:', err);
+        }
+      }
+
+      stop() {
+        this.isPlaying = false;
+        for (const s of this.activeSources) {
+          try { s.stop(); } catch (_) {}
+        }
+        this.activeSources = [];
+        this.nextStartTime = 0;
+      }
+    }
+
+    const streamingPlayer = new StreamingAudioQueuePlayer();
+
     function playAssistantAudio(audioBase64) {
       return new Promise((resolve) => {
         if (!audioBase64) return resolve();
@@ -143,38 +276,111 @@
       });
     }
 
-    async function handleCustomerTurn(transcript) {
+    async function handleCustomerTurn(transcript, turnId = null, clientTimestamps = {}) {
       if (!active || !transcript || !transcript.trim() || isTurnInFlight) return;
+      const cleanTranscript = transcript.trim();
+      if (!cleanTranscript) return;
+      const finalTurnId = turnId || ('turn_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9));
       isTurnInFlight = true;
       transitionState(CALL_STATES.PROCESSING);
+      clearLiveInterimCaption();
 
       if (voiceClient && typeof voiceClient.setMuted === 'function') {
         voiceClient.setMuted(true);
       }
 
-      appendCaption('user', transcript);
+      appendCaption('user', cleanTranscript);
+
+      const t4 = performance.now();
+      let t5 = 0;
+      let t6 = 0;
+      let t7 = 0;
+      let backendMetrics = null;
 
       try {
-        const turnResponse = await api(`/public/calls/${encodeURIComponent(linkToken)}/turn`, {
+        const streamUrl = `${BACKEND_URL}/public/calls/${encodeURIComponent(linkToken)}/turn?stream=true`;
+        streamingPlayer.stop();
+
+        streamingPlayer.onPlaybackStarted = () => {
+          if (!t7) t7 = performance.now();
+          transitionState(CALL_STATES.SPEAKING);
+        };
+        streamingPlayer.onPlaybackEnded = () => {
+          if (active && !isTurnInFlight) transitionState(CALL_STATES.LISTENING);
+        };
+
+        const response = await fetch(streamUrl, {
           method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'text/event-stream'
+          },
           body: JSON.stringify({
             sessionCredential: call.sessionCredential,
-            userText: transcript
+            turnId: finalTurnId,
+            userText: cleanTranscript,
+            clientTimestamps
           })
         });
 
-        if (turnResponse.assistantText) {
-          appendCaption('assistant', turnResponse.assistantText);
-        }
-        if (turnResponse.meetingRequest) {
-          renderMeetingRequest(turnResponse.meetingRequest);
+        if (!response.ok) {
+          throw new Error(`Turn HTTP error ${response.status}`);
         }
 
-        if (turnResponse.audioBase64) {
-          await playAssistantAudio(turnResponse.audioBase64);
-        } else {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (!t5) t5 = performance.now();
+
+          buffer += decoder.decode(value, { stream: true });
+          const blocks = buffer.split('\n\n');
+          buffer = blocks.pop();
+
+          for (const block of blocks) {
+            const eventMatch = block.match(/event:\s*(\w+)/);
+            const dataMatch = block.match(/data:\s*(.*)/s);
+            if (!eventMatch || !dataMatch) continue;
+
+            const eventType = eventMatch[1];
+            let dataObj;
+            try { dataObj = JSON.parse(dataMatch[1]); } catch (_) { continue; }
+
+            if (eventType === 'text') {
+              if (dataObj.assistantText) {
+                appendCaption('assistant', dataObj.assistantText);
+              }
+              if (dataObj.meetingRequest) {
+                renderMeetingRequest(dataObj.meetingRequest);
+              }
+            } else if (eventType === 'audio_chunk') {
+              if (!t6) t6 = performance.now();
+              if (dataObj.audioBase64) {
+                await streamingPlayer.enqueueChunk(dataObj.audioBase64, dataObj.contentType);
+              }
+            } else if (eventType === 'done') {
+              backendMetrics = dataObj.metrics;
+            }
+          }
+        }
+
+        // If no audio was produced, return to listening
+        if (!streamingPlayer.isPlaying && active) {
           transitionState(CALL_STATES.LISTENING);
         }
+
+        // Section 3: Safe diagnostic line logging
+        const t1 = clientTimestamps.t1 || 0;
+        const t3 = clientTimestamps.t3 || 0;
+        const totalTtfa = (t7 && t1) ? (t7 - t1) : ((t7 && t4) ? (t7 - t4) : 0);
+        const asrFinalization = (t3 && t1) ? (t3 - t1) : 0;
+        const turnNetwork = t5 ? (t5 - t4) : 0;
+        const audioStartup = (t7 && t6) ? (t7 - t6) : 0;
+
+        console.log(`[VOICE LATENCY] speechEnd=${t1 ? t1.toFixed(0) : '—'} finalTranscript=${t3 ? t3.toFixed(0) : '—'} turnSubmit=${t4.toFixed(0)} asrFinalization=${asrFinalization.toFixed(0)}ms turnNetwork=${turnNetwork.toFixed(0)}ms backend=${backendMetrics?.totalBackendMs ?? 0}ms geminiTTFU=${backendMetrics?.geminiFirstTokenMs ?? 0}ms ttsTTFB=${backendMetrics?.ttsTTFB ?? 0}ms playbackStartup=${audioStartup.toFixed(0)}ms TOTAL_TTFA=${totalTtfa ? totalTtfa.toFixed(0) + 'ms' : '—'}`);
       } catch (turnErr) {
         console.error('Turn handling failed:', turnErr);
         appendCaption('assistant', "I had trouble processing that. Could you repeat?");
@@ -188,6 +394,9 @@
     }
 
     async function cleanup() {
+      if (streamingPlayer) {
+        streamingPlayer.stop();
+      }
       if (currentAudio) {
         try { currentAudio.pause(); } catch (_) {}
         currentAudio = null;
@@ -279,13 +488,18 @@
         const response = await getCustomerTranscript(linkToken, call.sessionCredential);
         renderCaptions(response.messages || []);
       } catch (error) {
+        if (error.message && (error.message.includes('410') || error.message.includes('not active'))) {
+          if (captionsPollingTimer) { clearInterval(captionsPollingTimer); captionsPollingTimer = null; }
+          return;
+        }
         const captionStatus = document.getElementById('captions-status');
-        captionStatus.style.display = 'block';
-        if (error.message && error.message.includes('429')) {
-          captionStatus.textContent = 'Live transcript updating…';
-        } else {
-          captionStatus.textContent = 'Live transcript is reconnecting…';
-          console.warn('Caption refresh failed:', error.message || error);
+        if (captionStatus) {
+          captionStatus.style.display = 'block';
+          if (error.message && error.message.includes('429')) {
+            captionStatus.textContent = 'Live transcript updating…';
+          } else {
+            captionStatus.textContent = 'Live transcript is reconnecting…';
+          }
         }
       }
     }
@@ -302,8 +516,12 @@
         const response = await getCustomerMeetingRequest(linkToken, call.sessionCredential);
         if (response.request) renderMeetingRequest(response.request);
       } catch (error) {
+        if (error.message && (error.message.includes('410') || error.message.includes('not active'))) {
+          if (meetingRequestPollingTimer) { clearInterval(meetingRequestPollingTimer); meetingRequestPollingTimer = null; }
+          return;
+        }
         if (!error.message || !error.message.includes('429')) {
-          console.warn('Meeting request refresh failed:', error.message || error);
+          console.warn('Meeting request refresh note:', error.message || error);
         }
       }
     }
@@ -412,7 +630,9 @@
         muteButton.disabled = false;
         setButton('End Call', false);
         if (credentials.expiresAt) scheduleRenewal(credentials.expiresAt);
-        startCaptionFallback();
+        // Live transcript deltas handle captions for openai_realtime and browser_speech.
+        // Only Agora needs the 2.5s polling fallback since it has no client-side transcript events.
+        if (provider === 'agora') startCaptionFallback();
         startMeetingRequestFallback();
 
         // Request greeting from server
@@ -478,15 +698,39 @@
 
     // Voice client event listeners
     window.addEventListener('voice:turn-completed', (e) => {
+      tTranscriptCompleted = performance.now();
+      clearLiveInterimCaption();
       const transcript = e.detail?.transcript;
-      if (transcript) handleCustomerTurn(transcript);
+      const clientTimestamps = e.detail?.clientTimestamps || { t3: tTranscriptCompleted };
+      if (transcript && transcript.trim()) {
+        const turnId = 'turn_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+        handleCustomerTurn(transcript.trim(), turnId, clientTimestamps);
+      }
     });
-    window.addEventListener('voice:speech-started', () => {
+    window.addEventListener('voice:transcript-delta', (e) => {
+      const text = e.detail?.text || e.detail?.delta;
+      if (text && currentState === CALL_STATES.LISTENING) {
+        updateLiveInterimCaption(text);
+      }
+    });
+    window.addEventListener('voice:speech-started', (e) => {
+      tSpeechStarted = e.detail?.t0 || performance.now();
+      // Barge-in (Section 24): When customer starts talking while assistant is speaking, halt playback immediately
+      if (streamingPlayer && streamingPlayer.isPlaying) {
+        console.log('[Barge-in] Customer started speaking. Halting assistant audio playback immediately.');
+        streamingPlayer.stop();
+        transitionState(CALL_STATES.LISTENING);
+      } else if (currentAudio) {
+        try { currentAudio.pause(); } catch (_) {}
+        currentAudio = null;
+        transitionState(CALL_STATES.LISTENING);
+      }
       if (currentState === CALL_STATES.LISTENING) {
         setOrbState('customer-speaking');
       }
     });
-    window.addEventListener('voice:speech-stopped', () => {
+    window.addEventListener('voice:speech-stopped', (e) => {
+      tSpeechStopped = e.detail?.t1 || performance.now();
       if (currentState === CALL_STATES.LISTENING) {
         setOrbState('idle');
       }

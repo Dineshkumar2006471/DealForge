@@ -28,7 +28,27 @@ function renderProfileIcon(elementOrId, size = 20) {
 auth.onAuthStateChanged(async (user) => {
   if (user) {
     try {
-      const claims = await user.getIdTokenResult();
+      let claims = await user.getIdTokenResult();
+      if (claims.claims.role !== 'manager' || !claims.claims.organizationId) {
+        console.log('🔄 Provisioning manager access for user:', user.email);
+        const apiUrl = (window.DEALFORGE_API_URL || 'https://dealforge-core-6li7mfkrtq-uc.a.run.app/api').replace(/\/$/, '');
+        const idToken = await user.getIdToken();
+        const provRes = await fetch(`${apiUrl}/public/auth/provision`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${idToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (provRes.ok) {
+          await user.getIdToken(true);
+          claims = await user.getIdTokenResult(true);
+          console.log('✅ User successfully provisioned as manager:', claims.claims);
+        } else {
+          console.warn('Auto-provisioning endpoint returned status:', provRes.status);
+        }
+      }
+
       if (claims.claims.role !== 'manager' || !claims.claims.organizationId) {
         currentUser = null;
         resolveManagerReady(null);
@@ -70,28 +90,38 @@ auth.onAuthStateChanged(async (user) => {
 async function signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
   try {
-    await auth.signInWithPopup(provider);
-    // onAuthStateChanged will handle the redirect
+    const result = await auth.signInWithPopup(provider);
+    return result;
   } catch (error) {
     console.error('Google Sign-In Error:', error);
-    alert('Failed to sign in with Google: ' + error.message);
+    const errEl = document.getElementById('error-message');
+    if (errEl) {
+      errEl.innerText = error.message;
+      errEl.style.display = 'block';
+    } else {
+      alert('Failed to sign in with Google: ' + error.message);
+    }
   }
 }
 
 // Helper for Email/Password Sign-In
 async function signInWithEmail(email, password) {
   try {
-    await auth.signInWithEmailAndPassword(email, password);
-    // onAuthStateChanged will handle the redirect
+    return await auth.signInWithEmailAndPassword(email, password);
   } catch (error) {
     console.error('Email Sign-In Error:', error);
-    throw error; // Let the caller handle the UI error display
+    throw error;
   }
 }
 
 // Helper for Email/Password Sign-Up
-async function signUpWithEmail(email, password, firstName, lastName) {
-  throw new Error('Manager accounts are invite-only. Contact your DealForge administrator.');
+async function signUpWithEmail(email, password) {
+  try {
+    return await auth.createUserWithEmailAndPassword(email, password);
+  } catch (error) {
+    console.error('Email Sign-Up Error:', error);
+    throw error;
+  }
 }
 
 // Helper for Sign Out

@@ -25,7 +25,7 @@ async function updateDealState(args, context) {
 
   // Handle MEDDIC update
   if (meddic_pillar) {
-    await updateMEDDIC(dealId, meddic_pillar, meddic_status || 'confirmed', confidence || 0.9, turnNumber, organizationId, sessionId);
+    await updateMEDDIC(dealId, meddic_pillar, meddic_status || 'confirmed', confidence || 0.9, turnNumber, organizationId, sessionId, { turnId: context.turnId, source: { type: 'customer_utterance', turnId: context.turnId } });
     return { updated: true, field: `meddic.${meddic_pillar}`, value: meddic_status || 'confirmed' };
   }
 
@@ -36,7 +36,7 @@ async function updateDealState(args, context) {
 
   const conf = confidence || 0.85;
 
-  return updateDealWithEvidence({ organizationId, dealId, sessionId, field, value, confidence: conf, source: source || 'customer_statement', evidenceTurn: turnNumber });
+  return updateDealWithEvidence({ organizationId, dealId, sessionId, field, value, confidence: conf, source: { type: 'customer_utterance', turnId: context.turnId }, evidenceTurn: turnNumber, turnId: context.turnId });
 }
 
 registerTool('update_deal_state', updateDealState, {
