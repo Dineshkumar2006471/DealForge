@@ -155,28 +155,103 @@ router.post('/calls/:linkToken/ready', async (req, res, next) => {
 });
 
 router.post('/calls/:linkToken/turn', async (req, res, next) => {
+  const s0 = Date.now();
   try {
     const session = await activeSessionFromCredential(req);
+    const s1 = Date.now();
     const userText = typeof req.body?.userText === 'string' ? req.body.userText.trim() : '';
     if (!userText) {
       return res.status(400).json({ error: 'userText is required' });
     }
     const turnId = typeof req.body?.turnId === 'string' ? req.body.turnId.trim() : null;
+    const wantsStream = req.headers.accept?.includes('text/event-stream') || req.body?.stream === true || req.query?.stream === 'true';
 
-    const tServerStart = Date.now();
+    const s2 = Date.now();
     const { executeCustomerTurn } = require('../lib/agent/agentRuntime');
     const result = await executeCustomerTurn(session, userText, { turnId });
     const assistantText = result.content || '';
 
+    const request = await getLatestMeetingRequest(session.sessionId).catch(() => null);
+
+    if (wantsStream) {
+      // Set SSE headers for ultra-low-latency streaming to browser
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      if (typeof res.flushHeaders === 'function') res.flushHeaders();
+
+      // Emit text event immediately so browser displays assistant transcript instantly
+      res.write(`event: text\ndata: ${JSON.stringify({ assistantText, meetingRequest: request })}\n\n`);
+
+      const s12 = Date.now();
+      let s13 = 0;
+      const audioChunks = [];
+      const { streamSpeech } = require('../lib/tts/sarvamStreamingTts');
+
+      try {
+        if (assistantText) {
+          await streamSpeech(assistantText, {
+            onChunk: (chunk) => {
+              if (!s13) s13 = Date.now();
+              if (chunk.audioBase64) {
+                audioChunks.push(chunk.audioBase64);
+                res.write(`event: audio_chunk\ndata: ${JSON.stringify(chunk)}\n\n`);
+              }
+            }
+          });
+        }
+      } catch (streamErr) {
+        console.warn('Sarvam stream speech error:', streamErr.message);
+      }
+
+      const s14 = Date.now();
+      const s15 = Date.now();
+      const totalBackendMs = s15 - s0;
+      const ttsTTFB = s13 ? (s13 - s12) : 0;
+      const ttsTotalMs = s14 - s12;
+
+      // Attach complete turn response to Firestore receipt asynchronously
+      if (result.receiptId || turnId) {
+        const { attachTurnResponse } = require('../lib/agent/turnReceipts');
+        attachTurnResponse(session.sessionId, result.receiptId, turnId, {
+          assistantText,
+          audioBase64: audioChunks[0] || null
+        }).catch(() => {});
+      }
+
+      const metrics = {
+        evidenceMs: result.metrics?.evidenceMs || 0,
+        reasoningMs: result.metrics?.geminiTotalMs || result.metrics?.reasoningMs || 0,
+        geminiFirstTokenMs: result.metrics?.geminiFirstTokenMs || 0,
+        toolsMs: result.metrics?.toolsMs || 0,
+        ttsTTFB,
+        ttsMs: ttsTotalMs,
+        mossLatencyMs: result.metrics?.mossLatencyMs || 0,
+        mossIndex: result.metrics?.mossIndex || 'none',
+        totalBackendMs
+      };
+
+      // Emit terminal done event
+      res.write(`event: done\ndata: ${JSON.stringify({ turnId, metrics, duplicate: Boolean(result.duplicate) })}\n\n`);
+      res.end();
+
+      // Log safe diagnostic line (Section 3 of prompt)
+      console.log(`[VOICE LATENCY SERVER] turnId=${turnId || 'auto'} entry=${s1 - s0}ms claim=${s2 - s1}ms evidence=${metrics.evidenceMs}ms geminiTTFU=${metrics.geminiFirstTokenMs}ms tools=${metrics.toolsMs}ms ttsTTFB=${ttsTTFB}ms ttsTotal=${ttsTotalMs}ms moss=${metrics.mossLatencyMs}ms TOTAL=${totalBackendMs}ms`);
+      return;
+    }
+
+    // Standard non-streaming JSON path (for automated tests and standard callers)
+    const s12 = Date.now();
     let audioBase64 = result.audioBase64 || null;
     let ttsLatency = 0;
+    let s13 = 0;
     if (assistantText && !audioBase64) {
       try {
-        const { synthesizeSpeech } = require('../lib/tts/sarvamTtsService');
-        const ttsStart = Date.now();
-        const ttsRes = await synthesizeSpeech(assistantText, { codec: 'wav' });
-        ttsLatency = Date.now() - ttsStart;
-        audioBase64 = ttsRes.audioBase64;
+        const { streamSpeech } = require('../lib/tts/sarvamStreamingTts');
+        const ttsRes = await streamSpeech(assistantText);
+        s13 = Date.now();
+        ttsLatency = ttsRes.totalMs || (Date.now() - s12);
+        audioBase64 = ttsRes.audioBase64List?.[0] || null;
       } catch (err) {
         console.error('Sarvam TTS error for customer turn:', err.message);
       }
@@ -190,8 +265,11 @@ router.post('/calls/:linkToken/turn', async (req, res, next) => {
       });
     }
 
-    const request = await getLatestMeetingRequest(session.sessionId).catch(() => null);
-    const totalBackendMs = Date.now() - tServerStart;
+    const s15 = Date.now();
+    const totalBackendMs = s15 - s0;
+    const ttsTTFB = s13 ? (s13 - s12) : ttsLatency;
+
+    console.log(`[VOICE LATENCY SERVER] turnId=${turnId || 'auto'} entry=${s1 - s0}ms claim=${s2 - s1}ms evidence=${result.metrics?.evidenceMs || 0}ms geminiTTFU=${result.metrics?.geminiFirstTokenMs || 0}ms tools=${result.metrics?.toolsMs || 0}ms ttsTTFB=${ttsTTFB}ms ttsTotal=${ttsLatency}ms moss=${result.metrics?.mossLatencyMs || 0}ms TOTAL=${totalBackendMs}ms`);
 
     res.json({
       sessionId: session.sessionId,
@@ -206,7 +284,10 @@ router.post('/calls/:linkToken/turn', async (req, res, next) => {
         reasoningMs: result.metrics?.geminiTotalMs || result.metrics?.reasoningMs || 0,
         geminiFirstTokenMs: result.metrics?.geminiFirstTokenMs || 0,
         toolsMs: result.metrics?.toolsMs || 0,
+        ttsTTFB,
         ttsMs: ttsLatency,
+        mossLatencyMs: result.metrics?.mossLatencyMs || 0,
+        mossIndex: result.metrics?.mossIndex || 'none',
         totalBackendMs
       }
     });

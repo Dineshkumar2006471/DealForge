@@ -18,6 +18,9 @@ class RealtimeVoiceClient {
     this.connected = false;
     this.muted = false;
     this.activeTranscript = '';
+    this.t0 = 0;
+    this.t1 = 0;
+    this.t2 = 0;
   }
 
   async connect(existingTrack = null) {
@@ -149,30 +152,46 @@ class RealtimeVoiceClient {
     switch (event.type) {
       case 'input_audio_buffer.speech_started':
         console.log('[RealtimeVoiceClient] Speech started');
+        this.t0 = performance.now();
+        this.t2 = 0;
         this.activeTranscript = '';
-        window.dispatchEvent(new CustomEvent('voice:speech-started'));
+        window.dispatchEvent(new CustomEvent('voice:speech-started', { detail: { t0: this.t0 } }));
         break;
 
       case 'input_audio_buffer.speech_stopped':
         console.log('[RealtimeVoiceClient] Speech stopped');
-        window.dispatchEvent(new CustomEvent('voice:speech-stopped'));
+        this.t1 = performance.now();
+        window.dispatchEvent(new CustomEvent('voice:speech-stopped', { detail: { t1: this.t1 } }));
         break;
 
       case 'conversation.item.input_audio_transcription.delta':
+        if (!this.t2) this.t2 = performance.now();
         if (event.delta) {
           this.activeTranscript += event.delta;
-          window.dispatchEvent(new CustomEvent('voice:transcript-delta', { detail: { delta: event.delta, text: this.activeTranscript } }));
+          window.dispatchEvent(new CustomEvent('voice:transcript-delta', { detail: { delta: event.delta, text: this.activeTranscript, t2: this.t2 } }));
         }
         break;
 
-      case 'conversation.item.input_audio_transcription.completed':
+      case 'conversation.item.input_audio_transcription.completed': {
+        const t3 = performance.now();
         console.log('[RealtimeVoiceClient] Transcription completed:', event.transcript);
         const finalTranscript = (event.transcript || this.activeTranscript || '').trim();
         if (finalTranscript) {
-          window.dispatchEvent(new CustomEvent('voice:turn-completed', { detail: { transcript: finalTranscript } }));
+          window.dispatchEvent(new CustomEvent('voice:turn-completed', {
+            detail: {
+              transcript: finalTranscript,
+              clientTimestamps: {
+                t0: this.t0,
+                t1: this.t1,
+                t2: this.t2 || t3,
+                t3
+              }
+            }
+          }));
         }
         this.activeTranscript = '';
         break;
+      }
 
       case 'error':
         console.error('[RealtimeVoiceClient] Server error event:', event.error);
