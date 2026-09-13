@@ -7,7 +7,7 @@
     "lint:fix": "eslint --fix server/src/ server/test/",
     "format": "prettier --write \"server/src/**/*.js\" \"server/test/**/*.js\"",
     "format:check": "prettier --check \"server/src/**/*.js\" \"server/test/**/*.js\"",
-    "prepare": "husky"
+    "prepare": "node -e \"if (!process.env.CI && !process.env.GITHUB_ACTIONS) { try { require('child_process').execSync('npx husky', { stdio: 'inherit' }); } catch {} }\""
   },
   "devDependencies": {
     "eslint": "^9.27.0",

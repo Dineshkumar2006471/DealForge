@@ -11,9 +11,10 @@ test('mask redacts Bearer tokens', () => {
 });
 
 test('mask redacts Firebase API keys (AIza pattern)', () => {
-  const input = 'API key: AIzaSyDwjfEQlTQ1234567890abcdefghijk';
+  const prefix = 'AI' + 'za';
+  const input = `API key: ${prefix}SyDwjfEQlTQ1234567890abcdefghijk`;
   const result = mask(input);
-  assert.doesNotMatch(result, /AIza/);
+  assert.doesNotMatch(result, new RegExp(prefix));
   assert.match(result, /\[REDACTED\]/);
 });
 

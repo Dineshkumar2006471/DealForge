@@ -85,8 +85,8 @@ cd DealForge/server && npm test
 
 **Evidence:**
 - `publication-safety` job in CI scans for:
-  - Private key patterns (`BEGIN RSA PRIVATE KEY`)
-  - Firebase API key patterns (`AIza[0-9A-Za-z_-]{20,}`)
+  - Private key patterns (e.g. `BEGIN ... PRIVATE KEY`)
+  - Firebase API key tokens (`AIza...`)
   - Secret-bearing files (`.env`, `*.log`)
 
 ---

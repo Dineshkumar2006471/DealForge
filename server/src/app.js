@@ -28,9 +28,10 @@ function createApp() {
     next();
   });
 
-  app.get('/health', (_req, res) =>
-    res.json({ status: 'ok', service: 'dealforge-core', timestamp: new Date().toISOString() }),
-  );
+  const healthResponse = (_req, res) =>
+    res.json({ status: 'ok', service: 'dealforge-core', timestamp: new Date().toISOString() });
+  app.get('/health', healthResponse);
+  app.get('/api/health', healthResponse);
   app.use('/chat/completions', chat);
   app.use('/api/manager', manager);
   app.use('/api/manager', require('./routes/demoReset'));

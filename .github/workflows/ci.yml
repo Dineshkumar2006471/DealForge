@@ -18,11 +18,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            server/package-lock.json
+          cache-dependency-path: package-lock.json
       - run: npm ci
-      - run: cd server && npm ci
       - name: ESLint (zero errors required)
         run: npx eslint server/src/ server/test/
       - name: Prettier (format check)
