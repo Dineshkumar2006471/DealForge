@@ -9,7 +9,28 @@ permissions:
   contents: read
 
 jobs:
+  quality:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+      - run: npm ci
+      - run: cd server && npm ci
+      - name: ESLint (zero errors required)
+        run: npx eslint server/src/ server/test/
+      - name: Prettier (format check)
+        run: npx prettier --check "server/src/**/*.js" "server/test/**/*.js"
+
   server:
+    name: Server Tests
+    needs: quality
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -36,12 +57,13 @@ jobs:
       - run: npx firebase-tools --config ../firebase.json emulators:exec --only firestore "node --test test/firestore-emulator.test.js"
 
   publication-safety:
+    name: Secret Scan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Verify secret-bearing files are not tracked
         run: |
-          ! git ls-files | grep -E '(^|/)(\.env|firebaseConfig\.local\.js|.*\.log)$'
+          ! git ls-files | grep -E '(^|/)(\\.env|firebaseConfig\\.local\\.js|.*\\.log)$'
       - name: Scan tracked text for private keys and Firebase API keys
         run: |
           ! git grep -nE 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|AIza[0-9A-Za-z_-]{20,}'

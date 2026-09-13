@@ -1,15 +1,26 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { writeSafeFallback, currentUserText, writeSseReply, writeNoopSseReply, writeInterruptableMetadata } = require('../src/lib/agent/agentRuntime');
+const {
+  writeSafeFallback,
+  currentUserText,
+  writeSseReply,
+  writeNoopSseReply,
+  writeInterruptableMetadata,
+} = require('../src/lib/agent/agentRuntime');
 const { parse, chatSchema } = require('../src/lib/schema/validation');
 
 test('Gemini failure fallback is a complete OpenAI-compatible SSE response', () => {
   const writes = [];
   let ended = false;
-  writeSafeFallback({
-    write: value => writes.push(value),
-    end: () => { ended = true; },
-  }, 'chatcmpl-test');
+  writeSafeFallback(
+    {
+      write: (value) => writes.push(value),
+      end: () => {
+        ended = true;
+      },
+    },
+    'chatcmpl-test',
+  );
 
   assert.equal(ended, true);
   assert.equal(writes.length, 3);
@@ -25,14 +36,39 @@ test('empty Agora join turns are identified before reaching Gemini', () => {
   assert.equal(currentUserText([{ role: 'user', content: '   ' }]), '');
   assert.equal(currentUserText([{ role: 'user', content: 'We have 300 users.' }]), 'We have 300 users.');
   assert.equal(currentUserText([{ role: 'assistant', content: 'Hello' }]), '');
-  assert.equal(currentUserText([{ role: 'user', content: [{ type: 'input_text', text: 'We have ' }, { type: 'input_text', text: '300 users.' }] }]), 'We have\n300 users.');
-  assert.doesNotThrow(() => parse(chatSchema, { stream: true, messages: [{ role: 'user', content: [{ type: 'input_text', text: 'We have 300 users.' }] }] }));
+  assert.equal(
+    currentUserText([
+      {
+        role: 'user',
+        content: [
+          { type: 'input_text', text: 'We have ' },
+          { type: 'input_text', text: '300 users.' },
+        ],
+      },
+    ]),
+    'We have\n300 users.',
+  );
+  assert.doesNotThrow(() =>
+    parse(chatSchema, {
+      stream: true,
+      messages: [{ role: 'user', content: [{ type: 'input_text', text: 'We have 300 users.' }] }],
+    }),
+  );
 });
 
 test('explicit assistant speech uses the complete SSE contract', () => {
   const writes = [];
   let ended = false;
-  writeSseReply({ write: value => writes.push(value), end: () => { ended = true; } }, 'chatcmpl-opening', 'Hello from DealForge.');
+  writeSseReply(
+    {
+      write: (value) => writes.push(value),
+      end: () => {
+        ended = true;
+      },
+    },
+    'chatcmpl-opening',
+    'Hello from DealForge.',
+  );
   assert.equal(ended, true);
   const first = JSON.parse(writes[0].replace(/^data: |\n\n$/g, ''));
   const terminal = JSON.parse(writes[1].replace(/^data: |\n\n$/g, ''));
@@ -44,7 +80,15 @@ test('explicit assistant speech uses the complete SSE contract', () => {
 test('empty Agora lifecycle turns receive a silent terminal SSE completion', () => {
   const writes = [];
   let ended = false;
-  writeNoopSseReply({ write: value => writes.push(value), end: () => { ended = true; } }, 'chatcmpl-empty');
+  writeNoopSseReply(
+    {
+      write: (value) => writes.push(value),
+      end: () => {
+        ended = true;
+      },
+    },
+    'chatcmpl-empty',
+  );
   assert.equal(ended, true);
   assert.equal(writes.length, 2);
   const terminal = JSON.parse(writes[0].replace(/^data: |\n\n$/g, ''));
@@ -56,7 +100,15 @@ test('empty Agora lifecycle turns receive a silent terminal SSE completion', () 
 test('a terminal-only SSE response safely closes a stream after partial speech without another apology', () => {
   const writes = [];
   let ended = false;
-  writeNoopSseReply({ write: value => writes.push(value), end: () => { ended = true; } }, 'chatcmpl-partial');
+  writeNoopSseReply(
+    {
+      write: (value) => writes.push(value),
+      end: () => {
+        ended = true;
+      },
+    },
+    'chatcmpl-partial',
+  );
   assert.equal(ended, true);
   assert.equal(writes.length, 2);
   const terminal = JSON.parse(writes[0].replace(/^data: |\n\n$/g, ''));
@@ -67,7 +119,7 @@ test('a terminal-only SSE response safely closes a stream after partial speech w
 
 test('normal replies declare that customer speech may interrupt them', () => {
   const writes = [];
-  writeInterruptableMetadata({ write: value => writes.push(value) }, 'chatcmpl-turn', true);
+  writeInterruptableMetadata({ write: (value) => writes.push(value) }, 'chatcmpl-turn', true);
   const metadata = JSON.parse(writes[0].replace(/^data: |\n\n$/g, ''));
   assert.equal(metadata.object, 'chat.completion.custom_metadata');
   assert.equal(metadata.metadata.interruptable, true);

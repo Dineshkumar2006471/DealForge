@@ -16,7 +16,9 @@ async function updateDealState(args, context) {
   if (new_stage) {
     await updateConversationStage(dealId, new_stage, organizationId, sessionId);
     await writeAuditEvent({
-      organizationId, dealId, sessionId,
+      organizationId,
+      dealId,
+      sessionId,
       eventType: EVENT_TYPES.CONVERSATION_STAGE_CHANGED,
       trigger: `Stage → ${new_stage}`,
     });
@@ -25,7 +27,16 @@ async function updateDealState(args, context) {
 
   // Handle MEDDIC update
   if (meddic_pillar) {
-    await updateMEDDIC(dealId, meddic_pillar, meddic_status || 'confirmed', confidence || 0.9, turnNumber, organizationId, sessionId, { turnId: context.turnId, source: { type: 'customer_utterance', turnId: context.turnId } });
+    await updateMEDDIC(
+      dealId,
+      meddic_pillar,
+      meddic_status || 'confirmed',
+      confidence || 0.9,
+      turnNumber,
+      organizationId,
+      sessionId,
+      { turnId: context.turnId, source: { type: 'customer_utterance', turnId: context.turnId } },
+    );
     return { updated: true, field: `meddic.${meddic_pillar}`, value: meddic_status || 'confirmed' };
   }
 
@@ -36,7 +47,17 @@ async function updateDealState(args, context) {
 
   const conf = confidence || 0.85;
 
-  return updateDealWithEvidence({ organizationId, dealId, sessionId, field, value, confidence: conf, source: { type: 'customer_utterance', turnId: context.turnId }, evidenceTurn: turnNumber, turnId: context.turnId });
+  return updateDealWithEvidence({
+    organizationId,
+    dealId,
+    sessionId,
+    field,
+    value,
+    confidence: conf,
+    source: { type: 'customer_utterance', turnId: context.turnId },
+    evidenceTurn: turnNumber,
+    turnId: context.turnId,
+  });
 }
 
 registerTool('update_deal_state', updateDealState, {
@@ -48,7 +69,11 @@ registerTool('update_deal_state', updateDealState, {
       value: { type: 'string', description: 'The extracted value' },
       confidence: { type: 'number', description: 'Confidence score 0.0-1.0' },
       source: { type: 'string', description: 'Evidence source: customer_statement, inferred, tool_result' },
-      meddic_pillar: { type: 'string', description: 'MEDDIC pillar to update: metrics, economicBuyer, decisionCriteria, decisionProcess, identifyPain, champion' },
+      meddic_pillar: {
+        type: 'string',
+        description:
+          'MEDDIC pillar to update: metrics, economicBuyer, decisionCriteria, decisionProcess, identifyPain, champion',
+      },
       meddic_status: { type: 'string', description: 'MEDDIC status: confirmed, unknown' },
       new_stage: { type: 'string', description: 'New conversation stage: QUALIFY, NEGOTIATE, BOOK, ENDED' },
     },

@@ -6,16 +6,33 @@ const enabled = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
 let env;
 test.before(async () => {
   if (!enabled) return;
-  env = await initializeTestEnvironment({ projectId: 'dealforge-rules-test', firestore: { rules: fs.readFileSync(path.join(__dirname, '..', '..', 'firestore.rules'), 'utf8') } });
-  await env.withSecurityRulesDisabled(async context => { await context.firestore().collection('members').doc('manager-a').set({ organizationId: 'org-a', role: 'manager', status: 'ACTIVE' }); await context.firestore().collection('deals').doc('deal-a').set({ organizationId: 'org-a' }); await context.firestore().collection('deals').doc('deal-b').set({ organizationId: 'org-b' }); });
+  env = await initializeTestEnvironment({
+    projectId: 'dealforge-rules-test',
+    firestore: { rules: fs.readFileSync(path.join(__dirname, '..', '..', 'firestore.rules'), 'utf8') },
+  });
+  await env.withSecurityRulesDisabled(async (context) => {
+    await context
+      .firestore()
+      .collection('members')
+      .doc('manager-a')
+      .set({ organizationId: 'org-a', role: 'manager', status: 'ACTIVE' });
+    await context.firestore().collection('deals').doc('deal-a').set({ organizationId: 'org-a' });
+    await context.firestore().collection('deals').doc('deal-b').set({ organizationId: 'org-b' });
+  });
 });
-test.after(async () => { if (env) await env.cleanup(); });
-test('emulator enforces anonymous denial, organization isolation, and browser write denial', { skip: !enabled }, async () => {
-  await assertFails(env.unauthenticatedContext().firestore().collection('deals').doc('deal-a').get());
-  const manager = env.authenticatedContext('manager-a', { role: 'manager', organizationId: 'org-a' }).firestore();
-  await assertSucceeds(manager.collection('deals').doc('deal-a').get());
-  await assertFails(manager.collection('deals').doc('deal-b').get());
-  await assertSucceeds(manager.collection('deals').where('organizationId', '==', 'org-a').get());
-  await assertSucceeds(manager.collection('callSessions').where('organizationId', '==', 'org-a').get());
-  await assertFails(manager.collection('deals').doc('deal-a').update({ status: 'CLOSED_WON' }));
+test.after(async () => {
+  if (env) await env.cleanup();
 });
+test(
+  'emulator enforces anonymous denial, organization isolation, and browser write denial',
+  { skip: !enabled },
+  async () => {
+    await assertFails(env.unauthenticatedContext().firestore().collection('deals').doc('deal-a').get());
+    const manager = env.authenticatedContext('manager-a', { role: 'manager', organizationId: 'org-a' }).firestore();
+    await assertSucceeds(manager.collection('deals').doc('deal-a').get());
+    await assertFails(manager.collection('deals').doc('deal-b').get());
+    await assertSucceeds(manager.collection('deals').where('organizationId', '==', 'org-a').get());
+    await assertSucceeds(manager.collection('callSessions').where('organizationId', '==', 'org-a').get());
+    await assertFails(manager.collection('deals').doc('deal-a').update({ status: 'CLOSED_WON' }));
+  },
+);

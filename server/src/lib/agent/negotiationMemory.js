@@ -13,7 +13,23 @@ const { EVENT_TYPES } = require('../audit/eventTypes');
 /**
  * Record a negotiation signal.
  */
-async function recordSignal(dealId, organizationId, { sessionId = null, type = 'CUSTOMER_REQUEST', preference = null, requestedPct = null, offeredPct = null, tradeOffs = [], urgency = null, status = null, concession_available = null, turn_stated = 0, context = '' }) {
+async function recordSignal(
+  dealId,
+  organizationId,
+  {
+    sessionId = null,
+    type = 'CUSTOMER_REQUEST',
+    preference = null,
+    requestedPct = null,
+    offeredPct = null,
+    tradeOffs = [],
+    urgency = null,
+    status = null,
+    concession_available = null,
+    turn_stated = 0,
+    context = '',
+  },
+) {
   const entry = {
     type,
     preference,
@@ -28,9 +44,19 @@ async function recordSignal(dealId, organizationId, { sessionId = null, type = '
     recorded_at: new Date().toISOString(),
   };
   const eventId = uuidv4();
-  await db.collection('negotiationEvents').doc(eventId).set({ eventId, organizationId, dealId, sessionId, ...entry });
+  await db
+    .collection('negotiationEvents')
+    .doc(eventId)
+    .set({ eventId, organizationId, dealId, sessionId, ...entry });
   await appendNegotiationMemory(dealId, entry, organizationId, sessionId);
-  await writeAuditEvent({ organizationId, dealId, sessionId, eventType: EVENT_TYPES.NEGOTIATION_MEMORY_RECORDED, trigger: `Negotiation ${type.toLowerCase().replace(/_/g, ' ')}`, actionResult: { eventId, verified: true } });
+  await writeAuditEvent({
+    organizationId,
+    dealId,
+    sessionId,
+    eventType: EVENT_TYPES.NEGOTIATION_MEMORY_RECORDED,
+    trigger: `Negotiation ${type.toLowerCase().replace(/_/g, ' ')}`,
+    actionResult: { eventId, verified: true },
+  });
   return { eventId, ...entry };
 }
 

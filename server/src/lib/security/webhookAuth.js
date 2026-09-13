@@ -11,7 +11,9 @@ function verifyAgoraWebhook(req, _res, next) {
   const expected = process.env.AGORA_LLM_WEBHOOK_SECRET;
   const header = req.get('authorization');
   const supplied = typeof header === 'string' && header.match(/^Bearer\s+(.+)$/i)?.[1];
-  if (!expected || !supplied || !secureEqual(supplied, expected)) return next(new HttpError(401, 'Unauthorized webhook'));
+  if (!expected || !supplied || !secureEqual(supplied, expected)) {
+    return next(new HttpError(401, 'Unauthorized webhook'));
+  }
   next();
 }
 

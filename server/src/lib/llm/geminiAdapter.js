@@ -61,7 +61,7 @@ function openaiToGeminiMessages(messages) {
         // turn to be grouped in *one* following user message. The prior code
         // emitted one user message per tool result, which Vertex rejected with
         // HTTP 400 once a call had more than one tool action.
-        const parts = msg.tool_calls.map(tc => ({
+        const parts = msg.tool_calls.map((tc) => ({
           functionCall: {
             name: tc.function.name,
             args: parseToolArguments(tc.function.arguments),
@@ -96,11 +96,19 @@ function openaiToGeminiMessages(messages) {
 }
 
 function parseToolArguments(value) {
-  try { return JSON.parse(value || '{}'); } catch { return {}; }
+  try {
+    return JSON.parse(value || '{}');
+  } catch {
+    return {};
+  }
 }
 
 function parseToolResult(value) {
-  try { return JSON.parse(value); } catch { return { value: String(value || '') }; }
+  try {
+    return JSON.parse(value);
+  } catch {
+    return { value: String(value || '') };
+  }
 }
 
 /**
@@ -110,16 +118,14 @@ function openaiToGeminiTools(tools) {
   if (!tools || tools.length === 0) return undefined;
 
   const functionDeclarations = tools
-    .filter(t => t.type === 'function')
-    .map(t => ({
+    .filter((t) => t.type === 'function')
+    .map((t) => ({
       name: t.function.name,
       description: t.function.description,
       parameters: t.function.parameters || { type: 'object', properties: {} },
     }));
 
-  return functionDeclarations.length > 0
-    ? [{ functionDeclarations }]
-    : undefined;
+  return functionDeclarations.length > 0 ? [{ functionDeclarations }] : undefined;
 }
 
 /**
@@ -132,9 +138,9 @@ async function* generateResponse(messages, tools = [], options = {}) {
   const chatId = `chatcmpl-${uuidv4()}`;
 
   const request = {
-      contents,
-      tools: geminiTools,
-    };
+    contents,
+    tools: geminiTools,
+  };
 
   if (systemInstruction.length > 0) {
     request.systemInstruction = { parts: systemInstruction };
@@ -158,13 +164,13 @@ async function* generateResponse(messages, tools = [], options = {}) {
             object: 'chat.completion.chunk',
             created: Math.floor(Date.now() / 1000),
             model: modelId,
-            choices: [{
-              index: 0,
-              delta: isFirst
-                ? { role: 'assistant', content: part.text }
-                : { content: part.text },
-              finish_reason: null,
-            }],
+            choices: [
+              {
+                index: 0,
+                delta: isFirst ? { role: 'assistant', content: part.text } : { content: part.text },
+                finish_reason: null,
+              },
+            ],
           };
           isFirst = false;
         } else if (part.functionCall) {
@@ -176,22 +182,26 @@ async function* generateResponse(messages, tools = [], options = {}) {
             object: 'chat.completion.chunk',
             created: Math.floor(Date.now() / 1000),
             model: modelId,
-            choices: [{
-              index: 0,
-              delta: {
-                role: 'assistant',
-                tool_calls: [{
-                  index: 0,
-                  id: toolCallId,
-                  type: 'function',
-                  function: {
-                    name: part.functionCall.name,
-                    arguments: JSON.stringify(part.functionCall.args || {}),
-                  },
-                }],
+            choices: [
+              {
+                index: 0,
+                delta: {
+                  role: 'assistant',
+                  tool_calls: [
+                    {
+                      index: 0,
+                      id: toolCallId,
+                      type: 'function',
+                      function: {
+                        name: part.functionCall.name,
+                        arguments: JSON.stringify(part.functionCall.args || {}),
+                      },
+                    },
+                  ],
+                },
+                finish_reason: null,
               },
-              finish_reason: null,
-            }],
+            ],
           };
         }
       }
@@ -203,11 +213,13 @@ async function* generateResponse(messages, tools = [], options = {}) {
       object: 'chat.completion.chunk',
       created: Math.floor(Date.now() / 1000),
       model: modelId,
-      choices: [{
-        index: 0,
-        delta: {},
-        finish_reason: hasToolCalls ? 'tool_calls' : 'stop',
-      }],
+      choices: [
+        {
+          index: 0,
+          delta: {},
+          finish_reason: hasToolCalls ? 'tool_calls' : 'stop',
+        },
+      ],
     };
   } catch (err) {
     // The caller records this as a real runtime failure before returning a safe spoken apology.
@@ -232,15 +244,17 @@ async function generateResponseSync(messages, tools = []) {
   const candidate = result.response?.candidates?.[0];
   const parts = candidate?.content?.parts || [];
 
-  const textParts = parts.filter(p => p.text).map(p => p.text);
-  const toolCalls = parts.filter(p => p.functionCall).map((p, i) => ({
-    id: `tc_${uuidv4().slice(0, 8)}`,
-    type: 'function',
-    function: {
-      name: p.functionCall.name,
-      arguments: JSON.stringify(p.functionCall.args || {}),
-    },
-  }));
+  const textParts = parts.filter((p) => p.text).map((p) => p.text);
+  const toolCalls = parts
+    .filter((p) => p.functionCall)
+    .map((p, i) => ({
+      id: `tc_${uuidv4().slice(0, 8)}`,
+      type: 'function',
+      function: {
+        name: p.functionCall.name,
+        arguments: JSON.stringify(p.functionCall.args || {}),
+      },
+    }));
 
   return {
     content: textParts.join('') || null,

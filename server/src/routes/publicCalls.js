@@ -1,7 +1,22 @@
 const express = require('express');
-const { redeemLink, consumeLink, restoreForRetry, rtcCredentials, webhookTokenFor, findSessionByHash, endSession, sessionRef } = require('../lib/calls/callSessions');
+const {
+  redeemLink,
+  consumeLink,
+  restoreForRetry,
+  rtcCredentials,
+  webhookTokenFor,
+  findSessionByHash,
+  endSession,
+  sessionRef,
+} = require('../lib/calls/callSessions');
 const { startAgent, speakAgent } = require('../lib/calls/agoraAgentService');
-const { parse, sessionCredentialSchema, callActivitySchema, meetingDetailsSchema, meetingBookingSchema } = require('../lib/schema/validation');
+const {
+  parse,
+  sessionCredentialSchema,
+  callActivitySchema,
+  meetingDetailsSchema,
+  meetingBookingSchema,
+} = require('../lib/schema/validation');
 const { writeAuditEvent } = require('../lib/audit/eventStore');
 const { EVENT_TYPES } = require('../lib/audit/eventTypes');
 const { HttpError } = require('../lib/security/auth');
@@ -36,7 +51,7 @@ router.post('/calls/:linkToken/join', joinRateLimit, async (req, res, next) => {
         dealId: stored.dealId,
         sessionId: stored.sessionId,
         eventType: EVENT_TYPES.CALL_STARTED,
-        trigger: 'Customer joined verified call link (openai_realtime)'
+        trigger: 'Customer joined verified call link (openai_realtime)',
       });
       return res.json({
         voiceProvider: 'openai_realtime',
@@ -44,7 +59,7 @@ router.post('/calls/:linkToken/join', joinRateLimit, async (req, res, next) => {
         expiresAt: realtime.expiresAt,
         model: realtime.model,
         sessionId: stored.sessionId,
-        sessionCredential: refreshToken
+        sessionCredential: refreshToken,
       });
     }
 
@@ -56,12 +71,12 @@ router.post('/calls/:linkToken/join', joinRateLimit, async (req, res, next) => {
         dealId: stored.dealId,
         sessionId: stored.sessionId,
         eventType: EVENT_TYPES.CALL_STARTED,
-        trigger: 'Customer joined verified call link (browser_speech)'
+        trigger: 'Customer joined verified call link (browser_speech)',
       });
       return res.json({
         voiceProvider: 'browser_speech',
         sessionId: stored.sessionId,
-        sessionCredential: refreshToken
+        sessionCredential: refreshToken,
       });
     }
 
@@ -81,22 +96,40 @@ router.post('/calls/:linkToken/join', joinRateLimit, async (req, res, next) => {
     const activeDoc = await require('../lib/calls/callSessions').sessionRef(stored.sessionId).get();
     const activeSession = activeDoc.data();
     const credentials = rtcCredentials(activeSession);
-    await writeAuditEvent({ organizationId: activeSession.organizationId, dealId: activeSession.dealId, sessionId: activeSession.sessionId, eventType: EVENT_TYPES.CALL_STARTED, trigger: 'Customer joined verified call link (agora)' });
-    
-    res.json({ ...credentials, voiceProvider: 'agora', sessionId: activeSession.sessionId, agentId, sessionCredential: refreshToken });
-  } catch (error) { next(error); }
+    await writeAuditEvent({
+      organizationId: activeSession.organizationId,
+      dealId: activeSession.dealId,
+      sessionId: activeSession.sessionId,
+      eventType: EVENT_TYPES.CALL_STARTED,
+      trigger: 'Customer joined verified call link (agora)',
+    });
+
+    res.json({
+      ...credentials,
+      voiceProvider: 'agora',
+      sessionId: activeSession.sessionId,
+      agentId,
+      sessionCredential: refreshToken,
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 async function activeSessionFromCredential(req) {
   const { sessionCredential } = parse(sessionCredentialSchema, { sessionCredential: req.body?.sessionCredential });
   const { session } = await findSessionByHash('hashedRefreshToken', sessionCredential);
-  if (session.status !== 'ACTIVE' || session.revokedAt || new Date(session.expiresAt) <= new Date()) throw new HttpError(410, 'Call session is not active');
+  if (session.status !== 'ACTIVE' || session.revokedAt || new Date(session.expiresAt) <= new Date()) {
+    throw new HttpError(410, 'Call session is not active');
+  }
   return session;
 }
 router.post('/calls/:linkToken/token', async (req, res, next) => {
   try {
     const session = await activeSessionFromCredential(req);
     res.json({ ...rtcCredentials(session), sessionId: session.sessionId });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 // Customer transcript reads are authenticated with the same opaque, server-issued
 // session credential as the RTC flow. This fallback keeps captions available if a
@@ -106,37 +139,54 @@ router.post('/calls/:linkToken/transcript', async (req, res, next) => {
   try {
     const session = await activeSessionFromCredential(req);
     const messages = await getHistory(session.sessionId);
-    res.json({ sessionId: session.sessionId, messages: messages.filter(message => ['user', 'assistant'].includes(message?.role)) });
-  } catch (error) { next(error); }
+    res.json({
+      sessionId: session.sessionId,
+      messages: messages.filter((message) => ['user', 'assistant'].includes(message?.role)),
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 router.post('/calls/:linkToken/meeting-requests/latest', async (req, res, next) => {
   try {
     const session = await activeSessionFromCredential(req);
     const request = await getLatestMeetingRequest(session.sessionId);
     res.json({ sessionId: session.sessionId, request });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 router.post('/calls/:linkToken/ready', async (req, res, next) => {
   try {
     const session = await activeSessionFromCredential(req);
     const ref = sessionRef(session.sessionId);
     let shouldSpeak = false;
-    await db.runTransaction(async tx => {
+    await db.runTransaction(async (tx) => {
       const snapshot = await tx.get(ref);
-      if (!snapshot.exists || snapshot.data().status !== 'ACTIVE') throw new HttpError(410, 'Call session is not active');
+      if (!snapshot.exists || snapshot.data().status !== 'ACTIVE') {
+        throw new HttpError(410, 'Call session is not active');
+      }
       if (!snapshot.data().greetingRequestedAt) {
         tx.update(ref, { greetingRequestedAt: new Date().toISOString() });
         shouldSpeak = true;
       }
     });
     if (shouldSpeak) {
-      const greeting = "Hello, I'm the DealForge sales assistant. I'm ready to help with your team, timeline, or pricing needs.";
+      const greeting =
+        "Hello, I'm the DealForge sales assistant. I'm ready to help with your team, timeline, or pricing needs.";
       await addMessage(session.sessionId, { role: 'assistant', content: greeting });
       const isAgoraAgent = session.agentId && !['openai_realtime', 'browser_speech'].includes(session.agentId);
       if (isAgoraAgent) {
         await speakAgent(session, greeting, { priority: 'INTERRUPT', interruptable: false });
       }
-      await writeAuditEvent({ organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, eventType: EVENT_TYPES.AGENT_GREETING_REQUESTED, trigger: 'Customer voice ready; greeting requested', actionResult: { accepted: true, provider: isAgoraAgent ? 'agora' : session.agentId } });
+      await writeAuditEvent({
+        organizationId: session.organizationId,
+        dealId: session.dealId,
+        sessionId: session.sessionId,
+        eventType: EVENT_TYPES.AGENT_GREETING_REQUESTED,
+        trigger: 'Customer voice ready; greeting requested',
+        actionResult: { accepted: true, provider: isAgoraAgent ? 'agora' : session.agentId },
+      });
 
       let audioBase64 = null;
       if (!isAgoraAgent) {
@@ -151,7 +201,9 @@ router.post('/calls/:linkToken/ready', async (req, res, next) => {
       return res.status(202).json({ status: 'GREETING_REQUESTED', greeting, audioBase64 });
     }
     res.status(202).json({ status: 'ALREADY_READY' });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 router.post('/calls/:linkToken/turn', async (req, res, next) => {
@@ -164,7 +216,8 @@ router.post('/calls/:linkToken/turn', async (req, res, next) => {
     const session = await activeSessionFromCredential(req);
     const s1 = Date.now();
     const turnId = typeof req.body?.turnId === 'string' ? req.body.turnId.trim() : null;
-    const wantsStream = req.headers.accept?.includes('text/event-stream') || req.body?.stream === true || req.query?.stream === 'true';
+    const wantsStream =
+      req.headers.accept?.includes('text/event-stream') || req.body?.stream === true || req.query?.stream === 'true';
 
     const s2 = Date.now();
     const { executeCustomerTurn } = require('../lib/agent/agentRuntime');
@@ -197,7 +250,7 @@ router.post('/calls/:linkToken/turn', async (req, res, next) => {
                 audioChunks.push(chunk.audioBase64);
                 res.write(`event: audio_chunk\ndata: ${JSON.stringify(chunk)}\n\n`);
               }
-            }
+            },
           });
         }
       } catch (streamErr) {
@@ -207,7 +260,7 @@ router.post('/calls/:linkToken/turn', async (req, res, next) => {
       const s14 = Date.now();
       const s15 = Date.now();
       const totalBackendMs = s15 - s0;
-      const ttsTTFB = s13 ? (s13 - s12) : 0;
+      const ttsTTFB = s13 ? s13 - s12 : 0;
       const ttsTotalMs = s14 - s12;
 
       // Attach complete turn response to Firestore receipt asynchronously
@@ -215,7 +268,7 @@ router.post('/calls/:linkToken/turn', async (req, res, next) => {
         const { attachTurnResponse } = require('../lib/agent/turnReceipts');
         attachTurnResponse(session.sessionId, result.receiptId, turnId, {
           assistantText,
-          audioBase64: audioChunks[0] || null
+          audioBase64: audioChunks[0] || null,
         }).catch(() => {});
       }
 
@@ -228,7 +281,7 @@ router.post('/calls/:linkToken/turn', async (req, res, next) => {
         ttsMs: ttsTotalMs,
         mossLatencyMs: result.metrics?.mossLatencyMs || 0,
         mossIndex: result.metrics?.mossIndex || 'none',
-        totalBackendMs
+        totalBackendMs,
       };
 
       // Emit terminal done event
@@ -236,7 +289,9 @@ router.post('/calls/:linkToken/turn', async (req, res, next) => {
       res.end();
 
       // Log safe diagnostic line (Section 3 of prompt)
-      console.log(`[VOICE LATENCY SERVER] turnId=${turnId || 'auto'} entry=${s1 - s0}ms claim=${s2 - s1}ms evidence=${metrics.evidenceMs}ms geminiTTFU=${metrics.geminiFirstTokenMs}ms tools=${metrics.toolsMs}ms ttsTTFB=${ttsTTFB}ms ttsTotal=${ttsTotalMs}ms moss=${metrics.mossLatencyMs}ms TOTAL=${totalBackendMs}ms`);
+      console.log(
+        `[VOICE LATENCY SERVER] turnId=${turnId || 'auto'} entry=${s1 - s0}ms claim=${s2 - s1}ms evidence=${metrics.evidenceMs}ms geminiTTFU=${metrics.geminiFirstTokenMs}ms tools=${metrics.toolsMs}ms ttsTTFB=${ttsTTFB}ms ttsTotal=${ttsTotalMs}ms moss=${metrics.mossLatencyMs}ms TOTAL=${totalBackendMs}ms`,
+      );
       return;
     }
 
@@ -250,7 +305,7 @@ router.post('/calls/:linkToken/turn', async (req, res, next) => {
         const { streamSpeech } = require('../lib/tts/sarvamStreamingTts');
         const ttsRes = await streamSpeech(assistantText);
         s13 = Date.now();
-        ttsLatency = ttsRes.totalMs || (Date.now() - s12);
+        ttsLatency = ttsRes.totalMs || Date.now() - s12;
         audioBase64 = ttsRes.audioBase64List?.[0] || null;
       } catch (err) {
         console.error('Sarvam TTS error for customer turn:', err.message);
@@ -261,15 +316,17 @@ router.post('/calls/:linkToken/turn', async (req, res, next) => {
       const { attachTurnResponse } = require('../lib/agent/turnReceipts');
       await attachTurnResponse(session.sessionId, result.receiptId, turnId, {
         assistantText,
-        audioBase64
+        audioBase64,
       });
     }
 
     const s15 = Date.now();
     const totalBackendMs = s15 - s0;
-    const ttsTTFB = s13 ? (s13 - s12) : ttsLatency;
+    const ttsTTFB = s13 ? s13 - s12 : ttsLatency;
 
-    console.log(`[VOICE LATENCY SERVER] turnId=${turnId || 'auto'} entry=${s1 - s0}ms claim=${s2 - s1}ms evidence=${result.metrics?.evidenceMs || 0}ms geminiTTFU=${result.metrics?.geminiFirstTokenMs || 0}ms tools=${result.metrics?.toolsMs || 0}ms ttsTTFB=${ttsTTFB}ms ttsTotal=${ttsLatency}ms moss=${result.metrics?.mossLatencyMs || 0}ms TOTAL=${totalBackendMs}ms`);
+    console.log(
+      `[VOICE LATENCY SERVER] turnId=${turnId || 'auto'} entry=${s1 - s0}ms claim=${s2 - s1}ms evidence=${result.metrics?.evidenceMs || 0}ms geminiTTFU=${result.metrics?.geminiFirstTokenMs || 0}ms tools=${result.metrics?.toolsMs || 0}ms ttsTTFB=${ttsTTFB}ms ttsTotal=${ttsLatency}ms moss=${result.metrics?.mossLatencyMs || 0}ms TOTAL=${totalBackendMs}ms`,
+    );
 
     res.json({
       sessionId: session.sessionId,
@@ -288,10 +345,12 @@ router.post('/calls/:linkToken/turn', async (req, res, next) => {
         ttsMs: ttsLatency,
         mossLatencyMs: result.metrics?.mossLatencyMs || 0,
         mossIndex: result.metrics?.mossIndex || 'none',
-        totalBackendMs
-      }
+        totalBackendMs,
+      },
     });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 router.post('/calls/:linkToken/meeting-requests/:requestId/slots', async (req, res, next) => {
   try {
@@ -299,7 +358,9 @@ router.post('/calls/:linkToken/meeting-requests/:requestId/slots', async (req, r
     const session = await activeSessionFromCredential({ ...req, body: input });
     const result = await findMeetingSlots(session, req.params.requestId, input);
     res.json(result);
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 router.post('/calls/:linkToken/meeting-requests/:requestId/book', async (req, res, next) => {
   try {
@@ -313,10 +374,14 @@ router.post('/calls/:linkToken/meeting-requests/:requestId/book', async (req, re
     await addMessage(session.sessionId, { role: 'assistant', content: spoken });
     const isAgoraAgent = session.agentId && !['openai_realtime', 'browser_speech'].includes(session.agentId);
     if (isAgoraAgent) {
-      await speakAgent(session, spoken, { priority: 'APPEND', interruptable: true }).catch(error => console.warn('Verified meeting outcome could not be spoken:', error.message));
+      await speakAgent(session, spoken, { priority: 'APPEND', interruptable: true }).catch((error) =>
+        console.warn('Verified meeting outcome could not be spoken:', error.message),
+      );
     }
     res.status(outcome.booked ? 201 : 409).json({ ...outcome, spoken });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 router.post('/calls/:linkToken/stop', async (req, res, next) => {
   try {
@@ -324,13 +389,34 @@ router.post('/calls/:linkToken/stop', async (req, res, next) => {
     let agentStopped = true;
     const isAgoraAgent = session.agentId && !['openai_realtime', 'browser_speech'].includes(session.agentId);
     if (isAgoraAgent) {
-      try { await require('../lib/calls/agoraAgentService').stopAgent(session); } catch (_) { agentStopped = false; }
+      try {
+        await require('../lib/calls/agoraAgentService').stopAgent(session);
+      } catch (_) {
+        agentStopped = false;
+      }
     }
     await endSession(session.sessionId);
-    await writeAuditEvent({ organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, eventType: EVENT_TYPES.CALL_ENDED, trigger: agentStopped ? 'Customer left call' : 'Customer left; agent cleanup pending', actionResult: { agentStopped } });
-    try { await runPostCallAutopilot(session); } catch (autopilotError) { console.error('Post-call autopilot failed:', autopilotError.message); }
-    res.status(agentStopped ? 200 : 202).json({ sessionId: session.sessionId, status: agentStopped ? 'ENDED' : 'ENDED_WITH_AGENT_CLEANUP_ERROR', agentStopped });
-  } catch (error) { next(error); }
+    await writeAuditEvent({
+      organizationId: session.organizationId,
+      dealId: session.dealId,
+      sessionId: session.sessionId,
+      eventType: EVENT_TYPES.CALL_ENDED,
+      trigger: agentStopped ? 'Customer left call' : 'Customer left; agent cleanup pending',
+      actionResult: { agentStopped },
+    });
+    try {
+      await runPostCallAutopilot(session);
+    } catch (autopilotError) {
+      console.error('Post-call autopilot failed:', autopilotError.message);
+    }
+    res.status(agentStopped ? 200 : 202).json({
+      sessionId: session.sessionId,
+      status: agentStopped ? 'ENDED' : 'ENDED_WITH_AGENT_CLEANUP_ERROR',
+      agentStopped,
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 router.post('/calls/:linkToken/fail', async (req, res, next) => {
   try {
@@ -338,12 +424,24 @@ router.post('/calls/:linkToken/fail', async (req, res, next) => {
     const { markFailed } = require('../lib/calls/callSessions');
     const isAgoraAgent = session.agentId && !['openai_realtime', 'browser_speech'].includes(session.agentId);
     if (isAgoraAgent) {
-      try { await require('../lib/calls/agoraAgentService').stopAgent(session); } catch (_) {}
+      try {
+        await require('../lib/calls/agoraAgentService').stopAgent(session);
+      } catch (_) {
+        /* best-effort stop */
+      }
     }
     await markFailed(session.sessionId, 'Customer voice startup failed');
-    await writeAuditEvent({ organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, eventType: EVENT_TYPES.CALL_FAILED, trigger: 'Customer voice startup failed' });
+    await writeAuditEvent({
+      organizationId: session.organizationId,
+      dealId: session.dealId,
+      sessionId: session.sessionId,
+      eventType: EVENT_TYPES.CALL_FAILED,
+      trigger: 'Customer voice startup failed',
+    });
     res.json({ sessionId: session.sessionId, status: 'FAILED' });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 router.post('/calls/:linkToken/activity', async (req, res, next) => {
   try {
@@ -355,9 +453,18 @@ router.post('/calls/:linkToken/activity', async (req, res, next) => {
       AGENT_AUDIO_TIMEOUT: 'Customer browser did not receive agent audio before timeout',
       CUSTOMER_AUDIO_PLAYBACK_FAILED: 'Customer browser could not start agent audio playback',
     }[eventType];
-    await writeAuditEvent({ organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, eventType, trigger, actionResult: { source: 'customer_browser', verified: false } });
+    await writeAuditEvent({
+      organizationId: session.organizationId,
+      dealId: session.dealId,
+      sessionId: session.sessionId,
+      eventType,
+      trigger,
+      actionResult: { source: 'customer_browser', verified: false },
+    });
     res.status(202).json({ status: 'RECORDED' });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 router.post('/tts/sarvam', async (req, res, next) => {
   try {
@@ -365,21 +472,21 @@ router.post('/tts/sarvam', async (req, res, next) => {
     const expectedSecret = process.env.INTERNAL_API_KEY;
     if (expectedSecret && (!authHeader || authHeader !== `Bearer ${expectedSecret}`)) {
       return res.status(401).json({
-        error: { message: 'Unauthorized', type: 'authentication_error', code: 'invalid_token' }
+        error: { message: 'Unauthorized', type: 'authentication_error', code: 'invalid_token' },
       });
     }
 
     const { input, voice, speed, sample_rate } = req.body; // OpenAI TTS payload from Agora generic_http
     if (!input) {
       return res.status(400).json({
-        error: { message: 'Missing input text', type: 'invalid_request_error', code: 'missing_parameter' }
+        error: { message: 'Missing input text', type: 'invalid_request_error', code: 'missing_parameter' },
       });
     }
 
     const sarvamApiKey = process.env.SARVAM_API_KEY;
     if (!sarvamApiKey) {
       return res.status(503).json({
-        error: { message: 'Sarvam API key not configured', type: 'server_error', code: 'service_unavailable' }
+        error: { message: 'Sarvam API key not configured', type: 'server_error', code: 'service_unavailable' },
       });
     }
 
@@ -394,7 +501,7 @@ router.post('/tts/sarvam', async (req, res, next) => {
       speaker: voice || process.env.SARVAM_SPEAKER || 'ishita',
       pace: typeof speed === 'number' ? speed : 1.0,
       speech_sample_rate: requestedSampleRate,
-      output_audio_codec: 'linear16' // Returns pure 16-bit linear PCM without RIFF/WAV header
+      output_audio_codec: 'linear16', // Returns pure 16-bit linear PCM without RIFF/WAV header
     };
 
     const start = Date.now();
@@ -402,9 +509,9 @@ router.post('/tts/sarvam', async (req, res, next) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'api-subscription-key': sarvamApiKey
+        'api-subscription-key': sarvamApiKey,
       },
-      body: JSON.stringify(sarvamPayload)
+      body: JSON.stringify(sarvamPayload),
     });
     const latency = Date.now() - start;
 
@@ -412,14 +519,14 @@ router.post('/tts/sarvam', async (req, res, next) => {
       const errorText = await response.text();
       console.error('Sarvam TTS API failed:', response.status, errorText);
       return res.status(502).json({
-        error: { message: 'Upstream TTS provider failed', type: 'upstream_error', code: response.status }
+        error: { message: 'Upstream TTS provider failed', type: 'upstream_error', code: response.status },
       });
     }
 
     const data = await response.json();
     if (!data.audios || data.audios.length === 0) {
       return res.status(502).json({
-        error: { message: 'No audio returned by TTS provider', type: 'upstream_error', code: 'empty_audio' }
+        error: { message: 'No audio returned by TTS provider', type: 'upstream_error', code: 'empty_audio' },
       });
     }
 
@@ -432,7 +539,7 @@ router.post('/tts/sarvam', async (req, res, next) => {
   } catch (error) {
     console.error('Sarvam proxy unhandled exception:', error);
     res.status(500).json({
-      error: { message: 'Internal TTS proxy error', type: 'server_error', code: 'internal_error' }
+      error: { message: 'Internal TTS proxy error', type: 'server_error', code: 'internal_error' },
     });
   }
 });
@@ -453,28 +560,37 @@ router.post('/auth/provision', async (req, res, next) => {
     }
 
     // 2. Ensure Firestore members/{uid} document with ACTIVE status
-    await db.collection('members').doc(decoded.uid).set({
-      uid: decoded.uid,
-      email: decoded.email || null,
-      displayName: decoded.name || null,
-      organizationId: orgId,
-      role: 'manager',
-      status: 'ACTIVE',
-      updatedAt: new Date().toISOString()
-    }, { merge: true });
+    await db
+      .collection('members')
+      .doc(decoded.uid)
+      .set(
+        {
+          uid: decoded.uid,
+          email: decoded.email || null,
+          displayName: decoded.name || null,
+          organizationId: orgId,
+          role: 'manager',
+          status: 'ACTIVE',
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true },
+      );
 
     // 3. Ensure organization document exists
-    await db.collection('organizations').doc(orgId).set({
-      organizationId: orgId,
-      name: 'DealForge Staging',
-      updatedAt: new Date().toISOString()
-    }, { merge: true });
+    await db.collection('organizations').doc(orgId).set(
+      {
+        organizationId: orgId,
+        name: 'DealForge Staging',
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true },
+    );
 
     return res.json({
       success: true,
       uid: decoded.uid,
       role: 'manager',
-      organizationId: orgId
+      organizationId: orgId,
     });
   } catch (err) {
     next(err);
@@ -482,4 +598,3 @@ router.post('/auth/provision', async (req, res, next) => {
 });
 
 module.exports = router;
-

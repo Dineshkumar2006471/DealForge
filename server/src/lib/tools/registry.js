@@ -22,14 +22,16 @@ function registerTool(name, handler, schema) {
  * Get OpenAI-format tool definitions for Gemini.
  */
 function getToolDefinitions() {
-  return Object.entries(toolHandlers).filter(([, { schema }]) => schema.agentVisible !== false).map(([name, { schema }]) => ({
-    type: 'function',
-    function: {
-      name,
-      description: schema.description,
-      parameters: schema.parameters,
-    },
-  }));
+  return Object.entries(toolHandlers)
+    .filter(([, { schema }]) => schema.agentVisible !== false)
+    .map(([name, { schema }]) => ({
+      type: 'function',
+      function: {
+        name,
+        description: schema.description,
+        parameters: schema.parameters,
+      },
+    }));
 }
 
 /**
@@ -45,19 +47,37 @@ function getToolDefinitions() {
 async function executeTool(toolName, args, context) {
   const { dealId, sessionId, turnNumber, organizationId } = context;
   let validatedArgs;
-  try { validatedArgs = parseTool(toolName, args); } catch (error) { return { result: { error: 'Invalid tool arguments', rejected: true }, policyResult: { tier: 'REJECT', allowed: false, reason: error.message }, approved: false }; }
+  try {
+    validatedArgs = parseTool(toolName, args);
+  } catch (error) {
+    return {
+      result: { error: 'Invalid tool arguments', rejected: true },
+      policyResult: { tier: 'REJECT', allowed: false, reason: error.message },
+      approved: false,
+    };
+  }
 
   // 1. POLICY CHECK
   let policyResult = checkPolicy(toolName, validatedArgs, context);
-  const approvedReplay = context.approvedReplay && context.approvedReplay.toolName === toolName && JSON.stringify(context.approvedReplay.args) === JSON.stringify(validatedArgs);
-  if (policyResult.requiresApproval && approvedReplay) policyResult = { tier: 'ACT', allowed: true, reason: `Executing consumed approval ${context.approvedReplay.approvalId}` };
+  const approvedReplay =
+    context.approvedReplay &&
+    context.approvedReplay.toolName === toolName &&
+    JSON.stringify(context.approvedReplay.args) === JSON.stringify(validatedArgs);
+  if (policyResult.requiresApproval && approvedReplay) {
+    policyResult = {
+      tier: 'ACT',
+      allowed: true,
+      reason: `Executing consumed approval ${context.approvedReplay.approvalId}`,
+    };
+  }
 
   // Audit the policy check
   await writeAuditEvent({
     dealId,
     sessionId,
     eventType: EVENT_TYPES.POLICY_CHECKED,
-    organizationId, trigger: `${toolName} policy evaluated`,
+    organizationId,
+    trigger: `${toolName} policy evaluated`,
     policyResult,
   });
 
@@ -72,7 +92,15 @@ async function executeTool(toolName, args, context) {
 
   if (policyResult.requiresApproval) {
     // Create approval request — do NOT execute
-    const approval = await createApproval({ organizationId, dealId, sessionId, toolName, validatedArgs, requestedBy: 'agent', policyReason: policyResult.reason });
+    const approval = await createApproval({
+      organizationId,
+      dealId,
+      sessionId,
+      toolName,
+      validatedArgs,
+      requestedBy: 'agent',
+      policyReason: policyResult.reason,
+    });
     // A pending discount is not an executed concession, but it is commercial
     // state. Persist its ledger entry so the manager sees the exact INR impact
     // before deciding; the approved replay remains the only execution path.
@@ -103,11 +131,28 @@ async function executeTool(toolName, args, context) {
   }
 
   try {
-    const operationId = crypto.createHash('sha256').update(`${sessionId}:${turnNumber}:${toolName}:${JSON.stringify(validatedArgs)}`).digest('hex');
+    const operationId = crypto
+      .createHash('sha256')
+      .update(`${sessionId}:${turnNumber}:${toolName}:${JSON.stringify(validatedArgs)}`)
+      .digest('hex');
     const operationRef = require('../firebase/admin').db.collection('operations').doc(operationId);
     const previous = await operationRef.get();
-    if (previous.exists && previous.data().status === 'SUCCEEDED') return { result: previous.data().result, policyResult, approved: true };
-    await operationRef.set({ operationId, organizationId, dealId, sessionId, toolName, args: validatedArgs, status: 'RUNNING', updatedAt: new Date().toISOString() }, { merge: true });
+    if (previous.exists && previous.data().status === 'SUCCEEDED') {
+      return { result: previous.data().result, policyResult, approved: true };
+    }
+    await operationRef.set(
+      {
+        operationId,
+        organizationId,
+        dealId,
+        sessionId,
+        toolName,
+        args: validatedArgs,
+        status: 'RUNNING',
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true },
+    );
     const result = await handler.handler(validatedArgs, context);
 
     // 4. VERIFY. A handler may explicitly report an unverified external result;
@@ -130,7 +175,8 @@ async function executeTool(toolName, args, context) {
       dealId,
       sessionId,
       eventType: EVENT_TYPES.TOOL_EXECUTED,
-      organizationId, trigger: `${toolName} executed`,
+      organizationId,
+      trigger: `${toolName} executed`,
       policyResult,
       actionResult: {
         tool: toolName,
@@ -147,7 +193,26 @@ async function executeTool(toolName, args, context) {
     return { result, policyResult, approved: true };
   } catch (err) {
     recordFailure();
-    await require('../firebase/admin').db.collection('operations').doc(crypto.createHash('sha256').update(`${sessionId}:${turnNumber}:${toolName}:${JSON.stringify(validatedArgs)}`).digest('hex')).set({ organizationId, dealId, sessionId, toolName, status: 'FAILED', error: err.message, updatedAt: new Date().toISOString() }, { merge: true });
+    await require('../firebase/admin')
+      .db.collection('operations')
+      .doc(
+        crypto
+          .createHash('sha256')
+          .update(`${sessionId}:${turnNumber}:${toolName}:${JSON.stringify(validatedArgs)}`)
+          .digest('hex'),
+      )
+      .set(
+        {
+          organizationId,
+          dealId,
+          sessionId,
+          toolName,
+          status: 'FAILED',
+          error: err.message,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true },
+      );
     console.error(`Tool execution error (${toolName}):`, err.message);
 
     return {

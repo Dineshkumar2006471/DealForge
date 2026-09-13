@@ -104,11 +104,16 @@ function buildSystemPrompt(dealContext = {}) {
 
   if (dealContext.deal) {
     const deal = dealContext.deal;
-    const fieldValue = field => typeof deal[field] === 'object' ? deal[field]?.value : deal[field];
+    const fieldValue = (field) => (typeof deal[field] === 'object' ? deal[field]?.value : deal[field]);
     const verifiedState = {
-      company: fieldValue('company'), teamSize: fieldValue('teamSize'), timeline: fieldValue('timeline'),
-      budget: fieldValue('budget'), competitor: fieldValue('competitor'), pain: fieldValue('pain'),
-      conversationStage: deal.conversationStage, status: deal.status,
+      company: fieldValue('company'),
+      teamSize: fieldValue('teamSize'),
+      timeline: fieldValue('timeline'),
+      budget: fieldValue('budget'),
+      competitor: fieldValue('competitor'),
+      pain: fieldValue('pain'),
+      conversationStage: deal.conversationStage,
+      status: deal.status,
     };
     prompt += `\n\n## CURRENT VERIFIED DEAL STATE\n${JSON.stringify(verifiedState)}\nUse this only as current context; do not repeat questions already answered.`;
   }

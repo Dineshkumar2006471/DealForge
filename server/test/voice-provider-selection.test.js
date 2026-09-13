@@ -8,7 +8,7 @@ const { synthesizeSpeech } = require('../src/lib/tts/sarvamTtsService');
 const savedEnv = {
   VOICE_PROVIDER: process.env.VOICE_PROVIDER,
   OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-  SARVAM_API_KEY: process.env.SARVAM_API_KEY
+  SARVAM_API_KEY: process.env.SARVAM_API_KEY,
 };
 
 const originalFetch = global.fetch;
@@ -23,16 +23,13 @@ test.after(() => {
 
 test('createRealtimeSession fails cleanly when OPENAI_API_KEY is missing', async () => {
   delete process.env.OPENAI_API_KEY;
-  await assert.rejects(
-    () => createRealtimeSession(),
-    /OpenAI API key is not configured/
-  );
+  await assert.rejects(() => createRealtimeSession(), /OpenAI API key is not configured/);
 });
 
 test('createRealtimeSession returns ephemeral clientSecret from OpenAI GA API without exposing primary key', async () => {
   process.env.OPENAI_API_KEY = 'sk-proj-primary-key-test';
   delete process.env.OPENAI_REALTIME_MODEL;
-  
+
   let capturedAuth = null;
   let capturedBody = null;
   let endpointCalled = null;
@@ -43,10 +40,13 @@ test('createRealtimeSession returns ephemeral clientSecret from OpenAI GA API wi
     capturedBody = JSON.parse(options.body);
 
     if (url === 'https://api.openai.com/v1/realtime/client_secrets') {
-      return new Response(JSON.stringify({
-        value: 'ek_ephemeral_test_token_123',
-        expires_at: 1726090000
-      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      return new Response(
+        JSON.stringify({
+          value: 'ek_ephemeral_test_token_123',
+          expires_at: 1726090000,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
     }
     throw new Error('Unexpected URL: ' + url);
   };
@@ -72,10 +72,13 @@ test('createRealtimeSession uses OPENAI_REALTIME_MODEL when configured in enviro
   let capturedBody = null;
   global.fetch = async (url, options) => {
     capturedBody = JSON.parse(options.body);
-    return new Response(JSON.stringify({
-      value: 'ek_custom_model_token',
-      expires_at: 1726091000
-    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    return new Response(
+      JSON.stringify({
+        value: 'ek_custom_model_token',
+        expires_at: 1726091000,
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    );
   };
 
   const result = await createRealtimeSession();
@@ -90,9 +93,12 @@ test('createRealtimeSession fails safely and never calls legacy /v1/realtime/ses
   global.fetch = async (url, options) => {
     urlsCalled.push(url);
     if (url === 'https://api.openai.com/v1/realtime/client_secrets') {
-      return new Response(JSON.stringify({
-        error: { message: 'Invalid model parameter', type: 'invalid_request_error', code: 'model_not_found' }
-      }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+      return new Response(
+        JSON.stringify({
+          error: { message: 'Invalid model parameter', type: 'invalid_request_error', code: 'model_not_found' },
+        }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } },
+      );
     }
     throw new Error('Unexpected URL called: ' + url);
   };
@@ -103,12 +109,12 @@ test('createRealtimeSession fails safely and never calls legacy /v1/realtime/ses
       assert.equal(err.status, 502);
       assert.ok(err.message.includes('Invalid model parameter'));
       return true;
-    }
+    },
   );
 
   assert.deepEqual(urlsCalled, ['https://api.openai.com/v1/realtime/client_secrets']);
-  assert.ok(!urlsCalled.some(u => u.includes('/v1/realtime/sessions')));
-  assert.ok(!urlsCalled.some(u => u.includes('realtime?model=')));
+  assert.ok(!urlsCalled.some((u) => u.includes('/v1/realtime/sessions')));
+  assert.ok(!urlsCalled.some((u) => u.includes('realtime?model=')));
 });
 
 test('synthesizeSpeech produces WAV output for browser audio playback', async () => {
@@ -123,7 +129,7 @@ test('synthesizeSpeech produces WAV output for browser audio playback', async ()
     assert.equal(body.text, 'Hello from DealForge');
     return new Response(JSON.stringify({ audios: [sampleWav.toString('base64')] }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
     });
   };
 
@@ -138,9 +144,7 @@ test('POST /calls/:linkToken/turn validates userText and sessionCredential', asy
   const app = createApp();
 
   // Missing sessionCredential
-  const noCredRes = await request(app)
-    .post('/api/public/calls/test-link/turn')
-    .send({ userText: 'Hello' });
+  const noCredRes = await request(app).post('/api/public/calls/test-link/turn').send({ userText: 'Hello' });
   assert.equal(noCredRes.status, 400);
 
   // Empty userText

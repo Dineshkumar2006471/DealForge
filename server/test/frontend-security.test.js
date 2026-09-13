@@ -4,7 +4,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const publicRoot = path.join(__dirname, '..', '..', 'frontend', 'public');
 test('frontend has no direct Firestore sensitive mutation or localhost API endpoint', () => {
-  const sources = ['dashboard.html', 'js/auth.js', 'js/backendClient.js'].map(file => fs.readFileSync(path.join(publicRoot, file), 'utf8')).join('\n');
+  const sources = ['dashboard.html', 'js/auth.js', 'js/backendClient.js']
+    .map((file) => fs.readFileSync(path.join(publicRoot, file), 'utf8'))
+    .join('\n');
   assert.doesNotMatch(sources, /collection\(['"]approvals['"]\)\.doc\([^)]*\)\.update/);
   assert.doesNotMatch(sources, /localhost:8080/);
   const client = fs.readFileSync(path.join(publicRoot, 'js/backendClient.js'), 'utf8');
@@ -32,8 +34,16 @@ test('call activity renders Firestore data through DOM text nodes', () => {
 });
 
 test('dashboard surfaces do not render untrusted data through HTML parsing', () => {
-  const pages = ['index.html', 'overview.html', 'dashboard.html', 'deals.html', 'recordings.html', 'analytics.html', 'integrations.html'];
-  const source = pages.map(file => fs.readFileSync(path.join(publicRoot, file), 'utf8')).join('\n');
+  const pages = [
+    'index.html',
+    'overview.html',
+    'dashboard.html',
+    'deals.html',
+    'recordings.html',
+    'analytics.html',
+    'integrations.html',
+  ];
+  const source = pages.map((file) => fs.readFileSync(path.join(publicRoot, file), 'utf8')).join('\n');
   assert.doesNotMatch(source, /(?:innerHTML|insertAdjacentHTML)/);
 });
 
@@ -96,8 +106,17 @@ test('customer meeting details use the secure form and server-only booking route
 
 test('the complete manager workspace has a real tablet and mobile layout instead of an off-screen desktop sidebar', () => {
   const styles = fs.readFileSync(path.join(publicRoot, 'css', 'style.css'), 'utf8');
-  const pages = ['overview.html', 'deals.html', 'dashboard.html', 'recordings.html', 'agents.html', 'analytics.html', 'integrations.html', 'settings.html'];
-  const source = pages.map(file => fs.readFileSync(path.join(publicRoot, file), 'utf8')).join('\n');
+  const pages = [
+    'overview.html',
+    'deals.html',
+    'dashboard.html',
+    'recordings.html',
+    'agents.html',
+    'analytics.html',
+    'integrations.html',
+    'settings.html',
+  ];
+  const source = pages.map((file) => fs.readFileSync(path.join(publicRoot, file), 'utf8')).join('\n');
   assert.match(styles, /@media \(max-width: 960px\)[\s\S]*?\.layout-app \{ display: block; height: auto;/);
   assert.match(styles, /\.nav-links-sidebar \{ width: 100%;[\s\S]*?overflow-x: auto;/);
   assert.match(styles, /\.deals-table thead \{ display: none; \}/);

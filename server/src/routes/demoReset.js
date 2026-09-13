@@ -31,19 +31,21 @@ router.post('/demo-reset', async (req, res, next) => {
     }
 
     // Find previous sessions for this deal to clean up demo artifacts
-    const prevSessionsSnap = await db.collection('callSessions')
+    const prevSessionsSnap = await db
+      .collection('callSessions')
       .where('organizationId', '==', organizationId)
       .where('dealId', '==', dealId)
       .limit(50)
       .get();
 
-    const prevSessionIds = prevSessionsSnap.docs.map(d => d.id);
+    const prevSessionIds = prevSessionsSnap.docs.map((d) => d.id);
 
     // Delete session-scoped evidence, auditEvents, approvals, meetings for previous sessions
     const collectionsToClean = ['evidence', 'auditEvents', 'approvals', 'meetings', 'externalOperations'];
     for (const collName of collectionsToClean) {
       for (const sId of prevSessionIds) {
-        const snap = await db.collection(collName)
+        const snap = await db
+          .collection(collName)
           .where('organizationId', '==', organizationId)
           .where('sessionId', '==', sId)
           .limit(100)
@@ -51,7 +53,7 @@ router.post('/demo-reset', async (req, res, next) => {
 
         if (!snap.empty) {
           const batch = db.batch();
-          snap.docs.forEach(doc => batch.delete(doc.ref));
+          snap.docs.forEach((doc) => batch.delete(doc.ref));
           await batch.commit();
         }
       }
@@ -67,10 +69,10 @@ router.post('/demo-reset', async (req, res, next) => {
         decisionCriteria: { status: 'unconfirmed', value: null, confidence: 0 },
         decisionProcess: { status: 'unconfirmed', value: null, confidence: 0 },
         identifyPain: { status: 'unconfirmed', value: null, confidence: 0 },
-        champion: { status: 'unconfirmed', value: null, confidence: 0 }
+        champion: { status: 'unconfirmed', value: null, confidence: 0 },
       },
       discountLedger: [],
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     });
 
     // Create fresh call session
@@ -79,7 +81,7 @@ router.post('/demo-reset', async (req, res, next) => {
       dealId,
       managerId: req.manager.uid,
       customerLabel: 'Northstar Demo Session (Fresh)',
-      expiresInMinutes: 60
+      expiresInMinutes: 60,
     });
 
     const publicAppUrl = process.env.PUBLIC_APP_URL?.replace(/\/$/, '') || '';
@@ -91,7 +93,7 @@ router.post('/demo-reset', async (req, res, next) => {
       sessionId: session.sessionId,
       eventType: EVENT_TYPES.CALL_CREATED,
       trigger: 'Manager triggered demo reset — clean session initialized',
-      actionResult: { verified: true, newSessionId: session.sessionId }
+      actionResult: { verified: true, newSessionId: session.sessionId },
     });
 
     res.status(200).json({
@@ -100,7 +102,7 @@ router.post('/demo-reset', async (req, res, next) => {
       sessionId: session.sessionId,
       linkToken,
       callUrl,
-      message: 'Demo environment reset successfully with clean session state.'
+      message: 'Demo environment reset successfully with clean session state.',
     });
   } catch (error) {
     next(error);

@@ -11,10 +11,13 @@ async function requestMeetingDetailsTool(args, context) {
 }
 
 registerTool('request_meeting_details', requestMeetingDetailsTool, {
-  description: 'Open a secure on-screen meeting form for the customer. Use this instead of asking them to say their email address or exact time aloud.',
+  description:
+    'Open a secure on-screen meeting form for the customer. Use this instead of asking them to say their email address or exact time aloud.',
   parameters: {
     type: 'object',
-    properties: { meeting_type: { type: 'string', enum: ['enterprise_demo', 'technical_review', 'executive_briefing'] } },
+    properties: {
+      meeting_type: { type: 'string', enum: ['enterprise_demo', 'technical_review', 'executive_briefing'] },
+    },
     required: ['meeting_type'],
   },
 });

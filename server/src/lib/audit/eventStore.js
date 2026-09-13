@@ -37,12 +37,9 @@ async function writeAuditEvent(event) {
  * Get audit trail for a deal.
  */
 async function getAuditTrail(dealId) {
-  const snapshot = await db.collection('auditEvents')
-    .where('dealId', '==', dealId)
-    .orderBy('timestamp', 'asc')
-    .get();
+  const snapshot = await db.collection('auditEvents').where('dealId', '==', dealId).orderBy('timestamp', 'asc').get();
 
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 }
 
 module.exports = { writeAuditEvent, getAuditTrail };

@@ -34,10 +34,19 @@ function generateOperationId(sessionId, provider, action, requestId) {
  *
  * @returns {{ claimed: boolean, cached: boolean, operation: object }}
  */
-async function claimOperation({ operationId, organizationId, dealId, sessionId, provider, action, requestId, idempotencyKey }) {
+async function claimOperation({
+  operationId,
+  organizationId,
+  dealId,
+  sessionId,
+  provider,
+  action,
+  requestId,
+  idempotencyKey,
+}) {
   const ref = db.collection('externalOperations').doc(operationId);
 
-  return await db.runTransaction(async tx => {
+  return await db.runTransaction(async (tx) => {
     const doc = await tx.get(ref);
 
     if (doc.exists) {
@@ -48,7 +57,7 @@ async function claimOperation({ operationId, organizationId, dealId, sessionId, 
         return {
           claimed: false,
           cached: true,
-          operation: existing
+          operation: existing,
         };
       }
 
@@ -56,12 +65,12 @@ async function claimOperation({ operationId, organizationId, dealId, sessionId, 
       tx.update(ref, {
         status: 'PENDING',
         startedAt: new Date().toISOString(),
-        error: null
+        error: null,
       });
       return {
         claimed: true,
         cached: false,
-        operation: { ...existing, status: 'PENDING', startedAt: new Date().toISOString() }
+        operation: { ...existing, status: 'PENDING', startedAt: new Date().toISOString() },
       };
     }
 
@@ -81,14 +90,14 @@ async function claimOperation({ operationId, organizationId, dealId, sessionId, 
       externalRecordId: null,
       externalUrl: null,
       error: null,
-      result: null
+      result: null,
     };
 
     tx.create(ref, operation);
     return {
       claimed: true,
       cached: false,
-      operation
+      operation,
     };
   });
 }
@@ -103,7 +112,7 @@ async function completeOperation(operationId, { externalRecordId, externalUrl, r
     completedAt: new Date().toISOString(),
     externalRecordId: externalRecordId || null,
     externalUrl: externalUrl || null,
-    result: result || null
+    result: result || null,
   });
 }
 
@@ -115,7 +124,7 @@ async function failOperation(operationId, error) {
   await ref.update({
     status: 'FAILED',
     completedAt: new Date().toISOString(),
-    error: typeof error === 'string' ? error : (error?.message || String(error))
+    error: typeof error === 'string' ? error : error?.message || String(error),
   });
 }
 

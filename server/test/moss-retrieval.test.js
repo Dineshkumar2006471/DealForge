@@ -11,13 +11,13 @@ const {
   syncPolicyDocs,
   syncDealContext,
   initializeAllIndexes,
-  LocalMemorySearchEngine
+  LocalMemorySearchEngine,
 } = require('../src/lib/retrieval/mossIndexer');
 
 const {
   retrieveRelevantContext,
   classifyRetrievalRoute,
-  RETRIEVAL_TIMEOUT_MS
+  RETRIEVAL_TIMEOUT_MS,
 } = require('../src/lib/retrieval/mossRetriever');
 
 const { buildCompactAgentContext } = require('../src/lib/agent/agentContextBuilder');
@@ -78,7 +78,7 @@ describe('Moss Low-Latency Retrieval Integration', () => {
       company: { value: 'Acme Corp' },
       teamSize: { value: '250' },
       pain: { value: 'Inbound qualification bottleneck' },
-      dealStage: 'DISCOVERY'
+      dealStage: 'DISCOVERY',
     });
     assert.equal(dealRes.success, true);
     assert.equal(dealRes.indexName, INDEX_NAMES.DEAL_CONTEXT);
@@ -89,7 +89,7 @@ describe('Moss Low-Latency Retrieval Integration', () => {
       organizationId: 'dealforge-test-org',
       dealId: 'test_deal_101',
       userText: 'What are the pricing tiers and seat costs?',
-      topK: 2
+      topK: 2,
     });
 
     assert.ok(res.results.length > 0, 'Must return relevant results');
@@ -102,7 +102,12 @@ describe('Moss Low-Latency Retrieval Integration', () => {
     const first = res.results[0];
     assert.ok(first.id);
     assert.ok(first.title);
-    assert.ok(first.text.toLowerCase().includes('starter') || first.text.toLowerCase().includes('enterprise') || first.text.toLowerCase().includes('price') || first.text.toLowerCase().includes('plan'));
+    assert.ok(
+      first.text.toLowerCase().includes('starter') ||
+        first.text.toLowerCase().includes('enterprise') ||
+        first.text.toLowerCase().includes('price') ||
+        first.text.toLowerCase().includes('plan'),
+    );
     assert.ok(first.score > 0);
 
     // Verify zero secrets or credentials leaked
@@ -117,14 +122,14 @@ describe('Moss Low-Latency Retrieval Integration', () => {
     await syncDealContext('deal_org_a', {
       organizationId: 'org_A',
       company: { value: 'Company Alpha Exclusive' },
-      teamSize: { value: '100' }
+      teamSize: { value: '100' },
     });
 
     // Index deal context for Org B
     await syncDealContext('deal_org_b', {
       organizationId: 'org_B',
       company: { value: 'Company Beta Confidential' },
-      teamSize: { value: '500' }
+      teamSize: { value: '500' },
     });
 
     // Query with Org A scope
@@ -133,7 +138,7 @@ describe('Moss Low-Latency Retrieval Integration', () => {
       dealId: 'deal_org_a',
       userText: 'Company Alpha or Beta information',
       topic: 'deal_status',
-      topK: 5
+      topK: 5,
     });
 
     // Must NOT contain Org B documents
@@ -163,14 +168,14 @@ describe('Moss Low-Latency Retrieval Integration', () => {
     const failingEngine = {
       async query() {
         throw new Error('Simulated network failure on vector store');
-      }
+      },
     };
 
     const { retrieveRelevantContext: failingRetrieve } = proxyquireHelper(failingEngine);
     const res = await failingRetrieve({
       organizationId: 'dealforge-test-org',
       dealId: 'deal_1',
-      userText: 'pricing plans and enterprise features'
+      userText: 'pricing plans and enterprise features',
     });
 
     assert.equal(res.results.length, 0);
@@ -185,7 +190,7 @@ describe('Moss Low-Latency Retrieval Integration', () => {
       company: { value: 'Northstar Labs', status: 'confirmed' },
       teamSize: { value: '300', status: 'confirmed' },
       pain: { value: 'Inbound lead qualification' },
-      dealStage: 'DISCOVERY'
+      dealStage: 'DISCOVERY',
     };
 
     // Stale Moss retrieved snippet mentions old company 'OldCorp' and team size '50'
@@ -195,15 +200,15 @@ describe('Moss Low-Latency Retrieval Integration', () => {
         title: 'Old Stale Record',
         text: 'Company: OldCorp. Team Size: 50 reps. Stage: INITIAL.',
         score: 0.95,
-        index: INDEX_NAMES.DEAL_CONTEXT
-      }
+        index: INDEX_NAMES.DEAL_CONTEXT,
+      },
     ];
 
     const contextPayload = buildCompactAgentContext({
       deal: firestoreDeal,
       retrievedDocs: staleMossDocs,
       pendingApprovals: [],
-      resolvedApprovals: []
+      resolvedApprovals: [],
     });
 
     // Verify sections
@@ -216,7 +221,10 @@ describe('Moss Low-Latency Retrieval Integration', () => {
     // The authoritative block is prominently at the top, defining the ground truth
     const authoritativeIndex = contextPayload.indexOf('[AUTHORITATIVE DEAL STATE');
     const retrievedIndex = contextPayload.indexOf('[RETRIEVED CONTEXT');
-    assert.ok(authoritativeIndex < retrievedIndex, 'Authoritative Firestore state must appear before retrieved context');
+    assert.ok(
+      authoritativeIndex < retrievedIndex,
+      'Authoritative Firestore state must appear before retrieved context',
+    );
   });
 
   it('8. Deterministic policy rules remain strictly uncompromised by Moss context', () => {
@@ -257,7 +265,7 @@ function proxyquireHelper(mockEngine) {
         provider: 'moss_fallback',
         cacheHit: false,
         route: classifyRetrievalRoute(params.userText).route,
-        error: err.message
+        error: err.message,
       };
     }
   }

@@ -24,7 +24,7 @@ function buildCompactAgentContext({
   deal = {},
   retrievedDocs = [],
   resolvedApprovals = [],
-  pendingApprovals = []
+  pendingApprovals = [],
 } = {}) {
   const sections = [];
 
@@ -75,20 +75,24 @@ function buildCompactAgentContext({
   // 3. Commercial Policy Boundaries (Deterministic Enforcement)
   sections.push(
     `[COMMERCIAL POLICY BOUNDARIES]\n` +
-    `- Autonomous discount limit: Up to 18% may be agreed to directly.\n` +
-    `- Manager review required: Discounts between 18% and 25% require manager approval and must be queued as PENDING APPROVAL.\n` +
-    `- Maximum hard limit: Discounts > 25% are strictly prohibited and must be rejected.\n` +
-    `- Meeting scheduling: Direct customers to the verified meeting form; never confirm an unverified time slot.`
+      `- Autonomous discount limit: Up to 18% may be agreed to directly.\n` +
+      `- Manager review required: Discounts between 18% and 25% require manager approval and must be queued as PENDING APPROVAL.\n` +
+      `- Maximum hard limit: Discounts > 25% are strictly prohibited and must be rejected.\n` +
+      `- Meeting scheduling: Direct customers to the verified meeting form; never confirm an unverified time slot.`,
   );
 
   // 4. Active Pending & Resolved Approvals
   if (Array.isArray(pendingApprovals) && pendingApprovals.length > 0) {
-    const pendingLines = pendingApprovals.map(a => `- Pending Approval: ${a.exactToolName} (${JSON.stringify(a.exactValidatedArguments)})`);
+    const pendingLines = pendingApprovals.map(
+      (a) => `- Pending Approval: ${a.exactToolName} (${JSON.stringify(a.exactValidatedArguments)})`,
+    );
     sections.push(`[PENDING APPROVALS IN FLIGHT]\n${pendingLines.join('\n')}`);
   }
 
   if (Array.isArray(resolvedApprovals) && resolvedApprovals.length > 0) {
-    const resolvedLines = resolvedApprovals.slice(-3).map(a => `- Resolved Approval: ${a.exactToolName} -> ${a.status}`);
+    const resolvedLines = resolvedApprovals
+      .slice(-3)
+      .map((a) => `- Resolved Approval: ${a.exactToolName} -> ${a.status}`);
     sections.push(`[RECENT RESOLVED APPROVALS]\n${resolvedLines.join('\n')}`);
   }
 
@@ -96,5 +100,5 @@ function buildCompactAgentContext({
 }
 
 module.exports = {
-  buildCompactAgentContext
+  buildCompactAgentContext,
 };

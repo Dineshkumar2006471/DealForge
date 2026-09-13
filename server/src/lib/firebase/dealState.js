@@ -38,14 +38,30 @@ async function createDeal(dealId, dealState) {
  *
  * Returns: { updated: boolean, reason: string }
  */
-async function updateDealField(dealId, field, value, confidence, source, evidenceTurn, organizationId, sessionId = null) {
+async function updateDealField(
+  dealId,
+  field,
+  value,
+  confidence,
+  source,
+  evidenceTurn,
+  organizationId,
+  sessionId = null,
+) {
   // Confidence gate
   if (confidence < CONFIDENCE_THRESHOLDS.REJECT) {
-    return { updated: false, reason: `Confidence ${confidence} below reject threshold ${CONFIDENCE_THRESHOLDS.REJECT}` };
+    return {
+      updated: false,
+      reason: `Confidence ${confidence} below reject threshold ${CONFIDENCE_THRESHOLDS.REJECT}`,
+    };
   }
 
   if (confidence < CONFIDENCE_THRESHOLDS.ACCEPT) {
-    return { updated: false, reason: `Confidence ${confidence} in clarify range — ask clarifying question`, needsClarification: true };
+    return {
+      updated: false,
+      reason: `Confidence ${confidence} in clarify range — ask clarifying question`,
+      needsClarification: true,
+    };
   }
 
   const now = new Date().toISOString();
@@ -59,32 +75,74 @@ async function updateDealField(dealId, field, value, confidence, source, evidenc
   };
 
   const ref = stateRef(dealId, sessionId);
-  await db.runTransaction(async tx => { const deal = await tx.get(ref); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found'); tx.update(ref, update); });
+  await db.runTransaction(async (tx) => {
+    const deal = await tx.get(ref);
+    if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found');
+    tx.update(ref, update);
+  });
   return { updated: true, reason: `Field ${field} updated with confidence ${confidence}` };
 }
 
-async function updateDealWithEvidence({ organizationId, dealId, sessionId, field, value, confidence, source, evidenceTurn, turnId }) {
-  if (confidence < CONFIDENCE_THRESHOLDS.REJECT) return { updated: false, reason: `Confidence ${confidence} below reject threshold ${CONFIDENCE_THRESHOLDS.REJECT}` };
-  if (confidence < CONFIDENCE_THRESHOLDS.ACCEPT) return { updated: false, reason: `Confidence ${confidence} in clarify range — ask clarifying question`, needsClarification: true };
-  const timestamp = new Date().toISOString(); const evidenceId = uuidv4(); const auditId = uuidv4(); const dealRef = stateRef(dealId, sessionId);
+async function updateDealWithEvidence({
+  organizationId,
+  dealId,
+  sessionId,
+  field,
+  value,
+  confidence,
+  source,
+  evidenceTurn,
+  turnId,
+}) {
+  if (confidence < CONFIDENCE_THRESHOLDS.REJECT) {
+    return {
+      updated: false,
+      reason: `Confidence ${confidence} below reject threshold ${CONFIDENCE_THRESHOLDS.REJECT}`,
+    };
+  }
+  if (confidence < CONFIDENCE_THRESHOLDS.ACCEPT) {
+    return {
+      updated: false,
+      reason: `Confidence ${confidence} in clarify range — ask clarifying question`,
+      needsClarification: true,
+    };
+  }
+  const timestamp = new Date().toISOString();
+  const evidenceId = uuidv4();
+  const auditId = uuidv4();
+  const dealRef = stateRef(dealId, sessionId);
   const parentRef = db.collection('deals').doc(dealId);
   // Derive status from confidence: ≥ 0.85 → confirmed, ≥ 0.60 → likely, < 0.60 → needs_confirmation
-  const status = confidence >= CONFIDENCE_THRESHOLDS.ACCEPT ? 'confirmed' : confidence >= CONFIDENCE_THRESHOLDS.CLARIFY ? 'likely' : 'needs_confirmation';
+  const status =
+    confidence >= CONFIDENCE_THRESHOLDS.ACCEPT
+      ? 'confirmed'
+      : confidence >= CONFIDENCE_THRESHOLDS.CLARIFY
+        ? 'likely'
+        : 'needs_confirmation';
   // Structured source object with type and turnId
-  const structuredSource = typeof source === 'object' ? source : { type: source || 'customer_utterance', turnId: turnId || `turn_${evidenceTurn}` };
+  const structuredSource =
+    typeof source === 'object'
+      ? source
+      : { type: source || 'customer_utterance', turnId: turnId || `turn_${evidenceTurn}` };
   const fieldUpdate = {
     [`${field}.value`]: value,
     [`${field}.status`]: status,
     [`${field}.confidence`]: confidence,
     [`${field}.source`]: structuredSource,
     [`${field}.updatedAt`]: timestamp,
-    updatedAt: timestamp
+    updatedAt: timestamp,
   };
-  await db.runTransaction(async tx => {
+  await db.runTransaction(async (tx) => {
     const deal = await tx.get(dealRef);
     if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found');
     const existing = deal.data();
-    if (field === 'company' && existing.company?.value && existing.company.value !== 'Unknown' && existing.company.status === 'confirmed' && value !== existing.company.value) {
+    if (
+      field === 'company' &&
+      existing.company?.value &&
+      existing.company.value !== 'Unknown' &&
+      existing.company.status === 'confirmed' &&
+      value !== existing.company.value
+    ) {
       return; // Preserve the confirmed company name
     }
     let parent = null;
@@ -95,22 +153,65 @@ async function updateDealWithEvidence({ organizationId, dealId, sessionId, field
     if (parent && parent.exists && parent.data().organizationId === organizationId) {
       tx.update(parentRef, fieldUpdate);
     }
-    tx.create(db.collection('evidence').doc(evidenceId), { evidenceId, organizationId, dealId, sessionId, claim: `${field} = ${value}`, utteranceTurn: evidenceTurn, confidence, source: structuredSource, status, dealStateField: field, timestamp });
-    tx.create(db.collection('auditEvents').doc(auditId), { organizationId, dealId, sessionId, eventType: 'DEAL_STATE_UPDATED', trigger: `${field} updated from verified evidence`, evidence: [{ evidenceId, confidence, status }], timestamp });
+    tx.create(db.collection('evidence').doc(evidenceId), {
+      evidenceId,
+      organizationId,
+      dealId,
+      sessionId,
+      claim: `${field} = ${value}`,
+      utteranceTurn: evidenceTurn,
+      confidence,
+      source: structuredSource,
+      status,
+      dealStateField: field,
+      timestamp,
+    });
+    tx.create(db.collection('auditEvents').doc(auditId), {
+      organizationId,
+      dealId,
+      sessionId,
+      eventType: 'DEAL_STATE_UPDATED',
+      trigger: `${field} updated from verified evidence`,
+      evidence: [{ evidenceId, confidence, status }],
+      timestamp,
+    });
   });
-  return { updated: true, evidenceId, status, reason: `Field ${field} updated with confidence ${confidence} (${status})` };
+  return {
+    updated: true,
+    evidenceId,
+    status,
+    reason: `Field ${field} updated with confidence ${confidence} (${status})`,
+  };
 }
 
 /**
  * Update MEDDIC status for a specific pillar.
  */
-async function updateMEDDIC(dealId, pillar, status, confidence, evidenceTurn, organizationId, sessionId = null, extra = {}) {
+async function updateMEDDIC(
+  dealId,
+  pillar,
+  status,
+  confidence,
+  evidenceTurn,
+  organizationId,
+  sessionId = null,
+  extra = {},
+) {
   const now = new Date().toISOString();
   const ref = stateRef(dealId, sessionId);
   const parentRef = db.collection('deals').doc(dealId);
   // Derive status from confidence if not explicitly provided
-  const derivedStatus = status || (confidence >= CONFIDENCE_THRESHOLDS.ACCEPT ? 'confirmed' : confidence >= CONFIDENCE_THRESHOLDS.CLARIFY ? 'likely' : 'needs_confirmation');
-  const structuredSource = extra.source && typeof extra.source === 'object' ? extra.source : { type: extra.source || 'customer_turn', turnId: extra.turnId || `turn_${evidenceTurn}` };
+  const derivedStatus =
+    status ||
+    (confidence >= CONFIDENCE_THRESHOLDS.ACCEPT
+      ? 'confirmed'
+      : confidence >= CONFIDENCE_THRESHOLDS.CLARIFY
+        ? 'likely'
+        : 'needs_confirmation');
+  const structuredSource =
+    extra.source && typeof extra.source === 'object'
+      ? extra.source
+      : { type: extra.source || 'customer_turn', turnId: extra.turnId || `turn_${evidenceTurn}` };
   const meddicUpdate = {
     [`meddic.${pillar}.status`]: derivedStatus,
     [`meddic.${pillar}.confidence`]: confidence,
@@ -120,7 +221,7 @@ async function updateMEDDIC(dealId, pillar, status, confidence, evidenceTurn, or
   };
   if (extra.value !== undefined) meddicUpdate[`meddic.${pillar}.value`] = extra.value;
 
-  await db.runTransaction(async tx => {
+  await db.runTransaction(async (tx) => {
     const deal = await tx.get(ref);
     if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found');
     let parent = null;
@@ -138,10 +239,15 @@ async function updateMEDDIC(dealId, pillar, status, confidence, evidenceTurn, or
  * Update conversation stage.
  */
 async function updateConversationStage(dealId, stage, organizationId, sessionId = null) {
-  const ref = stateRef(dealId, sessionId); await db.runTransaction(async tx => { const deal = await tx.get(ref); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found'); tx.update(ref, {
-    conversationStage: stage,
-    updatedAt: new Date().toISOString(),
-  }); });
+  const ref = stateRef(dealId, sessionId);
+  await db.runTransaction(async (tx) => {
+    const deal = await tx.get(ref);
+    if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found');
+    tx.update(ref, {
+      conversationStage: stage,
+      updatedAt: new Date().toISOString(),
+    });
+  });
 }
 
 /**
@@ -149,34 +255,54 @@ async function updateConversationStage(dealId, stage, organizationId, sessionId 
  */
 async function appendDiscountLedger(dealId, entry, organizationId, sessionId = null) {
   const { admin } = require('./admin');
-  const ref = stateRef(dealId, sessionId); await db.runTransaction(async tx => { const deal = await tx.get(ref); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found'); tx.update(ref, {
-    discountLedger: admin.firestore.FieldValue.arrayUnion(entry),
-    updatedAt: new Date().toISOString(),
-  }); });
+  const ref = stateRef(dealId, sessionId);
+  await db.runTransaction(async (tx) => {
+    const deal = await tx.get(ref);
+    if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found');
+    tx.update(ref, {
+      discountLedger: admin.firestore.FieldValue.arrayUnion(entry),
+      updatedAt: new Date().toISOString(),
+    });
+  });
 }
 
 /**
  * Update next best action.
  */
 async function updateNextBestAction(dealId, nextBestAction, organizationId, sessionId = null) {
-  const ref = stateRef(dealId, sessionId); await db.runTransaction(async tx => { const deal = await tx.get(ref); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found'); tx.update(ref, {
-    nextBestAction: { ...nextBestAction, generatedAt: nextBestAction.generatedAt || new Date().toISOString() },
-    updatedAt: new Date().toISOString(),
-  }); });
+  const ref = stateRef(dealId, sessionId);
+  await db.runTransaction(async (tx) => {
+    const deal = await tx.get(ref);
+    if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found');
+    tx.update(ref, {
+      nextBestAction: { ...nextBestAction, generatedAt: nextBestAction.generatedAt || new Date().toISOString() },
+      updatedAt: new Date().toISOString(),
+    });
+  });
 }
 
 async function updateDealHealth(dealId, dealHealth, organizationId, sessionId = null) {
-  const ref = stateRef(dealId, sessionId); await db.runTransaction(async tx => { const deal = await tx.get(ref); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found'); tx.update(ref, { dealHealth, updatedAt: new Date().toISOString() }); });
+  const ref = stateRef(dealId, sessionId);
+  await db.runTransaction(async (tx) => {
+    const deal = await tx.get(ref);
+    if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found');
+    tx.update(ref, { dealHealth, updatedAt: new Date().toISOString() });
+  });
 }
 
 /**
  * Set escalation flag.
  */
 async function setEscalation(dealId, reason, urgency, organizationId, sessionId = null) {
-  const ref = stateRef(dealId, sessionId); await db.runTransaction(async tx => { const deal = await tx.get(ref); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found'); tx.update(ref, {
-    escalation: { flagged: true, reason, urgency, timestamp: new Date().toISOString() },
-    updatedAt: new Date().toISOString(),
-  }); });
+  const ref = stateRef(dealId, sessionId);
+  await db.runTransaction(async (tx) => {
+    const deal = await tx.get(ref);
+    if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found');
+    tx.update(ref, {
+      escalation: { flagged: true, reason, urgency, timestamp: new Date().toISOString() },
+      updatedAt: new Date().toISOString(),
+    });
+  });
 }
 
 /**
@@ -184,11 +310,23 @@ async function setEscalation(dealId, reason, urgency, organizationId, sessionId 
  */
 async function appendNegotiationMemory(dealId, memoryEntry, organizationId, sessionId = null) {
   const { FieldValue } = require('./admin').admin.firestore;
-  const ref = stateRef(dealId, sessionId); await db.runTransaction(async tx => { const deal = await tx.get(ref); if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found'); tx.update(ref, {
-    negotiationMemory: FieldValue.arrayUnion(memoryEntry),
-    negotiationSummary: { lastEvent: memoryEntry.type || memoryEntry.preference || 'NEGOTIATION_SIGNAL', requestedPct: memoryEntry.requestedPct ?? null, offeredPct: memoryEntry.offeredPct ?? null, urgency: memoryEntry.urgency ?? null, status: memoryEntry.status ?? null, updatedAt: new Date().toISOString() },
-    updatedAt: new Date().toISOString(),
-  }); });
+  const ref = stateRef(dealId, sessionId);
+  await db.runTransaction(async (tx) => {
+    const deal = await tx.get(ref);
+    if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found');
+    tx.update(ref, {
+      negotiationMemory: FieldValue.arrayUnion(memoryEntry),
+      negotiationSummary: {
+        lastEvent: memoryEntry.type || memoryEntry.preference || 'NEGOTIATION_SIGNAL',
+        requestedPct: memoryEntry.requestedPct ?? null,
+        offeredPct: memoryEntry.offeredPct ?? null,
+        urgency: memoryEntry.urgency ?? null,
+        status: memoryEntry.status ?? null,
+        updatedAt: new Date().toISOString(),
+      },
+      updatedAt: new Date().toISOString(),
+    });
+  });
 }
 
 module.exports = {

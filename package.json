@@ -1,0 +1,20 @@
+{
+  "name": "dealforge",
+  "private": true,
+  "workspaces": ["server"],
+  "scripts": {
+    "lint": "eslint server/src/ server/test/",
+    "lint:fix": "eslint --fix server/src/ server/test/",
+    "format": "prettier --write \"server/src/**/*.js\" \"server/test/**/*.js\"",
+    "format:check": "prettier --check \"server/src/**/*.js\" \"server/test/**/*.js\"",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "eslint": "^9.27.0",
+    "@eslint/js": "^9.27.0",
+    "globals": "^16.1.0",
+    "prettier": "^3.5.3",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.0"
+  }
+}

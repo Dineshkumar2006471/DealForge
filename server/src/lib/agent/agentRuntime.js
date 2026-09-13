@@ -9,28 +9,60 @@ const { db } = require('../firebase/admin');
 const { writeAuditEvent } = require('../audit/eventStore');
 const { EVENT_TYPES } = require('../audit/eventTypes');
 const { claimTurnReceipt } = require('./turnReceipts');
-require('../tools/calculateDiscount'); require('../tools/updateDealState'); require('../tools/checkProductAvailability'); require('../tools/bookMeeting'); require('../tools/requestMeetingDetails'); require('../tools/escalateToHuman');
+require('../tools/calculateDiscount');
+require('../tools/updateDealState');
+require('../tools/checkProductAvailability');
+require('../tools/bookMeeting');
+require('../tools/requestMeetingDetails');
+require('../tools/escalateToHuman');
 require('../integrations/hubspot');
 async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-${uuidv4()}`, turnId = null } = {}) {
-  const context = { organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, turnNumber: (await getTurnNumber(session.sessionId)) + 1, turnId: turnId || `turn_${Date.now()}` };
+  const context = {
+    organizationId: session.organizationId,
+    dealId: session.dealId,
+    sessionId: session.sessionId,
+    turnNumber: (await getTurnNumber(session.sessionId)) + 1,
+    turnId: turnId || `turn_${Date.now()}`,
+  };
   let history = await getHistory(session.sessionId);
-  if (!await getDeal(context.dealId, context.organizationId, context.sessionId)) throw new Error('Bound deal not found');
+  if (!(await getDeal(context.dealId, context.organizationId, context.sessionId))) {
+    throw new Error('Bound deal not found');
+  }
 
   // Agora sends lifecycle and empty ASR turns around joins, TTS, and reconnects.
   // The RTC-ready Speak request owns the only greeting. An empty lifecycle turn is
   // never a customer prompt, and must never wake Gemini or create a second greeting.
   if (!userText || !userText.trim()) {
-    await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_EMPTY_TURN_IGNORED, trigger: 'Ignored empty customer turn', actionResult: { verified: true } });
+    await writeAuditEvent({
+      organizationId: context.organizationId,
+      dealId: context.dealId,
+      sessionId: context.sessionId,
+      eventType: EVENT_TYPES.AGENT_EMPTY_TURN_IGNORED,
+      trigger: 'Ignored empty customer turn',
+      actionResult: { verified: true },
+    });
     if (res) writeNoopSseReply(res, chatId);
     return { empty: true, content: '' };
   }
 
   const receipt = await claimTurnReceipt(session.sessionId, userText, turnId);
   if (!receipt.claimed) {
-    await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_DUPLICATE_TURN_IGNORED, trigger: 'Ignored replayed customer turn', actionResult: { verified: true, turnId } });
+    await writeAuditEvent({
+      organizationId: context.organizationId,
+      dealId: context.dealId,
+      sessionId: context.sessionId,
+      eventType: EVENT_TYPES.AGENT_DUPLICATE_TURN_IGNORED,
+      trigger: 'Ignored replayed customer turn',
+      actionResult: { verified: true, turnId },
+    });
     if (res) writeNoopSseReply(res, chatId);
     if (receipt.cachedResponse) {
-      return { duplicate: true, content: receipt.cachedResponse.assistantText || '', audioBase64: receipt.cachedResponse.audioBase64 || null, receiptId: receipt.receiptId };
+      return {
+        duplicate: true,
+        content: receipt.cachedResponse.assistantText || '',
+        audioBase64: receipt.cachedResponse.audioBase64 || null,
+        receiptId: receipt.receiptId,
+      };
     }
     return { duplicate: true, content: '', receiptId: receipt.receiptId };
   }
@@ -61,13 +93,28 @@ async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-
         ? 'I cannot approve that request, but I can explore a more suitable commercial package with you.'
         : `I can confirm a ${requestedDiscount}% discount for this negotiation.`;
     await addMessage(session.sessionId, { role: 'assistant', content: spoken });
-    await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_RESPONSE_COMPLETED, trigger: 'Deterministic discount-policy response completed', actionResult: { verified: true, requestedDiscount } });
+    await writeAuditEvent({
+      organizationId: context.organizationId,
+      dealId: context.dealId,
+      sessionId: context.sessionId,
+      eventType: EVENT_TYPES.AGENT_RESPONSE_COMPLETED,
+      trigger: 'Deterministic discount-policy response completed',
+      actionResult: { verified: true, requestedDiscount },
+    });
     try {
       const { refreshAutonomy } = require('./autonomyService');
       await refreshAutonomy(context);
-    } catch (_) {}
+    } catch (_) {
+      /* non-critical side effect */
+    }
     if (res) writeSseReply(res, chatId, spoken);
-    return { content: spoken, chatId, requestedDiscount, receiptId: receipt.receiptId, metrics: { evidenceMs: tEvidenceEnd - tEvidenceStart, reasoningMs: 0, toolsMs: 10 } };
+    return {
+      content: spoken,
+      chatId,
+      requestedDiscount,
+      receiptId: receipt.receiptId,
+      metrics: { evidenceMs: tEvidenceEnd - tEvidenceStart, reasoningMs: 0, toolsMs: 10 },
+    };
   }
 
   const isMeeting = explicitMeetingRequest(userText);
@@ -75,23 +122,50 @@ async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-
     await executeTool('request_meeting_details', { meeting_type: 'technical_review' }, context);
     const spoken = "I've opened a secure form for your contact details and available times.";
     await addMessage(session.sessionId, { role: 'assistant', content: spoken });
-    await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_RESPONSE_COMPLETED, trigger: 'Deterministic meeting request completed', actionResult: { verified: true, meetingType: 'technical_review' } });
+    await writeAuditEvent({
+      organizationId: context.organizationId,
+      dealId: context.dealId,
+      sessionId: context.sessionId,
+      eventType: EVENT_TYPES.AGENT_RESPONSE_COMPLETED,
+      trigger: 'Deterministic meeting request completed',
+      actionResult: { verified: true, meetingType: 'technical_review' },
+    });
     try {
       const { refreshAutonomy } = require('./autonomyService');
       await refreshAutonomy(context);
-    } catch (_) {}
+    } catch (_) {
+      /* non-critical side effect */
+    }
     if (res) writeSseReply(res, chatId, spoken);
-    return { content: spoken, chatId, receiptId: receipt.receiptId, metrics: { evidenceMs: tEvidenceEnd - tEvidenceStart, reasoningMs: 0, toolsMs: 10 } };
+    return {
+      content: spoken,
+      chatId,
+      receiptId: receipt.receiptId,
+      metrics: { evidenceMs: tEvidenceEnd - tEvidenceStart, reasoningMs: 0, toolsMs: 10 },
+    };
   }
 
   for (const approval of await claimApprovedApprovals(context)) {
-    const executed = await executeTool(approval.exactToolName, approval.exactValidatedArguments, { ...context, approvedReplay: { approvalId: approval.approvalId, toolName: approval.exactToolName, args: approval.exactValidatedArguments } });
+    const executed = await executeTool(approval.exactToolName, approval.exactValidatedArguments, {
+      ...context,
+      approvedReplay: {
+        approvalId: approval.approvalId,
+        toolName: approval.exactToolName,
+        args: approval.exactValidatedArguments,
+      },
+    });
     if (executed.approved) {
       await completeApproval(approval.approvalId, context.organizationId);
-      await addMessage(session.sessionId, { role: 'system', content: `[SYSTEM] The approved ${approval.exactToolName} operation was executed once: ${JSON.stringify(executed.result)}` });
+      await addMessage(session.sessionId, {
+        role: 'system',
+        content: `[SYSTEM] The approved ${approval.exactToolName} operation was executed once: ${JSON.stringify(executed.result)}`,
+      });
     } else {
       await releaseApproval(approval.approvalId, context.organizationId, executed.result?.error || 'Operation failed');
-      await addMessage(session.sessionId, { role: 'system', content: `[SYSTEM] The approved operation could not execute and remains retryable.` });
+      await addMessage(session.sessionId, {
+        role: 'system',
+        content: `[SYSTEM] The approved operation could not execute and remains retryable.`,
+      });
     }
   }
 
@@ -107,10 +181,10 @@ async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-
       organizationId: context.organizationId,
       dealId: context.dealId,
       sessionId: context.sessionId,
-      userText
+      userText,
     });
     retrievedDocs = retrieval.results || [];
-    mossLatencyMs = retrieval.latencyMs || (Date.now() - tMossStart);
+    mossLatencyMs = retrieval.latencyMs || Date.now() - tMossStart;
     mossIndex = retrieval.index || 'none';
     mossCacheHit = Boolean(retrieval.cacheHit);
   } catch (mossErr) {
@@ -118,9 +192,16 @@ async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-
   }
   context.retrievedDocs = retrievedDocs;
 
-  const tools = getToolDefinitions(); history = await getHistory(session.sessionId);
-  let content = ''; let calls = []; let finishReason; let hasSpokenContent = false;
-  let tGeminiStart = 0, tGeminiFirstToken = 0, tToolsStart = 0, tToolsEnd = 0;
+  const tools = getToolDefinitions();
+  history = await getHistory(session.sessionId);
+  let content = '';
+  const calls = [];
+  let finishReason;
+  let hasSpokenContent = false;
+  let tGeminiStart = 0,
+    tGeminiFirstToken = 0,
+    tToolsStart = 0,
+    tToolsEnd = 0;
   try {
     if (res) writeInterruptableMetadata(res, chatId, true);
     // Buffer the first model pass. A tool-using pass is provisional: speaking
@@ -129,13 +210,22 @@ async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-
     const initialTextChunks = [];
     tGeminiStart = Date.now();
     for await (const chunk of generateResponse(await currentModelMessages(context), tools, context)) {
-      const choice = chunk.choices?.[0]; if (!choice) continue;
+      const choice = chunk.choices?.[0];
+      if (!choice) continue;
       if (choice.delta?.content) {
         if (!tGeminiFirstToken) tGeminiFirstToken = Date.now();
         content += choice.delta.content;
         initialTextChunks.push(chunk);
       }
-      if (choice.delta?.tool_calls) calls.push(...choice.delta.tool_calls.map(item => ({ id: item.id, type: item.type, function: { name: item.function.name, arguments: item.function.arguments || '{}' } })));
+      if (choice.delta?.tool_calls) {
+        calls.push(
+          ...choice.delta.tool_calls.map((item) => ({
+            id: item.id,
+            type: item.type,
+            function: { name: item.function.name, arguments: item.function.arguments || '{}' },
+          })),
+        );
+      }
       if (choice.finish_reason) finishReason = choice.finish_reason;
     }
     const MAX_TOOL_ROUNDS = 3;
@@ -146,18 +236,39 @@ async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-
       await addMessage(session.sessionId, { role: 'assistant', tool_calls: calls, content: null });
       tToolsStart = Date.now();
       for (const call of calls) {
-        let args; try { args = JSON.parse(call.function.arguments || '{}'); } catch { args = {}; }
+        let args;
+        try {
+          args = JSON.parse(call.function.arguments || '{}');
+        } catch {
+          args = {};
+        }
         const { result } = await executeTool(call.function.name, args, context);
-        await addMessage(session.sessionId, { role: 'tool', tool_call_id: call.id, name: call.function.name, content: JSON.stringify(result) });
+        await addMessage(session.sessionId, {
+          role: 'tool',
+          tool_call_id: call.id,
+          name: call.function.name,
+          content: JSON.stringify(result),
+        });
       }
       // Bounded iterative loop: allow the LLM to emit further tool calls up
       // to MAX_TOOL_ROUNDS total. Each round validates, executes, persists
       // tool results, and returns them to the model for the next pass.
       for (let round = 1; round < MAX_TOOL_ROUNDS; round++) {
-        let followUpCalls = []; let followUpContent = ''; let followUpFinish;
+        const followUpCalls = [];
+        let followUpContent = '';
+        let followUpFinish;
         for await (const chunk of generateResponse(await currentModelMessages(context), tools, context)) {
-          const choice = chunk.choices?.[0]; if (!choice) continue;
-          if (choice.delta?.tool_calls) followUpCalls.push(...choice.delta.tool_calls.map(item => ({ id: item.id, type: item.type, function: { name: item.function.name, arguments: item.function.arguments || '{}' } })));
+          const choice = chunk.choices?.[0];
+          if (!choice) continue;
+          if (choice.delta?.tool_calls) {
+            followUpCalls.push(
+              ...choice.delta.tool_calls.map((item) => ({
+                id: item.id,
+                type: item.type,
+                function: { name: item.function.name, arguments: item.function.arguments || '{}' },
+              })),
+            );
+          }
           if (choice.delta?.content) followUpContent += choice.delta.content;
           if (choice.finish_reason) followUpFinish = choice.finish_reason;
         }
@@ -166,16 +277,28 @@ async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-
           content = followUpContent;
           if (content && res) {
             hasSpokenContent = true;
-            res.write(`data: ${JSON.stringify({ id: chatId, object: 'chat.completion.chunk', choices: [{ index: 0, delta: { role: 'assistant', content }, finish_reason: null }] })}\n\n`);
+            res.write(
+              `data: ${JSON.stringify({ id: chatId, object: 'chat.completion.chunk', choices: [{ index: 0, delta: { role: 'assistant', content }, finish_reason: null }] })}\n\n`,
+            );
           }
           break;
         }
         // Another tool round — execute and persist
         await addMessage(session.sessionId, { role: 'assistant', tool_calls: followUpCalls, content: null });
         for (const call of followUpCalls) {
-          let args; try { args = JSON.parse(call.function.arguments || '{}'); } catch { args = {}; }
+          let args;
+          try {
+            args = JSON.parse(call.function.arguments || '{}');
+          } catch {
+            args = {};
+          }
           const { result } = await executeTool(call.function.name, args, context);
-          await addMessage(session.sessionId, { role: 'tool', tool_call_id: call.id, name: call.function.name, content: JSON.stringify(result) });
+          await addMessage(session.sessionId, {
+            role: 'tool',
+            tool_call_id: call.id,
+            name: call.function.name,
+            content: JSON.stringify(result),
+          });
         }
       }
       // If we exhausted all rounds without a final text, generate one last
@@ -201,23 +324,32 @@ async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-
       }
     }
     if (content) await addMessage(session.sessionId, { role: 'assistant', content });
-    await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_RESPONSE_COMPLETED, trigger: 'Response completed', actionResult: { verified: true, hasContent: Boolean(content) } });
+    await writeAuditEvent({
+      organizationId: context.organizationId,
+      dealId: context.dealId,
+      sessionId: context.sessionId,
+      eventType: EVENT_TYPES.AGENT_RESPONSE_COMPLETED,
+      trigger: 'Response completed',
+      actionResult: { verified: true, hasContent: Boolean(content) },
+    });
     try {
       const { refreshAutonomy } = require('./autonomyService');
       await refreshAutonomy(context);
-    } catch (_) {}
+    } catch (_) {
+      /* non-critical side effect */
+    }
     tToolsEnd = tToolsEnd || Date.now();
     const tTurnEnd = Date.now();
     const metrics = {
       evidenceMs: tEvidenceEnd - tEvidenceStart,
       geminiFirstTokenMs: tGeminiFirstToken ? tGeminiFirstToken - tGeminiStart : 0,
       geminiTotalMs: tGeminiStart ? tTurnEnd - tGeminiStart : 0,
-      toolsMs: tToolsStart ? (tToolsEnd - tToolsStart) : 0,
+      toolsMs: tToolsStart ? tToolsEnd - tToolsStart : 0,
       totalMs: tTurnEnd - tEvidenceStart,
       mossLatencyMs,
       mossIndex,
       mossCacheHit,
-      mossResultCount: retrievedDocs.length
+      mossResultCount: retrievedDocs.length,
     };
 
     // Non-blocking asynchronous Moss deal context sync (Firestore remains source of truth)
@@ -228,14 +360,23 @@ async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-
         if (latestDeal) {
           await syncDealContext(context.dealId, latestDeal);
         }
-      } catch (_) {}
+      } catch (_) {
+        /* non-critical side effect */
+      }
     });
 
     if (res) writeTerminalSseReply(res, chatId);
     return { content, chatId, receiptId: receipt.receiptId, metrics };
   } catch (error) {
     console.error('Agent runtime error:', error.message);
-    await writeAuditEvent({ organizationId: context.organizationId, dealId: context.dealId, sessionId: context.sessionId, eventType: EVENT_TYPES.AGENT_RESPONSE_FAILED, trigger: 'Gemini/runtime response failed', actionResult: { verified: false, error: String(error.message).slice(0, 200) } }).catch(() => {});
+    await writeAuditEvent({
+      organizationId: context.organizationId,
+      dealId: context.dealId,
+      sessionId: context.sessionId,
+      eventType: EVENT_TYPES.AGENT_RESPONSE_FAILED,
+      trigger: 'Gemini/runtime response failed',
+      actionResult: { verified: false, error: String(error.message).slice(0, 200) },
+    }).catch(() => {});
     if (res && !res.writableEnded) {
       // Never append a spoken apology after a customer has already received
       // part of an answer. That is the source of repeated/conflicting agent
@@ -259,14 +400,19 @@ async function handleChatCompletion(requestBody, res, session) {
 }
 
 function currentUserText(messages) {
-  const lastUser = Array.isArray(messages) ? messages.filter(message => message?.role === 'user').pop() : null;
+  const lastUser = Array.isArray(messages) ? messages.filter((message) => message?.role === 'user').pop() : null;
   return extractTextContent(lastUser?.content);
 }
 
 function extractTextContent(content) {
   if (typeof content === 'string') return content.trim();
   if (!Array.isArray(content)) return '';
-  return content.filter(part => part && typeof part.text === 'string').map(part => part.text.trim()).filter(Boolean).join('\n').trim();
+  return content
+    .filter((part) => part && typeof part.text === 'string')
+    .map((part) => part.text.trim())
+    .filter(Boolean)
+    .join('\n')
+    .trim();
 }
 
 function explicitDiscountRequest(text) {
@@ -284,13 +430,29 @@ async function currentModelMessages(context) {
   const [deal, history, approvalSnapshot] = await Promise.all([
     getDeal(context.dealId, context.organizationId, context.sessionId),
     getHistory(context.sessionId),
-    db.collection('approvals').where('organizationId', '==', context.organizationId).where('dealId', '==', context.dealId).where('sessionId', '==', context.sessionId).limit(20).get(),
+    db
+      .collection('approvals')
+      .where('organizationId', '==', context.organizationId)
+      .where('dealId', '==', context.dealId)
+      .where('sessionId', '==', context.sessionId)
+      .limit(20)
+      .get(),
   ]);
   if (!deal) throw new Error('Bound deal not found');
-  const resolvedApprovals = approvalSnapshot.docs.map(doc => doc.data()).filter(approval => ['APPROVED', 'REJECTED', 'EXPIRED'].includes(approval.status));
+  const resolvedApprovals = approvalSnapshot.docs
+    .map((doc) => doc.data())
+    .filter((approval) => ['APPROVED', 'REJECTED', 'EXPIRED'].includes(approval.status));
   return [
-    { role: 'system', content: buildSystemPrompt({ deal, negotiationMemory: (deal.negotiationMemory || []).slice(-10), resolvedApprovals, retrievedDocs: context.retrievedDocs || [] }) },
-    ...history.filter(message => message.role !== 'system'),
+    {
+      role: 'system',
+      content: buildSystemPrompt({
+        deal,
+        negotiationMemory: (deal.negotiationMemory || []).slice(-10),
+        resolvedApprovals,
+        retrievedDocs: context.retrievedDocs || [],
+      }),
+    },
+    ...history.filter((message) => message.role !== 'system'),
   ];
 }
 
@@ -302,16 +464,20 @@ function writeSafeFallback(res, chatId) {
 }
 
 function writeSseReply(res, chatId, content) {
-  res.write(`data: ${JSON.stringify({
-    id: chatId,
-    object: 'chat.completion.chunk',
-    choices: [{ index: 0, delta: { role: 'assistant', content }, finish_reason: null }],
-  })}\n\n`);
-  res.write(`data: ${JSON.stringify({
-    id: chatId,
-    object: 'chat.completion.chunk',
-    choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
-  })}\n\n`);
+  res.write(
+    `data: ${JSON.stringify({
+      id: chatId,
+      object: 'chat.completion.chunk',
+      choices: [{ index: 0, delta: { role: 'assistant', content }, finish_reason: null }],
+    })}\n\n`,
+  );
+  res.write(
+    `data: ${JSON.stringify({
+      id: chatId,
+      object: 'chat.completion.chunk',
+      choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+    })}\n\n`,
+  );
   res.write('data: [DONE]\n\n');
   res.end();
 }
@@ -321,22 +487,37 @@ function writeNoopSseReply(res, chatId) {
 }
 
 function writeTerminalSseReply(res, chatId) {
-  res.write(`data: ${JSON.stringify({
-    id: chatId,
-    object: 'chat.completion.chunk',
-    choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
-  })}\n\n`);
+  res.write(
+    `data: ${JSON.stringify({
+      id: chatId,
+      object: 'chat.completion.chunk',
+      choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+    })}\n\n`,
+  );
   res.write('data: [DONE]\n\n');
   res.end();
 }
 
 function writeInterruptableMetadata(res, chatId, interruptable) {
-  res.write(`data: ${JSON.stringify({
-    id: chatId,
-    object: 'chat.completion.custom_metadata',
-    choices: [],
-    metadata: { interruptable },
-  })}\n\n`);
+  res.write(
+    `data: ${JSON.stringify({
+      id: chatId,
+      object: 'chat.completion.custom_metadata',
+      choices: [],
+      metadata: { interruptable },
+    })}\n\n`,
+  );
 }
 
-module.exports = { executeCustomerTurn, handleChatCompletion, writeSafeFallback, writeSseReply, writeNoopSseReply, writeInterruptableMetadata, currentUserText, extractTextContent, explicitDiscountRequest, currentModelMessages };
+module.exports = {
+  executeCustomerTurn,
+  handleChatCompletion,
+  writeSafeFallback,
+  writeSseReply,
+  writeNoopSseReply,
+  writeInterruptableMetadata,
+  currentUserText,
+  extractTextContent,
+  explicitDiscountRequest,
+  currentModelMessages,
+};

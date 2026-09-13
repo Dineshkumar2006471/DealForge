@@ -48,7 +48,7 @@ function getConcessions(maxCount = 3) {
 }
 
 function getConcessionById(id) {
-  return CONCESSIONS.find(c => c.id === id) || null;
+  return CONCESSIONS.find((c) => c.id === id) || null;
 }
 
 module.exports = { CONCESSIONS, getConcessions, getConcessionById };

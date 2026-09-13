@@ -7,16 +7,20 @@ const { createBlankDealState } = require('../schema/dealState');
 
 const ACTIVE = ['CREATED', 'JOINING', 'ACTIVE'];
 const now = () => new Date().toISOString();
-const hash = value => crypto.createHash('sha256').update(value).digest('hex');
-const random = bytes => crypto.randomBytes(bytes).toString('base64url');
+const hash = (value) => crypto.createHash('sha256').update(value).digest('hex');
+const random = (bytes) => crypto.randomBytes(bytes).toString('base64url');
 function webhookTokenFor(sessionId) {
   const secret = process.env.CALL_SESSION_WEBHOOK_SIGNING_SECRET;
   if (!secret) throw new HttpError(503, 'Webhook signing is not configured');
   return crypto.createHmac('sha256', secret).update(sessionId).digest('base64url');
 }
 
-function sessionRef(id) { return db.collection('callSessions').doc(id); }
-function sessionStateRef(id) { return sessionRef(id).collection('state').doc('current'); }
+function sessionRef(id) {
+  return db.collection('callSessions').doc(id);
+}
+function sessionStateRef(id) {
+  return sessionRef(id).collection('state').doc('current');
+}
 
 async function createCallSession({ organizationId, dealId, managerId, customerLabel, expiresInMinutes }) {
   const deal = await db.collection('deals').doc(dealId).get();
@@ -26,11 +30,24 @@ async function createCallSession({ organizationId, dealId, managerId, customerLa
   const createdAt = now();
   const expiresAt = new Date(Date.now() + expiresInMinutes * 60000).toISOString();
   const session = {
-    sessionId, organizationId, dealId, managerId, customerLabel,
-    hashedLinkToken: hash(linkToken), hashedWebhookToken: hash(webhookTokenFor(sessionId)),
-    opaqueAgoraChannel: `df_${random(18)}`, customerUid: crypto.randomInt(100000, 999999999),
-    agentId: null, status: 'CREATED', expiresAt, createdAt, startedAt: null, endedAt: null,
-    joinedAt: null, revokedAt: null, failureReason: null,
+    sessionId,
+    organizationId,
+    dealId,
+    managerId,
+    customerLabel,
+    hashedLinkToken: hash(linkToken),
+    hashedWebhookToken: hash(webhookTokenFor(sessionId)),
+    opaqueAgoraChannel: `df_${random(18)}`,
+    customerUid: crypto.randomInt(100000, 999999999),
+    agentId: null,
+    status: 'CREATED',
+    expiresAt,
+    createdAt,
+    startedAt: null,
+    endedAt: null,
+    joinedAt: null,
+    revokedAt: null,
+    failureReason: null,
   };
   // Each customer link starts a clean negotiation while inheriting only safe
   // account identity and commercial terms from the parent account.
@@ -38,9 +55,10 @@ async function createCallSession({ organizationId, dealId, managerId, customerLa
   const parent = deal.data();
   state.organizationId = organizationId;
   state.dealId = dealId;
-  const companyValue = (parent.company?.value && parent.company.value !== 'Pending' && parent.company.value !== 'Loading...')
-    ? parent.company.value
-    : (customerLabel || parent.name || 'Customer');
+  const companyValue =
+    parent.company?.value && parent.company.value !== 'Pending' && parent.company.value !== 'Loading...'
+      ? parent.company.value
+      : customerLabel || parent.name || 'Customer';
   state.company = {
     value: companyValue,
     confidence: parent.company?.confidence ?? 1.0,
@@ -50,7 +68,13 @@ async function createCallSession({ organizationId, dealId, managerId, customerLa
   };
   state.owner = parent.owner || null;
   state.integrations = parent.integrations || {};
-  state.arr = Number(parent.arr) || (String(parent.company?.value || '').toLowerCase().includes('acme') ? 1200000 : 0);
+  state.arr =
+    Number(parent.arr) ||
+    (String(parent.company?.value || '')
+      .toLowerCase()
+      .includes('acme')
+      ? 1200000
+      : 0);
   state.currency = 'INR';
   state.listPrice = state.arr;
   state.accountDealId = dealId;
@@ -83,7 +107,7 @@ function assertActiveSession(session) {
 async function redeemLink(linkToken) {
   const found = await findSessionByHash('hashedLinkToken', linkToken);
   const refreshToken = random(32);
-  await db.runTransaction(async transaction => {
+  await db.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(found.ref);
     if (!snapshot.exists) throw new HttpError(404, 'Call session not found');
     const session = snapshot.data();
@@ -105,7 +129,7 @@ async function redeemLink(linkToken) {
 
 async function consumeLink(sessionId) {
   const ref = sessionRef(sessionId);
-  await db.runTransaction(async tx => {
+  await db.runTransaction(async (tx) => {
     const snapshot = await tx.get(ref);
     if (!snapshot.exists) return;
     if (snapshot.data().status !== 'ACTIVE') return;
@@ -118,7 +142,7 @@ async function consumeLink(sessionId) {
 
 async function restoreForRetry(sessionId) {
   const ref = sessionRef(sessionId);
-  await db.runTransaction(async tx => {
+  await db.runTransaction(async (tx) => {
     const snapshot = await tx.get(ref);
     if (!snapshot.exists) return;
     const session = snapshot.data();
@@ -137,7 +161,6 @@ async function restoreForRetry(sessionId) {
   });
 }
 
-
 function rtcCredentials(session) {
   assertActiveSession(session);
   const appId = process.env.AGORA_APP_ID;
@@ -145,11 +168,24 @@ function rtcCredentials(session) {
   if (!appId || !certificate) throw new HttpError(503, 'Agora is not configured');
   const nowSeconds = Math.floor(Date.now() / 1000);
   const sessionExpiry = Math.floor(new Date(session.expiresAt).getTime() / 1000);
-  if (!Number.isFinite(sessionExpiry) || sessionExpiry <= nowSeconds) throw new HttpError(410, 'Call session has expired');
+  if (!Number.isFinite(sessionExpiry) || sessionExpiry <= nowSeconds) {
+    throw new HttpError(410, 'Call session has expired');
+  }
   const expiration = Math.min(nowSeconds + 3600, sessionExpiry);
-  return { appId, channel: session.opaqueAgoraChannel, uid: session.customerUid,
-    token: RtcTokenBuilder.buildTokenWithUid(appId, certificate, session.opaqueAgoraChannel, session.customerUid, RtcRole.PUBLISHER, expiration),
-    expiresAt: new Date(expiration * 1000).toISOString() };
+  return {
+    appId,
+    channel: session.opaqueAgoraChannel,
+    uid: session.customerUid,
+    token: RtcTokenBuilder.buildTokenWithUid(
+      appId,
+      certificate,
+      session.opaqueAgoraChannel,
+      session.customerUid,
+      RtcRole.PUBLISHER,
+      expiration,
+    ),
+    expiresAt: new Date(expiration * 1000).toISOString(),
+  };
 }
 
 async function getWebhookSession(token) {
@@ -160,7 +196,7 @@ async function getWebhookSession(token) {
 
 async function markActive(sessionId, agentId) {
   const ref = sessionRef(sessionId);
-  await db.runTransaction(async tx => {
+  await db.runTransaction(async (tx) => {
     const snapshot = await tx.get(ref);
     if (!snapshot.exists) throw new HttpError(404, 'Call session not found');
     const session = snapshot.data();
@@ -172,7 +208,7 @@ async function markActive(sessionId, agentId) {
 }
 async function markFailed(sessionId, reason) {
   const ref = sessionRef(sessionId);
-  await db.runTransaction(async tx => {
+  await db.runTransaction(async (tx) => {
     const snapshot = await tx.get(ref);
     // A server-side agent failure happens while JOINING. A browser RTC/audio
     // failure happens after the agent has already transitioned the session to
@@ -181,7 +217,28 @@ async function markFailed(sessionId, reason) {
     tx.update(ref, { status: 'FAILED', endedAt: now(), failureReason: String(reason).slice(0, 500) });
   });
 }
-async function endSession(sessionId) { await sessionRef(sessionId).update({ status: 'ENDED', endedAt: now() }); }
-async function revokeSession(sessionId) { await sessionRef(sessionId).update({ status: 'REVOKED', revokedAt: now(), endedAt: now() }); }
+async function endSession(sessionId) {
+  await sessionRef(sessionId).update({ status: 'ENDED', endedAt: now() });
+}
+async function revokeSession(sessionId) {
+  await sessionRef(sessionId).update({ status: 'REVOKED', revokedAt: now(), endedAt: now() });
+}
 
-module.exports = { createCallSession, redeemLink, consumeLink, restoreForRetry, rtcCredentials, getWebhookSession, markActive, markFailed, endSession, revokeSession, sessionRef, sessionStateRef, findSessionByHash, assertActiveSession, hash, webhookTokenFor };
+module.exports = {
+  createCallSession,
+  redeemLink,
+  consumeLink,
+  restoreForRetry,
+  rtcCredentials,
+  getWebhookSession,
+  markActive,
+  markFailed,
+  endSession,
+  revokeSession,
+  sessionRef,
+  sessionStateRef,
+  findSessionByHash,
+  assertActiveSession,
+  hash,
+  webhookTokenFor,
+};

@@ -20,7 +20,12 @@ async function requireManager(req, _res, next) {
     const memberDoc = await db.collection('members').doc(decoded.uid).get();
     if (!memberDoc.exists) throw new HttpError(403, 'Manager membership not found');
     const member = memberDoc.data();
-    if (member.role !== 'manager' || !member.organizationId || decoded.organizationId !== member.organizationId || decoded.role !== 'manager') {
+    if (
+      member.role !== 'manager' ||
+      !member.organizationId ||
+      decoded.organizationId !== member.organizationId ||
+      decoded.role !== 'manager'
+    ) {
       throw new HttpError(403, 'Manager role is required');
     }
     if (member.status && member.status !== 'ACTIVE') throw new HttpError(403, 'Manager membership is inactive');

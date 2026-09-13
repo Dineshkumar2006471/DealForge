@@ -22,17 +22,26 @@ router.post('/:sessionWebhookToken', verifyAgoraWebhook, agoraRateLimit, async (
   try {
     parse(chatSchema, req.body);
     session = await getWebhookSession(req.params.sessionWebhookToken);
-  } catch (error) { 
+  } catch (error) {
     console.error(`[chatCompletions] Error parsing request or finding session: ${error.message}`);
-    return next(error); 
+    return next(error);
   }
   const { messages, stream } = req.body;
-  
+
   const userText = agentRuntime.currentUserText(messages);
   // Do not put customer transcript text in Cloud Run logs. The durable transcript
   // is protected in Firestore; this log is only operational metadata.
-  console.log(`[chatCompletions] verified request session=${session.sessionId} messages=${messages?.length || 0} hasUserText=${Boolean(userText)}`);
-  await writeAuditEvent({ organizationId: session.organizationId, dealId: session.dealId, sessionId: session.sessionId, eventType: EVENT_TYPES.AGENT_WEBHOOK_RECEIVED, trigger: 'Verified Agora custom LLM webhook received', actionResult: { verified: true, hasUserText: Boolean(userText) } }).catch(error => console.error('Webhook audit write failed:', error.message));
+  console.log(
+    `[chatCompletions] verified request session=${session.sessionId} messages=${messages?.length || 0} hasUserText=${Boolean(userText)}`,
+  );
+  await writeAuditEvent({
+    organizationId: session.organizationId,
+    dealId: session.dealId,
+    sessionId: session.sessionId,
+    eventType: EVENT_TYPES.AGENT_WEBHOOK_RECEIVED,
+    trigger: 'Verified Agora custom LLM webhook received',
+    actionResult: { verified: true, hasUserText: Boolean(userText) },
+  }).catch((error) => console.error('Webhook audit write failed:', error.message));
 
   // Agora always sends stream: true
   if (stream !== true) {
@@ -53,7 +62,5 @@ router.post('/:sessionWebhookToken', verifyAgoraWebhook, agoraRateLimit, async (
     if (!res.writableEnded) agentRuntime.writeSafeFallback(res, `chatcmpl-error-${session.sessionId}`);
   }
 });
-
-
 
 module.exports = router;

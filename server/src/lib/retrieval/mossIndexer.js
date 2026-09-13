@@ -28,12 +28,12 @@ const INDEX_NAMES = {
   // Backward compatibility aliases
   PRODUCT: 'dealforge-knowledge',
   PLAYBOOK: 'dealforge-knowledge',
-  POLICY: 'dealforge-knowledge'
+  POLICY: 'dealforge-knowledge',
 };
 
 const INDEX_VERSIONS = {
   [INDEX_NAMES.KNOWLEDGE]: '1.0.0',
-  [INDEX_NAMES.DEAL_CONTEXT]: '1.0.0'
+  [INDEX_NAMES.DEAL_CONTEXT]: '1.0.0',
 };
 
 // In-Memory search engine fallback for sub-10ms queries & offline resilience
@@ -50,7 +50,7 @@ class LocalMemorySearchEngine {
           id: doc.id,
           text: doc.text || '',
           metadata: doc.metadata || {},
-          updatedAt: doc.updatedAt || new Date().toISOString()
+          updatedAt: doc.updatedAt || new Date().toISOString(),
         });
       }
     }
@@ -76,7 +76,7 @@ class LocalMemorySearchEngine {
           id: doc.id,
           text: doc.text || '',
           metadata: doc.metadata || {},
-          updatedAt: doc.updatedAt || new Date().toISOString()
+          updatedAt: doc.updatedAt || new Date().toISOString(),
         });
       }
     }
@@ -105,14 +105,21 @@ class LocalMemorySearchEngine {
     }
 
     const { topK = 3, filter = null } = options;
-    const tokens = String(queryText || '').toLowerCase().split(/\W+/).filter(t => t.length > 2);
+    const tokens = String(queryText || '')
+      .toLowerCase()
+      .split(/\W+/)
+      .filter((t) => t.length > 2);
 
     const scored = [];
     for (const doc of docMap.values()) {
       // Apply metadata filter if specified
       if (filter && typeof filter === 'object') {
         let matches = true;
-        if (filter.organizationId && doc.metadata?.organizationId && doc.metadata.organizationId !== filter.organizationId) {
+        if (
+          filter.organizationId &&
+          doc.metadata?.organizationId &&
+          doc.metadata.organizationId !== filter.organizationId
+        ) {
           matches = false;
         }
         if (filter.dealId && doc.metadata?.dealId && doc.metadata.dealId !== filter.dealId) {
@@ -130,13 +137,13 @@ class LocalMemorySearchEngine {
       }
 
       // Base relevance normalization
-      const normalizedScore = tokens.length > 0 ? (score / tokens.length) : 0.1;
+      const normalizedScore = tokens.length > 0 ? score / tokens.length : 0.1;
       if (score > 0 || tokens.length === 0) {
         scored.push({
           id: doc.id,
           score: Math.min(1.0, Math.max(0.1, normalizedScore)),
           text: doc.text,
-          metadata: doc.metadata
+          metadata: doc.metadata,
         });
       }
     }
@@ -145,7 +152,7 @@ class LocalMemorySearchEngine {
     scored.sort((a, b) => b.score - a.score);
     return {
       query: queryText,
-      docs: scored.slice(0, topK)
+      docs: scored.slice(0, topK),
     };
   }
 
@@ -195,7 +202,7 @@ const KNOWLEDGE_DOCS = [
     title: 'DealForge Pricing Plans & Tiers',
     text: 'DealForge offers three commercial pricing tiers: Starter Plan is $29 per user per month for teams up to 50 seats, including core CRM integration and email automation. Pro Plan is $79 per user per month for teams up to 500 seats, featuring advanced analytics, custom workflows, API access, and priority support. Enterprise Plan is $149 per user per month with custom seat scaling (100+ seats), dedicated account manager, SSO SAML, custom integrations, and 99.9% SLA. Annual commitment offers an additional 5% discount, while a 24-month multi-year commitment offers up to 10% discount.',
     version: '1.0.0',
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   },
   {
     id: 'prod_capabilities',
@@ -203,7 +210,7 @@ const KNOWLEDGE_DOCS = [
     title: 'Core Platform Capabilities',
     text: 'DealForge is an autonomous AI sales agent built for B2B enterprise revenue teams. Key capabilities include: Real-time autonomous voice conversations, deterministic commercial policy guardrails, automated MEDDIC evidence extraction from natural speech, bidirectional CRM synchronization with HubSpot and Salesforce, real-time meeting scheduling via Cal.com, and immutable audit trail logging with exact cryptographic provenance.',
     version: '1.0.0',
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   },
   {
     id: 'prod_integrations',
@@ -211,7 +218,7 @@ const KNOWLEDGE_DOCS = [
     title: 'Integrations & Ecosystem',
     text: 'DealForge integrates out of the box with HubSpot CRM (bidirectional contact, deal stage, and note synchronization), Cal.com for live calendar availability and booking, OpenAI Realtime WebRTC for ultra-low-latency voice transport, Sarvam Bulbul v3 for natural Indian-accented voice synthesis, Agora Voice WebRTC fallback, and Google Vertex AI Gemini 2.5 Flash for enterprise reasoning.',
     version: '1.0.0',
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   },
   {
     id: 'prod_security_compliance',
@@ -219,7 +226,7 @@ const KNOWLEDGE_DOCS = [
     title: 'Security, Privacy & Compliance',
     text: 'Enterprise security is built into every layer of DealForge: SOC2 Type II compliance, encryption in transit via TLS 1.3 and at rest via AES-256, SAML 2.0 and OAuth enterprise identity, role-based access control (RBAC), multi-tenant data isolation with organization-scoped Firestore security rules, and strict zero-credential-leakage guarantees.',
     version: '1.0.0',
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   },
   {
     id: 'prod_faqs',
@@ -227,7 +234,7 @@ const KNOWLEDGE_DOCS = [
     title: 'Product & Implementation FAQs',
     text: 'Q: How fast can DealForge be deployed? Standard onboarding takes under 14 days with dedicated engineering support. Q: What happens if an AI agent needs human approval? When a discount between 18% and 25% is requested, the deterministic policy engine immediately halts auto-approval, registers a PENDING APPROVAL record, and notifies the sales manager. Q: Does DealForge store sensitive voice recordings? Audio is processed ephemerally in memory; only verified transcripts, structured MEDDIC evidence, and audit logs are stored.',
     version: '1.0.0',
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   },
   // Playbook & MEDDIC
   {
@@ -236,7 +243,7 @@ const KNOWLEDGE_DOCS = [
     title: 'MEDDIC Qualification Framework',
     text: 'DealForge strictly qualifies enterprise deals using the 6 MEDDIC pillars: Metrics (quantifiable business impact, e.g. 35% rep time saved on inbound qualification), Economic Buyer (the executive with discretionary sign-off authority, e.g. VP of Sales or CRO), Decision Criteria (technical requirements, pricing, integrations, security), Decision Process (formal evaluation, legal, security, and procurement steps), Identify Pain (root business problem causing revenue friction), and Champion (internal influencer who actively sells DealForge internally).',
     version: '1.0.0',
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   },
   {
     id: 'playbook_discovery_questions',
@@ -244,7 +251,7 @@ const KNOWLEDGE_DOCS = [
     title: 'Discovery & Qualification Questions',
     text: 'Recommended discovery questions: How many sales reps are currently on your team? What is the single biggest bottleneck in your sales qualification process today? What percentage of rep time is spent on manual lead triage versus active selling? Who besides yourself will be reviewing and approving this purchase? What other solutions or competitors are you evaluating?',
     version: '1.0.0',
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   },
   {
     id: 'playbook_objection_handling',
@@ -252,7 +259,7 @@ const KNOWLEDGE_DOCS = [
     title: 'Objection Handling & Competitive Positioning',
     text: 'Competitor comparison: When a customer mentions evaluating Salesforce or generic voice bots, emphasize that DealForge is not a replacement CRM or simple IVR. DealForge is an active autonomous sales negotiation copilot that operates with deterministic policy boundaries, live MEDDIC extraction, and manager approval queues. Unlike static bots, DealForge guarantees policy safety and never hallucinates unauthorized commercial commitments.',
     version: '1.0.0',
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   },
   {
     id: 'playbook_negotiation_tradeoffs',
@@ -260,7 +267,7 @@ const KNOWLEDGE_DOCS = [
     title: 'Trade-off & Value Concession Playbook',
     text: 'Rule of negotiation: Never give away cash discounts without receiving value or offering non-cash concessions first. When a customer pushes on price, offer structured concessions in order: 1. 60-day extended trial (reduces perceived risk), 2. Dedicated priority onboarding specialist for 30 days (accelerates time-to-value for teams over 50 reps), 3. Waived setup fee, 4. 5% annual commitment discount for upfront payment.',
     version: '1.0.0',
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   },
   // Human-Readable Policy Reference (Non-Authoritative Advisory Context)
   {
@@ -269,7 +276,7 @@ const KNOWLEDGE_DOCS = [
     title: 'Commercial Discount Thresholds & Approval Rules',
     text: 'Deterministic Discount Policy: Autonomous limit is 18% maximum discount. Any discount request between 0% and 18% can be autonomously confirmed by DealForge. Any discount request greater than 18% up to 25% strictly requires human sales manager review and is placed into PENDING APPROVAL state. Any discount request exceeding 25% is strictly REJECTED and cannot be approved by either the agent or standard workflow.',
     version: '1.0.0',
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   },
   {
     id: 'policy_approval_workflow',
@@ -277,7 +284,7 @@ const KNOWLEDGE_DOCS = [
     title: 'Manager Approval Workflow Policy',
     text: 'When a customer requests terms exceeding autonomous thresholds (such as a 25% discount), the agent must clearly state: "I can take that request to my manager for review. I will update you as soon as I have their decision." The agent must never promise immediate acceptance. Once the manager logs an approval in the DealForge dashboard, the approved operation is executed on the next turn.',
     version: '1.0.0',
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   },
   {
     id: 'policy_escalation_rules',
@@ -285,14 +292,18 @@ const KNOWLEDGE_DOCS = [
     title: 'Commercial Escalation & Meeting Rules',
     text: 'Meeting requests must always route through verified calendar booking via Cal.com. The agent must never promise a time slot without real-time availability verification. CRM sync operations to HubSpot require validated fields and manager oversight.',
     version: '1.0.0',
-    updatedAt: new Date().toISOString()
-  }
+    updatedAt: new Date().toISOString(),
+  },
 ];
 
 // Compatibility exports
-const PRODUCT_DOCS = KNOWLEDGE_DOCS.filter(d => ['pricing', 'capabilities', 'integrations', 'security', 'faq'].includes(d.type));
-const PLAYBOOK_DOCS = KNOWLEDGE_DOCS.filter(d => ['meddic', 'discovery', 'objections', 'negotiation'].includes(d.type));
-const POLICY_DOCS = KNOWLEDGE_DOCS.filter(d => d.type === 'policy_reference');
+const PRODUCT_DOCS = KNOWLEDGE_DOCS.filter((d) =>
+  ['pricing', 'capabilities', 'integrations', 'security', 'faq'].includes(d.type),
+);
+const PLAYBOOK_DOCS = KNOWLEDGE_DOCS.filter((d) =>
+  ['meddic', 'discovery', 'objections', 'negotiation'].includes(d.type),
+);
+const POLICY_DOCS = KNOWLEDGE_DOCS.filter((d) => d.type === 'policy_reference');
 
 /**
  * Synchronize the Unified Knowledge Documentation index (dealforge-knowledge)
@@ -302,15 +313,15 @@ async function syncKnowledgeDocs() {
   const indexName = INDEX_NAMES.KNOWLEDGE;
   const localEngine = getLocalEngine();
 
-  const formattedDocs = KNOWLEDGE_DOCS.map(d => ({
+  const formattedDocs = KNOWLEDGE_DOCS.map((d) => ({
     id: d.id,
     text: `${d.title}. ${d.text}`,
     metadata: {
       type: d.type,
       title: d.title,
       version: d.version,
-      updatedAt: d.updatedAt
-    }
+      updatedAt: d.updatedAt,
+    },
   }));
 
   // Always seed local engine for zero-downtime, sub-2ms query responses
@@ -320,7 +331,7 @@ async function syncKnowledgeDocs() {
   if (client && typeof client.createIndex === 'function' && client !== localEngine) {
     try {
       const existing = await client.listIndexes().catch(() => []);
-      const indexExists = existing.some(idx => idx.name === indexName);
+      const indexExists = existing.some((idx) => idx.name === indexName);
 
       if (indexExists) {
         if (typeof client.addDocs === 'function') {
@@ -378,9 +389,8 @@ async function syncDealContext(dealId, dealState = {}) {
   if (dealState.dealStage) parts.push(`Deal Stage: ${dealState.dealStage}`);
   if (dealState.nextBestAction?.action) parts.push(`Next Best Action: ${dealState.nextBestAction.action}`);
 
-  const summaryText = parts.length > 0
-    ? parts.join('. ') + '.'
-    : `Deal ${dealId} in ${dealState.dealStage || 'DISCOVERY'} stage.`;
+  const summaryText =
+    parts.length > 0 ? parts.join('. ') + '.' : `Deal ${dealId} in ${dealState.dealStage || 'DISCOVERY'} stage.`;
 
   const doc = {
     id: `deal_${dealId}`,
@@ -393,8 +403,8 @@ async function syncDealContext(dealId, dealState = {}) {
       title: `Deal Context for ${dealState.company?.value || dealId}`,
       source: 'authoritative_firestore',
       version: '1.0.0',
-      updatedAt: new Date().toISOString()
-    }
+      updatedAt: new Date().toISOString(),
+    },
   };
 
   const client = getClient();
@@ -407,7 +417,7 @@ async function syncDealContext(dealId, dealState = {}) {
   if (client && typeof client.addDocs === 'function' && client !== localEngine) {
     try {
       const existing = await client.listIndexes().catch(() => []);
-      const indexExists = existing.some(idx => idx.name === indexName);
+      const indexExists = existing.some((idx) => idx.name === indexName);
       if (indexExists) {
         await client.addDocs(indexName, [doc]);
       } else {
@@ -434,7 +444,7 @@ async function initializeAllIndexes() {
     // Backwards compatibility mappings
     product: knowledgeRes,
     playbook: knowledgeRes,
-    policy: knowledgeRes
+    policy: knowledgeRes,
   };
 }
 
@@ -453,5 +463,5 @@ module.exports = {
   syncPolicyDocs,
   syncDealContext,
   initializeAllIndexes,
-  LocalMemorySearchEngine
+  LocalMemorySearchEngine,
 };

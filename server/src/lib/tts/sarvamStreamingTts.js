@@ -35,11 +35,7 @@ const DEFAULT_CODEC = 'mp3';
  * @param {number} [options.timeoutMs=8000] - Hard timeout before fallback
  * @returns {Promise<{ totalChunks: number, ttfbMs: number, totalMs: number, audioBase64List: string[] }>}
  */
-async function streamSpeech(text, {
-  speaker = DEFAULT_SPEAKER,
-  onChunk = null,
-  timeoutMs = 8000
-} = {}) {
+async function streamSpeech(text, { speaker = DEFAULT_SPEAKER, onChunk = null, timeoutMs = 8000 } = {}) {
   const apiKey = process.env.SARVAM_API_KEY;
   const cleanText = String(text || '').trim();
 
@@ -77,14 +73,14 @@ async function streamSpeech(text, {
         chunkIndex: 0,
         audioBase64,
         contentType: 'audio/wav',
-        isFinal: true
+        isFinal: true,
       });
     }
     return {
       totalChunks: 1,
       ttfbMs: latency,
       totalMs: latency,
-      audioBase64List: [audioBase64]
+      audioBase64List: [audioBase64],
     };
   }
 
@@ -105,7 +101,9 @@ async function streamSpeech(text, {
           if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
             ws.close();
           }
-        } catch (_) {}
+        } catch (_) {
+          /* best-effort close */
+        }
       }
     };
 
@@ -116,20 +114,20 @@ async function streamSpeech(text, {
       console.warn(`[Sarvam Streaming TTS] WebSocket timed out after ${timeoutMs}ms. Falling back to REST.`);
       // Safe fallback to REST synthesizeSpeech
       synthesizeSpeech(cleanText, { speaker, codec: 'wav' })
-        .then(restRes => {
+        .then((restRes) => {
           if (typeof onChunk === 'function' && restRes.audioBase64) {
             onChunk({
               chunkIndex: 0,
               audioBase64: restRes.audioBase64,
               contentType: 'audio/wav',
-              isFinal: true
+              isFinal: true,
             });
           }
           resolve({
             totalChunks: 1,
             ttfbMs: Date.now() - tStart,
             totalMs: Date.now() - tStart,
-            audioBase64List: [restRes.audioBase64]
+            audioBase64List: [restRes.audioBase64],
           });
         })
         .catch(reject);
@@ -138,31 +136,35 @@ async function streamSpeech(text, {
     try {
       ws = new WebSocket(SARVAM_WS_URL, {
         headers: {
-          'Api-Subscription-Key': apiKey
-        }
+          'Api-Subscription-Key': apiKey,
+        },
       });
 
       ws.on('open', () => {
         // Step 1: Config
-        ws.send(JSON.stringify({
-          type: 'config',
-          data: {
-            model: 'bulbul:v3',
-            language_code: 'en-IN',
-            speaker: speaker || DEFAULT_SPEAKER,
-            speech_sample_rate: DEFAULT_SAMPLE_RATE,
-            output_audio_codec: DEFAULT_CODEC,
-            output_audio_bitrate: '128k',
-            min_buffer_size: 50,
-            max_chunk_length: 150
-          }
-        }));
+        ws.send(
+          JSON.stringify({
+            type: 'config',
+            data: {
+              model: 'bulbul:v3',
+              language_code: 'en-IN',
+              speaker: speaker || DEFAULT_SPEAKER,
+              speech_sample_rate: DEFAULT_SAMPLE_RATE,
+              output_audio_codec: DEFAULT_CODEC,
+              output_audio_bitrate: '128k',
+              min_buffer_size: 50,
+              max_chunk_length: 150,
+            },
+          }),
+        );
 
         // Step 2: Text
-        ws.send(JSON.stringify({
-          type: 'text',
-          data: { text: cleanText }
-        }));
+        ws.send(
+          JSON.stringify({
+            type: 'text',
+            data: { text: cleanText },
+          }),
+        );
 
         // Step 3: Flush
         ws.send(JSON.stringify({ type: 'flush' }));
@@ -185,7 +187,7 @@ async function streamSpeech(text, {
                 audioBase64: chunkBase64,
                 contentType: msg.data.content_type || 'audio/mp3',
                 ttfbMs,
-                isFinal: false
+                isFinal: false,
               });
             }
           } else if (msg.type === 'event' && msg.data?.event_type === 'final') {
@@ -193,7 +195,7 @@ async function streamSpeech(text, {
             isSettled = true;
             cleanup();
             const totalMs = Date.now() - tStart;
-            const ttfbMs = tFirstByte ? (tFirstByte - tStart) : totalMs;
+            const ttfbMs = tFirstByte ? tFirstByte - tStart : totalMs;
 
             if (typeof onChunk === 'function') {
               onChunk({
@@ -201,7 +203,7 @@ async function streamSpeech(text, {
                 audioBase64: null,
                 contentType: 'audio/mp3',
                 ttfbMs,
-                isFinal: true
+                isFinal: true,
               });
             }
 
@@ -209,7 +211,7 @@ async function streamSpeech(text, {
               totalChunks: audioBase64List.length,
               ttfbMs,
               totalMs,
-              audioBase64List
+              audioBase64List,
             });
           }
         } catch (parseErr) {
@@ -223,20 +225,20 @@ async function streamSpeech(text, {
         cleanup();
         console.warn('[Sarvam Streaming TTS] WebSocket error, falling back to REST:', err.message);
         synthesizeSpeech(cleanText, { speaker, codec: 'wav' })
-          .then(restRes => {
+          .then((restRes) => {
             if (typeof onChunk === 'function' && restRes.audioBase64) {
               onChunk({
                 chunkIndex: 0,
                 audioBase64: restRes.audioBase64,
                 contentType: 'audio/wav',
-                isFinal: true
+                isFinal: true,
               });
             }
             resolve({
               totalChunks: 1,
               ttfbMs: Date.now() - tStart,
               totalMs: Date.now() - tStart,
-              audioBase64List: [restRes.audioBase64]
+              audioBase64List: [restRes.audioBase64],
             });
           })
           .catch(reject);
@@ -247,12 +249,12 @@ async function streamSpeech(text, {
           isSettled = true;
           cleanup();
           const totalMs = Date.now() - tStart;
-          const ttfbMs = tFirstByte ? (tFirstByte - tStart) : totalMs;
+          const ttfbMs = tFirstByte ? tFirstByte - tStart : totalMs;
           resolve({
             totalChunks: audioBase64List.length,
             ttfbMs,
             totalMs,
-            audioBase64List
+            audioBase64List,
           });
         }
       });
@@ -262,20 +264,20 @@ async function streamSpeech(text, {
       cleanup();
       console.warn('[Sarvam Streaming TTS] Init error, falling back to REST:', createErr.message);
       synthesizeSpeech(cleanText, { speaker, codec: 'wav' })
-        .then(restRes => {
+        .then((restRes) => {
           if (typeof onChunk === 'function' && restRes.audioBase64) {
             onChunk({
               chunkIndex: 0,
               audioBase64: restRes.audioBase64,
               contentType: 'audio/wav',
-              isFinal: true
+              isFinal: true,
             });
           }
           resolve({
             totalChunks: 1,
             ttfbMs: Date.now() - tStart,
             totalMs: Date.now() - tStart,
-            audioBase64List: [restRes.audioBase64]
+            audioBase64List: [restRes.audioBase64],
           });
         })
         .catch(reject);
@@ -286,5 +288,5 @@ async function streamSpeech(text, {
 module.exports = {
   streamSpeech,
   SARVAM_WS_URL,
-  DEFAULT_SPEAKER
+  DEFAULT_SPEAKER,
 };

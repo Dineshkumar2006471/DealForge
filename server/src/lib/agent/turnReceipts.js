@@ -7,14 +7,16 @@ const { db, admin } = require('../firebase/admin');
 const DUPLICATE_WINDOW_MS = 60_000;
 
 function normalizedTurn(text) {
-  return String(text || '')
-    .normalize('NFKC')
-    .toLocaleLowerCase('en-US')
-    // ASR finalization often changes punctuation ("users" → "users."). It
-    // must not create a second customer turn or second spoken answer.
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
-    .trim()
-    .replace(/\s+/g, ' ');
+  return (
+    String(text || '')
+      .normalize('NFKC')
+      .toLocaleLowerCase('en-US')
+      // ASR finalization often changes punctuation ("users" → "users."). It
+      // must not create a second customer turn or second spoken answer.
+      .replace(/[^\p{L}\p{N}]+/gu, ' ')
+      .trim()
+      .replace(/\s+/g, ' ')
+  );
 }
 
 function receiptIdFor(text) {
@@ -36,7 +38,7 @@ async function claimTurnReceipt(sessionId, text, turnId = null) {
   let claimed = false;
   let cachedResponse = null;
 
-  await db.runTransaction(async tx => {
+  await db.runTransaction(async (tx) => {
     const textSnapshot = await tx.get(textRef);
     let turnSnapshot = null;
     if (turnRef) {

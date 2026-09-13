@@ -10,7 +10,16 @@ const { v4: uuidv4 } = require('uuid');
 /**
  * Store an evidence record.
  */
-async function storeEvidence({ organizationId, dealId, sessionId, claim, utteranceTurn, confidence, source, dealStateField }) {
+async function storeEvidence({
+  organizationId,
+  dealId,
+  sessionId,
+  claim,
+  utteranceTurn,
+  confidence,
+  source,
+  dealStateField,
+}) {
   const evidenceId = uuidv4();
   const record = {
     organizationId,
@@ -32,12 +41,9 @@ async function storeEvidence({ organizationId, dealId, sessionId, claim, utteran
  * Get all evidence for a deal.
  */
 async function getEvidenceForDeal(dealId) {
-  const snapshot = await db.collection('evidence')
-    .where('dealId', '==', dealId)
-    .orderBy('timestamp', 'asc')
-    .get();
+  const snapshot = await db.collection('evidence').where('dealId', '==', dealId).orderBy('timestamp', 'asc').get();
 
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 }
 
 /**
@@ -45,13 +51,14 @@ async function getEvidenceForDeal(dealId) {
  * Answers: "Why does DealForge think teamSize is 300?"
  */
 async function getEvidenceChain(dealId, field) {
-  const snapshot = await db.collection('evidence')
+  const snapshot = await db
+    .collection('evidence')
     .where('dealId', '==', dealId)
     .where('dealStateField', '==', field)
     .orderBy('timestamp', 'asc')
     .get();
 
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 }
 
 module.exports = {

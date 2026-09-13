@@ -16,7 +16,8 @@ async function escalateToHuman(args, context) {
   await setEscalation(dealId, reason, urgency || 'medium', organizationId, sessionId);
 
   await writeAuditEvent({
-    organizationId, dealId,
+    organizationId,
+    dealId,
     sessionId,
     eventType: EVENT_TYPES.ESCALATION_TRIGGERED,
     trigger: `Escalation: ${reason}`,
@@ -32,7 +33,8 @@ async function escalateToHuman(args, context) {
 }
 
 registerTool('escalate_to_human', escalateToHuman, {
-  description: 'Escalate the conversation to a human manager. Use when the customer is hostile, makes legal threats, or the conversation is stuck.',
+  description:
+    'Escalate the conversation to a human manager. Use when the customer is hostile, makes legal threats, or the conversation is stuck.',
   parameters: {
     type: 'object',
     properties: {

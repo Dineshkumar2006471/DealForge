@@ -5,14 +5,8 @@ const { streamSpeech, SARVAM_WS_URL, DEFAULT_SPEAKER } = require('../src/lib/tts
 
 describe('Sarvam Bulbul v3 Streaming TTS Service', () => {
   it('1. Rejects empty or missing text with clear validation error', async () => {
-    await assert.rejects(
-      async () => streamSpeech(''),
-      /text is required/
-    );
-    await assert.rejects(
-      async () => streamSpeech(null),
-      /text is required/
-    );
+    await assert.rejects(async () => streamSpeech(''), /text is required/);
+    await assert.rejects(async () => streamSpeech(null), /text is required/);
   });
 
   it('2. Exposes correct default configuration and official AsyncAPI endpoint', () => {
@@ -30,7 +24,7 @@ describe('Sarvam Bulbul v3 Streaming TTS Service', () => {
       onChunk: (chunk) => {
         receivedChunks.push(chunk);
       },
-      timeoutMs: 7000
+      timeoutMs: 7000,
     });
 
     assert.ok(result.totalChunks >= 1, 'Should deliver at least one audio chunk');
@@ -52,7 +46,10 @@ describe('Sarvam Bulbul v3 Streaming TTS Service', () => {
       const serialized = JSON.stringify(res);
       assert.ok(!serialized.includes(process.env.SARVAM_API_KEY || 'no_key_found'), 'API key must never be in result');
     } catch (err) {
-      assert.ok(!err.message.includes(process.env.SARVAM_API_KEY || 'no_key_found'), 'API key must never be in error message');
+      assert.ok(
+        !err.message.includes(process.env.SARVAM_API_KEY || 'no_key_found'),
+        'API key must never be in error message',
+      );
     }
   });
 });

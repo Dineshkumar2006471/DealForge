@@ -12,14 +12,17 @@ const { HttpError } = require('../security/auth');
  * @param {'wav'|'linear16'} [options.codec='wav']
  * @returns {Promise<{ audioBuffer: Buffer, audioBase64: string, sampleRate: number, codec: string, durationMs?: number }>}
  */
-async function synthesizeSpeech(text, {
-  speaker = process.env.SARVAM_SPEAKER || 'ishita',
-  model = process.env.SARVAM_MODEL || 'bulbul:v3',
-  languageCode = process.env.SARVAM_LANGUAGE || 'en-IN',
-  pace = 1.0,
-  sampleRate = 16000,
-  codec = 'wav'
-} = {}) {
+async function synthesizeSpeech(
+  text,
+  {
+    speaker = process.env.SARVAM_SPEAKER || 'ishita',
+    model = process.env.SARVAM_MODEL || 'bulbul:v3',
+    languageCode = process.env.SARVAM_LANGUAGE || 'en-IN',
+    pace = 1.0,
+    sampleRate = 16000,
+    codec = 'wav',
+  } = {},
+) {
   const sarvamApiKey = process.env.SARVAM_API_KEY;
   if (!sarvamApiKey) {
     throw new HttpError(503, 'Sarvam API key not configured');
@@ -35,7 +38,7 @@ async function synthesizeSpeech(text, {
     speaker,
     pace,
     speech_sample_rate: sampleRate,
-    output_audio_codec: codec
+    output_audio_codec: codec,
   };
 
   const start = Date.now();
@@ -48,14 +51,14 @@ async function synthesizeSpeech(text, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'api-subscription-key': sarvamApiKey
+          'api-subscription-key': sarvamApiKey,
         },
         body: JSON.stringify(sarvamPayload),
-        signal: AbortSignal.timeout(15000)
+        signal: AbortSignal.timeout(15000),
       });
       if (response.ok) break;
       if (response.status >= 500 && attempt < 3) {
-        await new Promise(r => setTimeout(r, 400 * attempt));
+        await new Promise((r) => setTimeout(r, 400 * attempt));
         continue;
       }
       break;
@@ -63,7 +66,7 @@ async function synthesizeSpeech(text, {
       lastError = err;
       console.warn(`[SarvamTTS] Attempt ${attempt} failed:`, err.message);
       if (attempt < 3) {
-        await new Promise(r => setTimeout(r, 400 * attempt));
+        await new Promise((r) => setTimeout(r, 400 * attempt));
       }
     }
   }
@@ -94,7 +97,7 @@ async function synthesizeSpeech(text, {
     audioBase64,
     sampleRate,
     codec,
-    latency
+    latency,
   };
 }
 

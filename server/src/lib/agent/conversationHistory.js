@@ -8,14 +8,20 @@ const { db, admin } = require('../firebase/admin');
 const { v4: uuidv4 } = require('uuid');
 
 async function getHistory(sessionId) {
-  const snap = await db.collection('callSessions').doc(sessionId).collection('messages').orderBy('sequence', 'desc').limit(50).get();
-  return snap.docs.map(doc => doc.data().message).reverse();
+  const snap = await db
+    .collection('callSessions')
+    .doc(sessionId)
+    .collection('messages')
+    .orderBy('sequence', 'desc')
+    .limit(50)
+    .get();
+  return snap.docs.map((doc) => doc.data().message).reverse();
 }
 
 async function addMessage(sessionId, message) {
   const sessionRef = db.collection('callSessions').doc(sessionId);
   const messageRef = sessionRef.collection('messages').doc(uuidv4());
-  await db.runTransaction(async tx => {
+  await db.runTransaction(async (tx) => {
     const session = await tx.get(sessionRef);
     if (!session.exists) throw new Error('Call session not found');
     const sequence = (session.data().messageSequence || 0) + 1;
@@ -34,9 +40,11 @@ async function addMessage(sessionId, message) {
 
 async function getTurnNumber(sessionId) {
   const history = await getHistory(sessionId);
-  return history.filter(m => m.role === 'user').length;
+  return history.filter((m) => m.role === 'user').length;
 }
 
-async function clearHistory() { throw new Error('Conversation deletion is controlled by retention policy'); }
+async function clearHistory() {
+  throw new Error('Conversation deletion is controlled by retention policy');
+}
 
 module.exports = { getHistory, addMessage, getTurnNumber, clearHistory };

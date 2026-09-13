@@ -27,25 +27,39 @@ const CACHE_TTL_MS = 60_000; // 1 minute for static knowledge queries
  * Classify customer utterance into retrieval topics
  */
 function classifyRetrievalRoute(userText) {
-  const text = String(userText || '').toLowerCase().trim();
+  const text = String(userText || '')
+    .toLowerCase()
+    .trim();
 
   // 1. Greetings & Pleasantries -> No retrieval
-  if (!text || (/^(hi|hello|hey|good\s*(morning|afternoon|evening)|howdy|sup)\b/i.test(text) && text.split(/\s+/).length <= 4)) {
+  if (
+    !text ||
+    (/^(hi|hello|hey|good\s*(morning|afternoon|evening)|howdy|sup)\b/i.test(text) && text.split(/\s+/).length <= 4)
+  ) {
     return { route: 'GREETING', indexes: [] };
   }
 
   // 2. Small Talk -> No retrieval
-  if (/^(how are you|who are you|thanks|thank you|ok|okay|yes|no|got it|sure|sounds good)\b/i.test(text) && text.split(/\s+/).length <= 5) {
+  if (
+    /^(how are you|who are you|thanks|thank you|ok|okay|yes|no|got it|sure|sounds good)\b/i.test(text) &&
+    text.split(/\s+/).length <= 5
+  ) {
     return { route: 'SMALL_TALK', indexes: [] };
   }
 
   // 3. Meeting requests -> Action path (Cal.com); bypass retrieval
-  if (/(?:schedule|book|set up)\s*(?:a\s*)?(?:review|meeting|call|demo|follow-up)/i.test(text) || (/\b(tomorrow|available|slots?|calendar|meet)\b/i.test(text) && /meet/i.test(text))) {
+  if (
+    /(?:schedule|book|set up)\s*(?:a\s*)?(?:review|meeting|call|demo|follow-up)/i.test(text) ||
+    (/\b(tomorrow|available|slots?|calendar|meet)\b/i.test(text) && /meet/i.test(text))
+  ) {
     return { route: 'MEETING', indexes: [] };
   }
 
   // 4. CRM operations -> Action path (HubSpot); bypass retrieval
-  if (/\b(crm|hubspot|salesforce|sync contacts?|update record)\b/i.test(text) && /(?:sync|update|send|export)/i.test(text)) {
+  if (
+    /\b(crm|hubspot|salesforce|sync contacts?|update record)\b/i.test(text) &&
+    /(?:sync|update|send|export)/i.test(text)
+  ) {
     return { route: 'CRM', indexes: [] };
   }
 
@@ -81,7 +95,13 @@ function classifyRetrievalRoute(userText) {
 /**
  * Execute a single index query with a strict timeout
  */
-async function querySingleIndexWithTimeout(client, indexName, queryText, options = {}, timeoutMs = RETRIEVAL_TIMEOUT_MS) {
+async function querySingleIndexWithTimeout(
+  client,
+  indexName,
+  queryText,
+  options = {},
+  timeoutMs = RETRIEVAL_TIMEOUT_MS,
+) {
   let timer;
   const timeoutPromise = new Promise((_, reject) => {
     timer = setTimeout(() => reject(new Error(`Moss query timeout after ${timeoutMs}ms on ${indexName}`)), timeoutMs);
@@ -122,7 +142,7 @@ async function retrieveRelevantContext({
   sessionId = null,
   userText = '',
   topic = null,
-  topK = 3
+  topK = 3,
 } = {}) {
   const tStart = performance.now();
 
@@ -133,12 +153,14 @@ async function retrieveRelevantContext({
       index: 'none',
       provider: 'moss',
       cacheHit: false,
-      route: 'EMPTY'
+      route: 'EMPTY',
     };
   }
 
   // Route classification
-  const routeDecision = topic ? { route: topic.toUpperCase(), indexes: [INDEX_NAMES.KNOWLEDGE] } : classifyRetrievalRoute(userText);
+  const routeDecision = topic
+    ? { route: topic.toUpperCase(), indexes: [INDEX_NAMES.KNOWLEDGE] }
+    : classifyRetrievalRoute(userText);
   if (!routeDecision.indexes || routeDecision.indexes.length === 0) {
     const latencyMs = Number((performance.now() - tStart).toFixed(2));
     return {
@@ -147,7 +169,7 @@ async function retrieveRelevantContext({
       index: 'bypass',
       provider: 'moss',
       cacheHit: false,
-      route: routeDecision.route
+      route: routeDecision.route,
     };
   }
 
@@ -167,7 +189,7 @@ async function retrieveRelevantContext({
         index: cached.index,
         provider: 'moss',
         cacheHit: true,
-        route: routeDecision.route
+        route: routeDecision.route,
       };
     }
     queryCache.delete(cacheKey);
@@ -180,7 +202,7 @@ async function retrieveRelevantContext({
   try {
     const queryPromises = targetIndexes.map(async (indexName) => {
       const queryOptions = {
-        topK: Math.max(1, Math.min(topK, 5))
+        topK: Math.max(1, Math.min(topK, 5)),
       };
       if (indexName === INDEX_NAMES.DEAL_CONTEXT) {
         queryOptions.filter = { organizationId, dealId };
@@ -200,7 +222,7 @@ async function retrieveRelevantContext({
             text: doc.text || '',
             score: typeof doc.score === 'number' ? Number(doc.score.toFixed(4)) : 0.5,
             index: indexName,
-            type: doc.metadata?.type || 'general'
+            type: doc.metadata?.type || 'general',
           });
         }
       }
@@ -216,7 +238,7 @@ async function retrieveRelevantContext({
       queryCache.set(cacheKey, {
         results: finalResults,
         index: primaryIndex,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
     }
 
@@ -226,19 +248,19 @@ async function retrieveRelevantContext({
       index: primaryIndex,
       provider: 'moss',
       cacheHit: false,
-      route: routeDecision.route
+      route: routeDecision.route,
     };
   } catch (err) {
     // Safe diagnostic log — never leak secrets or customer credentials
     console.warn(`[MOSS RETRIEVAL FALLBACK] ${primaryIndex}: ${err.message}. Serving from local search engine.`);
-    
+
     // High-speed fallback to LocalMemorySearchEngine so retrieval never fails silently
     const localEngine = getLocalEngine();
-    let fallbackDocs = [];
+    const fallbackDocs = [];
     try {
       for (const indexName of targetIndexes) {
         const queryOptions = {
-          topK: Math.max(1, Math.min(topK, 5))
+          topK: Math.max(1, Math.min(topK, 5)),
         };
         if (indexName === INDEX_NAMES.DEAL_CONTEXT) {
           queryOptions.filter = { organizationId, dealId };
@@ -252,13 +274,15 @@ async function retrieveRelevantContext({
               text: doc.text || '',
               score: typeof doc.score === 'number' ? Number(doc.score.toFixed(4)) : 0.5,
               index: indexName,
-              type: doc.metadata?.type || 'general'
+              type: doc.metadata?.type || 'general',
             });
           }
         }
       }
       fallbackDocs.sort((a, b) => b.score - a.score);
-    } catch (_) {}
+    } catch (_) {
+      /* fallback search best-effort */
+    }
 
     const latencyMs = Number((performance.now() - tStart).toFixed(2));
     return {
@@ -268,7 +292,7 @@ async function retrieveRelevantContext({
       provider: 'moss_fallback',
       cacheHit: false,
       route: routeDecision.route,
-      error: err.message
+      error: err.message,
     };
   }
 }
@@ -276,5 +300,5 @@ async function retrieveRelevantContext({
 module.exports = {
   retrieveRelevantContext,
   classifyRetrievalRoute,
-  RETRIEVAL_TIMEOUT_MS
+  RETRIEVAL_TIMEOUT_MS,
 };

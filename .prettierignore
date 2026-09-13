@@ -1,0 +1,10 @@
+node_modules
+dist
+*.log
+*.wav
+*.png
+*.jpg
+server/test-results
+.firebase
+package-lock.json
+frontend/public/node_modules

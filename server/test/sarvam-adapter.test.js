@@ -28,9 +28,7 @@ test.after(() => {
 test('Sarvam TTS adapter rejects requests without input text', async () => {
   process.env.SARVAM_API_KEY = 'test-sarvam-key';
   const app = createTestApp();
-  const res = await request(app)
-    .post('/api/public/tts/sarvam')
-    .send({});
+  const res = await request(app).post('/api/public/tts/sarvam').send({});
   assert.equal(res.status, 400);
   assert.equal(res.body.error.code, 'missing_parameter');
 });
@@ -39,11 +37,9 @@ test('Sarvam TTS adapter validates INTERNAL_API_KEY when set', async () => {
   process.env.SARVAM_API_KEY = 'test-sarvam-key';
   process.env.INTERNAL_API_KEY = 'secret-token';
   const app = createTestApp();
-  
+
   // Unauthorized request
-  const unauthRes = await request(app)
-    .post('/api/public/tts/sarvam')
-    .send({ input: 'Hello' });
+  const unauthRes = await request(app).post('/api/public/tts/sarvam').send({ input: 'Hello' });
   assert.equal(unauthRes.status, 401);
   assert.equal(unauthRes.body.error.code, 'invalid_token');
 

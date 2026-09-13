@@ -15,7 +15,7 @@ async function checkProductAvailability(args, context) {
       return {
         available: false,
         message: `Plan "${plan}" not found. Available plans: Starter, Pro, Enterprise.`,
-        plans: getAllProducts().map(p => p.name),
+        plans: getAllProducts().map((p) => p.name),
       };
     }
 
@@ -47,7 +47,7 @@ async function checkProductAvailability(args, context) {
   // No specific plan — return all
   return {
     available: true,
-    plans: getAllProducts().map(p => ({
+    plans: getAllProducts().map((p) => ({
       name: p.name,
       pricePerSeat: p.pricePerSeat,
       features: p.features.slice(0, 3),

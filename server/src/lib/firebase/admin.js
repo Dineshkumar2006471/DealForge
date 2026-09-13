@@ -10,7 +10,9 @@ const { FieldValue, getFirestore, Timestamp } = require('firebase-admin/firestor
 
 const existingApp = getApps()[0];
 const projectId = process.env.FIREBASE_PROJECT_ID || process.env.GCP_PROJECT_ID || 'dealforge-507515';
-const app = existingApp || initializeApp({
+const app =
+  existingApp ||
+  initializeApp({
     projectId,
   });
 
