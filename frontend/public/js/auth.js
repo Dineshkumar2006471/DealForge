@@ -86,15 +86,67 @@ auth.onAuthStateChanged(async (user) => {
   }
 });
 
-// Helper for Google Sign-In
+// Check for pending redirect sign-in result on load
+if (auth && typeof auth.getRedirectResult === 'function') {
+  auth.getRedirectResult().then((result) => {
+    if (result && result.user) {
+      console.log('✅ Google redirect sign-in successful for:', result.user.email);
+    }
+  }).catch((error) => {
+    console.error('Google redirect sign-in error:', error);
+    const errEl = document.getElementById('error-message');
+    if (errEl) {
+      errEl.innerText = error.message;
+      errEl.style.display = 'block';
+    }
+  });
+}
+
+// Helper for Google Sign-In with automatic redirect fallback if popups are blocked
 async function signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+  const btn = document.getElementById('google-sign-in-btn');
+  const errEl = document.getElementById('error-message');
+  if (errEl) errEl.style.display = 'none';
+
+  const origHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span>Connecting to Google...</span>`;
+  }
+
   try {
     const result = await auth.signInWithPopup(provider);
     return result;
   } catch (error) {
-    console.error('Google Sign-In Error:', error);
-    const errEl = document.getElementById('error-message');
+    console.warn('Google popup error:', error.code, error.message);
+
+    // If popup was blocked by browser or cross-domain communication severed,
+    // seamlessly fall back to full-page redirect!
+    if (
+      error.code === 'auth/popup-blocked' ||
+      error.code === 'auth/cancelled-popup-request' ||
+      error.code === 'auth/internal-error' ||
+      (error.message && error.message.toLowerCase().includes('popup'))
+    ) {
+      console.log('🔄 Popup blocked by browser. Automatically redirecting to Google Sign-In...');
+      if (btn) {
+        btn.innerHTML = `<span>Redirecting to Google...</span>`;
+      }
+      try {
+        await auth.signInWithRedirect(provider);
+        return;
+      } catch (redirErr) {
+        console.error('Redirect error:', redirErr);
+        error = redirErr;
+      }
+    }
+
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+    }
     if (errEl) {
       errEl.innerText = error.message;
       errEl.style.display = 'block';
