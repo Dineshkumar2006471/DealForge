@@ -11,7 +11,14 @@
     "noEmit": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node"]
   },
-  "include": ["src/types/**/*.ts"]
+  "include": [
+    "src/types/**/*.ts",
+    "src/lib/policy/**/*.ts",
+    "src/lib/schema/**/*.ts",
+    "src/lib/security/**/*.ts",
+    "src/lib/evidence/**/*.ts"
+  ]
 }

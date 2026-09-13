@@ -4,10 +4,18 @@ export default function ApprovalPanel({ approvals = [], onResolveApproval }) {
   const pending = approvals.filter((a) => a.status === 'PENDING');
 
   return (
-    <div className="glass-panel" style={{ padding: '1.5rem', borderTop: pending.length ? '3px solid var(--accent-amber)' : '1px solid var(--border-subtle)' }}>
+    <div
+      className="glass-panel"
+      style={{
+        padding: '1.5rem',
+        borderTop: pending.length ? '3px solid var(--accent-amber)' : '1px solid var(--border-subtle)',
+      }}
+    >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
         <div>
-          <h3 className="heading-display" style={{ fontSize: '1.125rem' }}>Manager Approval Queue</h3>
+          <h3 className="heading-display" style={{ fontSize: '1.125rem' }}>
+            Manager Approval Queue
+          </h3>
           <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Deterministic policy threshold violations</p>
         </div>
         <span className={pending.length ? 'badge badge-amber' : 'badge badge-emerald'}>
@@ -33,7 +41,14 @@ export default function ApprovalPanel({ approvals = [], onResolveApproval }) {
                   padding: '1.25rem',
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '0.5rem',
+                  }}
+                >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <span className="badge badge-amber">Approval Required</span>
                     <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{req.toolName}</span>
@@ -48,8 +63,17 @@ export default function ApprovalPanel({ approvals = [], onResolveApproval }) {
                 </p>
 
                 {requestedPct && (
-                  <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)', marginBottom: '1rem', fontSize: '0.8125rem' }}>
-                    <strong>Proposed Commercial Concession:</strong> {requestedPct}% discount requested by customer. Max autonomous limit: 18%.
+                  <div
+                    style={{
+                      background: 'rgba(0,0,0,0.2)',
+                      padding: '0.5rem 0.75rem',
+                      borderRadius: 'var(--radius-sm)',
+                      marginBottom: '1rem',
+                      fontSize: '0.8125rem',
+                    }}
+                  >
+                    <strong>Proposed Commercial Concession:</strong> {requestedPct}% discount requested by customer. Max
+                    autonomous limit: 18%.
                   </div>
                 )}
 
@@ -64,7 +88,11 @@ export default function ApprovalPanel({ approvals = [], onResolveApproval }) {
                   <button
                     className="btn-primary"
                     onClick={() => onResolveApproval && onResolveApproval(req.approvalId, 'APPROVED')}
-                    style={{ padding: '0.4rem 1rem', fontSize: '0.8125rem', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' }}
+                    style={{
+                      padding: '0.4rem 1rem',
+                      fontSize: '0.8125rem',
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    }}
                   >
                     Authorize & Replay
                   </button>

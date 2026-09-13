@@ -20,10 +20,12 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
-      - name: ESLint (zero errors required)
+      - name: Server ESLint (zero errors required)
         run: npx eslint server/src/ server/test/
+      - name: Frontend ESLint (zero errors required)
+        run: npm run lint:frontend
       - name: Prettier (format check)
-        run: npx prettier --check "server/src/**/*.js" "server/test/**/*.js"
+        run: npm run format:check
       - name: TypeScript Typecheck (zero errors required)
         run: npm run typecheck
       - name: Frontend Build (production bundle)
@@ -53,7 +55,8 @@ jobs:
           distribution: temurin
           java-version: '21'
       - run: npm ci
-      - run: npm run check
+      - name: Backend Syntax & Module Check
+        run: npm run check
       - name: Server Unit, Integration, Contract, Adversarial & E2E Tests (with Coverage)
         run: npm run test:coverage
       - name: Firestore Security Rules Emulator Test

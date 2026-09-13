@@ -1,6 +1,9 @@
 import React from 'react';
 
-export default function LoadingState({ message = 'Loading workspace state...', subtext = 'Synchronizing authoritative deal state' }) {
+export default function LoadingState({
+  message = 'Loading workspace state...',
+  subtext = 'Synchronizing authoritative deal state',
+}) {
   return (
     <div className="glass-panel" style={{ padding: '3rem 2rem', textAlign: 'center', margin: '1rem 0' }}>
       <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.25rem' }}>
@@ -18,9 +21,7 @@ export default function LoadingState({ message = 'Loading workspace state...', s
       <h3 style={{ fontSize: '1.125rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
         {message}
       </h3>
-      <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-        {subtext}
-      </p>
+      <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>{subtext}</p>
       <style>{`
         @keyframes spin {
           to { transform: rotate(360deg); }

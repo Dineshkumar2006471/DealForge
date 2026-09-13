@@ -28,14 +28,30 @@ export default function DealTable({ deals = [], selectedDealId, onSelectDeal }) 
 
   return (
     <div className="glass-panel" style={{ overflow: 'hidden' }}>
-      <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 className="heading-display" style={{ fontSize: '1.125rem' }}>Active Deal Pipeline</h3>
+      <div
+        style={{
+          padding: '1.25rem 1.5rem',
+          borderBottom: '1px solid var(--border-subtle)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        <h3 className="heading-display" style={{ fontSize: '1.125rem' }}>
+          Active Deal Pipeline
+        </h3>
         <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{deals.length} deals tracked</span>
       </div>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
           <thead>
-            <tr style={{ background: 'rgba(255, 255, 255, 0.02)', borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>
+            <tr
+              style={{
+                background: 'rgba(255, 255, 255, 0.02)',
+                borderBottom: '1px solid var(--border-subtle)',
+                color: 'var(--text-muted)',
+              }}
+            >
               <th style={{ padding: '0.85rem 1.5rem', fontWeight: 600 }}>Company</th>
               <th style={{ padding: '0.85rem 1rem', fontWeight: 600 }}>Stage</th>
               <th style={{ padding: '0.85rem 1rem', fontWeight: 600 }}>Target ARR</th>
@@ -65,9 +81,7 @@ export default function DealTable({ deals = [], selectedDealId, onSelectDeal }) 
                       ID: {deal.id.slice(0, 12)}...
                     </div>
                   </td>
-                  <td style={{ padding: '1rem 1rem' }}>
-                    {getStageBadge(deal.stage || deal.conversationStage)}
-                  </td>
+                  <td style={{ padding: '1rem 1rem' }}>{getStageBadge(deal.stage || deal.conversationStage)}</td>
                   <td style={{ padding: '1rem 1rem', fontFamily: 'var(--font-mono)' }}>
                     ${Number(deal.targetArr || 50000).toLocaleString()}
                   </td>
@@ -78,7 +92,12 @@ export default function DealTable({ deals = [], selectedDealId, onSelectDeal }) 
                           width: '8px',
                           height: '8px',
                           borderRadius: '50%',
-                          background: healthScore >= 80 ? 'var(--accent-emerald)' : healthScore >= 60 ? 'var(--accent-amber)' : 'var(--accent-rose)',
+                          background:
+                            healthScore >= 80
+                              ? 'var(--accent-emerald)'
+                              : healthScore >= 60
+                                ? 'var(--accent-amber)'
+                                : 'var(--accent-rose)',
                         }}
                       />
                       <span>{healthScore}%</span>

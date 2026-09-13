@@ -232,23 +232,23 @@ Empirical latency measurements from 100 automated retrieval queries and 20 repre
 
 ### Test Suite Results
 ```bash
-ℹ tests 96
-ℹ suites 3
-ℹ pass 95
+ℹ tests 347
+ℹ pass 346
 ℹ fail 0
 ℹ cancelled 0
-ℹ skipped 1 # Emulator-only integration test
-ℹ duration_ms 12819.66
+ℹ skipped 1 # Requires live Java Firebase emulator in CI environment
 ```
+- **Categorization**: 206 Unit Tests, 46 Integration Tests, 48 Contract Tests, 40 Security Tests, 6 E2E Tests, 1 Live Emulator Test.
 - **Northstar Labs E2E Verification**: 6/6 turns passed (100% green), including 56 concrete audit events and verified discount escalation.
 
 ---
 
-## Production Standards: 100% Score Across 4 Dimensions
+## Production Standards: Engineering Quality Verification
 
-### 1. Code Quality
+### 1. Code Quality & Type Safety
+- **TypeScript Compiler Checking**: Critical domain contracts and business modules (`domain.ts`, policy engine, validation, auth, evidence store) are compiler-checked via `tsc --noEmit`.
 - **Typed Schemas**: Zod validation across all tool inputs, manager endpoints, and webhook payloads.
-- **Strict Lint & Check**: Zero unhandled promise rejections, clean syntax verification across all scripts.
+- **Strict Lint & Check**: Zero unhandled promise rejections, clean syntax verification, ESLint 9 across backend and frontend React source.
 - **Modularity**: Clean separation of concerns between agent runtime, policy engine, retrieval layer, and integrations.
 
 ### 2. Security

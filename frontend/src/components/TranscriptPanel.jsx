@@ -2,10 +2,15 @@ import React from 'react';
 
 export default function TranscriptPanel({ turns = [], isStreaming = false }) {
   return (
-    <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div
+      className="glass-panel"
+      style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', height: '100%' }}
+    >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <h3 className="heading-display" style={{ fontSize: '1.125rem' }}>Real-Time Call Transcript</h3>
+          <h3 className="heading-display" style={{ fontSize: '1.125rem' }}>
+            Real-Time Call Transcript
+          </h3>
           {isStreaming && (
             <div className="waveform-container">
               <div className="waveform-bar" />
@@ -24,7 +29,16 @@ export default function TranscriptPanel({ turns = [], isStreaming = false }) {
           No active call turn logged. Audio stream will transcribe in real-time.
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', overflowY: 'auto', maxHeight: '420px', paddingRight: '0.5rem' }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1rem',
+            overflowY: 'auto',
+            maxHeight: '420px',
+            paddingRight: '0.5rem',
+          }}
+        >
           {turns.map((turn, i) => {
             const isAgent = turn.speaker === 'agent';
             return (
@@ -37,8 +51,18 @@ export default function TranscriptPanel({ turns = [], isStreaming = false }) {
                   maxWidth: '85%',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem', alignSelf: isAgent ? 'flex-start' : 'flex-end' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: isAgent ? 'var(--accent-cyan)' : '#818cf8' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    marginBottom: '0.25rem',
+                    alignSelf: isAgent ? 'flex-start' : 'flex-end',
+                  }}
+                >
+                  <span
+                    style={{ fontSize: '0.75rem', fontWeight: 600, color: isAgent ? 'var(--accent-cyan)' : '#818cf8' }}
+                  >
                     {isAgent ? 'DealForge AI Agent' : 'Customer Prospect'}
                   </span>
                   {turn.latencyMs && (

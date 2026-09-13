@@ -20,5 +20,10 @@
     "lcov",
     "json-summary"
   ],
-  "reports-dir": "./coverage"
+  "reports-dir": "./coverage",
+  "check-coverage": true,
+  "lines": 75,
+  "statements": 75,
+  "functions": 70,
+  "branches": 70
 }

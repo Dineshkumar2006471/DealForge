@@ -1,6 +1,13 @@
 import React from 'react';
 
-export default function CallControls({ isCallActive = false, isMuted = false, onStartCall, onEndCall, onToggleMute, ttsLatency = 142 }) {
+export default function CallControls({
+  isCallActive = false,
+  isMuted = false,
+  onStartCall,
+  onEndCall,
+  onToggleMute,
+  ttsLatency = 142,
+}) {
   return (
     <div
       className="glass-panel"

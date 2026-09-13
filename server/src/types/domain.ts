@@ -28,12 +28,7 @@ export interface ConfidenceGatedField<T = string | number> {
 }
 
 export type MEDDICPillar =
-  | 'metrics'
-  | 'economicBuyer'
-  | 'decisionCriteria'
-  | 'decisionProcess'
-  | 'identifyPain'
-  | 'champion';
+  'metrics' | 'economicBuyer' | 'decisionCriteria' | 'decisionProcess' | 'identifyPain' | 'champion';
 
 export interface MEDDICItem {
   status: 'confirmed' | 'unknown' | 'not_asked';
@@ -118,22 +113,29 @@ export interface PolicyDecision {
   requiresApproval?: boolean;
 }
 
-export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXECUTING';
+export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXECUTING' | 'CONSUMED' | 'EXPIRED';
 
 export interface ApprovalRequest {
   approvalId: string;
   organizationId: string;
   dealId: string;
-  sessionId: string;
-  toolName: string;
-  validatedArgs: Record<string, unknown>;
-  requestedBy: 'agent' | 'user';
+  sessionId?: string | null;
+  exactToolName?: string;
+  toolName?: string;
+  exactValidatedArguments?: Record<string, unknown>;
+  validatedArgs?: Record<string, unknown>;
+  requestedBy: 'agent' | 'user' | string;
   status: ApprovalStatus;
   policyReason: string;
   approvedBy?: string;
   reviewedAt?: string;
   createdAt: string;
-  updatedAt: string;
+  expiresAt?: string;
+  resolvedAt?: string | null;
+  resolvedBy?: string | null;
+  consumedAt?: string | null;
+  executionStartedAt?: string | null;
+  lastExecutionError?: string | null;
 }
 
 export interface ToolCall {

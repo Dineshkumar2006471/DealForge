@@ -15,21 +15,29 @@ export default function IntegrationCard({ title, icon, provider, status = 'ACTIV
       }}
     >
       <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+        <div
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <span style={{ fontSize: '1.5rem' }}>{icon}</span>
             <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>{title}</span>
           </div>
-          <span className={isHealthy ? 'badge badge-emerald' : 'badge badge-amber'}>
-            {status}
-          </span>
+          <span className={isHealthy ? 'badge badge-emerald' : 'badge badge-amber'}>{status}</span>
         </div>
-        <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-          {details}
-        </p>
+        <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>{details}</p>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', paddingTop: '0.75rem', borderTop: '1px solid var(--border-subtle)' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          fontSize: '0.75rem',
+          color: 'var(--text-muted)',
+          paddingTop: '0.75rem',
+          borderTop: '1px solid var(--border-subtle)',
+        }}
+      >
         <span style={{ fontFamily: 'var(--font-mono)' }}>{provider}</span>
         {latency && <span>{latency}</span>}
       </div>

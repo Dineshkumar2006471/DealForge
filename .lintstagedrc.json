@@ -1,4 +1,5 @@
 {
-  "server/src/**/*.js": ["eslint --fix", "prettier --write"],
-  "server/test/**/*.js": ["eslint --fix", "prettier --write"]
+  "server/src/**/*.{js,ts}": ["eslint --fix", "prettier --write"],
+  "server/test/**/*.js": ["eslint --fix", "prettier --write"],
+  "frontend/src/**/*.{js,jsx,css,html}": ["eslint --fix", "prettier --write"]
 }

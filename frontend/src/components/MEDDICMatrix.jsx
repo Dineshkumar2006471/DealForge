@@ -26,7 +26,9 @@ export default function MEDDICMatrix({ meddic = {} }) {
     <div className="glass-panel" style={{ padding: '1.5rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
         <div>
-          <h3 className="heading-display" style={{ fontSize: '1.125rem' }}>MEDDIC Qualification Matrix</h3>
+          <h3 className="heading-display" style={{ fontSize: '1.125rem' }}>
+            MEDDIC Qualification Matrix
+          </h3>
           <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Evidence-backed qualification gating</p>
         </div>
         <span className="badge badge-indigo">
@@ -48,14 +50,38 @@ export default function MEDDICMatrix({ meddic = {} }) {
                 padding: '1rem',
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '0.5rem',
+                }}
+              >
                 <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>{PILLAR_LABELS[key]}</span>
                 {getStatusBadge(item)}
               </div>
-              <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '0.75rem', minHeight: '36px' }}>
-                {item.value || item.status === 'confirmed' ? (item.value || 'Verified via customer turn') : 'Pending discovery in conversation'}
+              <p
+                style={{
+                  fontSize: '0.8125rem',
+                  color: 'var(--text-secondary)',
+                  marginBottom: '0.75rem',
+                  minHeight: '36px',
+                }}
+              >
+                {item.value || item.status === 'confirmed'
+                  ? item.value || 'Verified via customer turn'
+                  : 'Pending discovery in conversation'}
               </p>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  fontSize: '0.75rem',
+                  color: 'var(--text-muted)',
+                }}
+              >
                 <span>Confidence: {confidence > 0 ? `${confidence}%` : 'N/A'}</span>
                 <span>{item.updatedAt ? new Date(item.updatedAt).toLocaleTimeString() : 'Awaiting turn'}</span>
               </div>
