@@ -29,8 +29,13 @@ function formatEntry(level, message, meta = {}) {
     service: 'dealforge-core',
   };
   if (meta.requestId) entry.requestId = meta.requestId;
+  if (meta.correlationId) entry.correlationId = meta.correlationId;
+  if (meta.organizationId) entry.organizationId = meta.organizationId;
   if (meta.sessionId) entry.sessionId = meta.sessionId;
   if (meta.dealId) entry.dealId = meta.dealId;
+  if (meta.turnId) entry.turnId = meta.turnId;
+  if (typeof meta.durationMs === 'number') entry.durationMs = meta.durationMs;
+  if (typeof meta.retryCount === 'number') entry.retryCount = meta.retryCount;
   if (meta.error) {
     entry.error = {
       message: mask(meta.error.message || String(meta.error)),
@@ -39,8 +44,19 @@ function formatEntry(level, message, meta = {}) {
     };
   }
   // Merge remaining safe metadata
+  const standardFields = [
+    'requestId',
+    'correlationId',
+    'organizationId',
+    'sessionId',
+    'dealId',
+    'turnId',
+    'durationMs',
+    'retryCount',
+    'error',
+  ];
   for (const [key, val] of Object.entries(meta)) {
-    if (!['requestId', 'sessionId', 'dealId', 'error'].includes(key)) {
+    if (!standardFields.includes(key)) {
       entry[key] = typeof val === 'string' ? mask(val) : val;
     }
   }

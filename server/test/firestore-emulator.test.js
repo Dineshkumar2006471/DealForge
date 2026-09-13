@@ -25,7 +25,11 @@ test.after(async () => {
 });
 test(
   'emulator enforces anonymous denial, organization isolation, and browser write denial',
-  { skip: !enabled },
+  {
+    skip: !enabled
+      ? 'FIRESTORE_EMULATOR_HOST environment variable not set (requires live Java emulator process)'
+      : false,
+  },
   async () => {
     await assertFails(env.unauthenticatedContext().firestore().collection('deals').doc('deal-a').get());
     const manager = env.authenticatedContext('manager-a', { role: 'manager', organizationId: 'org-a' }).firestore();

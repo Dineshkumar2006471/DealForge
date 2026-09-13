@@ -1,12 +1,14 @@
 {
   "name": "dealforge",
   "private": true,
-  "workspaces": ["server"],
+  "workspaces": ["server", "frontend"],
   "scripts": {
     "lint": "eslint server/src/ server/test/",
     "lint:fix": "eslint --fix server/src/ server/test/",
     "format": "prettier --write \"server/src/**/*.js\" \"server/test/**/*.js\"",
     "format:check": "prettier --check \"server/src/**/*.js\" \"server/test/**/*.js\"",
+    "typecheck": "npm run typecheck --workspace=server",
+    "build:frontend": "npm run build --workspace=frontend",
     "prepare": "node -e \"if (!process.env.CI && !process.env.GITHUB_ACTIONS) { try { require('child_process').execSync('npx husky', { stdio: 'inherit' }); } catch {} }\""
   },
   "devDependencies": {

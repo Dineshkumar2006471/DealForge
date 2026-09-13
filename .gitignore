@@ -19,3 +19,6 @@ test-results/
 scratch/
 recent_logs.json
 session_logs.json
+frontend/dist/
+server/coverage/
+coverage/

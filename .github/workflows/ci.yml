@@ -24,9 +24,13 @@ jobs:
         run: npx eslint server/src/ server/test/
       - name: Prettier (format check)
         run: npx prettier --check "server/src/**/*.js" "server/test/**/*.js"
+      - name: TypeScript Typecheck (zero errors required)
+        run: npm run typecheck
+      - name: Frontend Build (production bundle)
+        run: npm run build:frontend
 
   server:
-    name: Server Tests
+    name: Server Tests & Verification
     needs: quality
     runs-on: ubuntu-latest
     defaults:
@@ -50,8 +54,10 @@ jobs:
           java-version: '21'
       - run: npm ci
       - run: npm run check
-      - run: npm test
-      - run: npx firebase-tools --config ../firebase.json emulators:exec --only firestore "node --test test/firestore-emulator.test.js"
+      - name: Server Unit, Integration, Contract, Adversarial & E2E Tests (with Coverage)
+        run: npm run test:coverage
+      - name: Firestore Security Rules Emulator Test
+        run: npx firebase-tools --config ../firebase.json emulators:exec --only firestore "node --test test/firestore-emulator.test.js"
 
   publication-safety:
     name: Secret Scan
