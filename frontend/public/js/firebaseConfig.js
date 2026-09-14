@@ -8,19 +8,9 @@
 // Firebase SDK loaded via CDN in HTML files
 // This file initializes the app and exports references
 
-// Default public Firebase configuration for project dealforge-507515.
-// Canonical authDomain is ALWAYS dealforge-507515.firebaseapp.com,
-// which matches the registered Authorized Redirect URIs in Google Cloud Console OAuth 2.0 Client.
-const DEFAULT_FIREBASE_CONFIG = {
-  apiKey: 'AIzaSyAuQ1K1hKPBzgy1nKtJ0JYGaarSGQv9rU8',
-  appId: '1:442569512705:web:6b2edfbe5988608d9dad00',
-  authDomain: 'dealforge-507515.firebaseapp.com',
-  projectId: 'dealforge-507515',
-  storageBucket: 'dealforge-507515.firebasestorage.app',
-  messagingSenderId: '442569512705',
-};
-
-const FIREBASE_CONFIG = window.DEALFORGE_FIREBASE_CONFIG || DEFAULT_FIREBASE_CONFIG;
+// Firebase Hosting injects the active project's public web configuration at /__/firebase/init.js.
+// Local development can set window.DEALFORGE_FIREBASE_CONFIG before this script if needed.
+const FIREBASE_CONFIG = window.DEALFORGE_FIREBASE_CONFIG || null;
 
 let app, auth, firestore;
 
