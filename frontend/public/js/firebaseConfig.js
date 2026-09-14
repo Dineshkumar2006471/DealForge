@@ -8,9 +8,19 @@
 // Firebase SDK loaded via CDN in HTML files
 // This file initializes the app and exports references
 
-// Firebase Hosting injects the active project's public web configuration at /__/firebase/init.js.
-// Local development must set window.DEALFORGE_FIREBASE_CONFIG before this script.
-const FIREBASE_CONFIG = window.DEALFORGE_FIREBASE_CONFIG || null;
+// Default public Firebase configuration for project dealforge-507515.
+// Canonical authDomain is ALWAYS dealforge-507515.firebaseapp.com,
+// which matches the registered Authorized Redirect URIs in Google Cloud Console OAuth 2.0 Client.
+const DEFAULT_FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyAuQ1K1hKPBzgy1nKtJ0JYGaarSGQv9rU8',
+  appId: '1:442569512705:web:6b2edfbe5988608d9dad00',
+  authDomain: 'dealforge-507515.firebaseapp.com',
+  projectId: 'dealforge-507515',
+  storageBucket: 'dealforge-507515.firebasestorage.app',
+  messagingSenderId: '442569512705',
+};
+
+const FIREBASE_CONFIG = window.DEALFORGE_FIREBASE_CONFIG || DEFAULT_FIREBASE_CONFIG;
 
 let app, auth, firestore;
 
@@ -19,26 +29,22 @@ function initFirebase() {
 
   if (firebase.apps.length) {
     app = firebase.app();
-  } else if (FIREBASE_CONFIG) {
-    app = firebase.initializeApp(FIREBASE_CONFIG);
   } else {
-    throw new Error('Firebase Hosting initialization is required');
+    app = firebase.initializeApp(FIREBASE_CONFIG);
   }
 
-  // Same-origin authDomain optimization:
-  // If running on dealforge-507515.web.app or a custom domain, align authDomain with the current host
-  // so the auth handler is served same-origin (dealforge-507515.web.app/__/auth/handler).
-  // This completely eliminates third-party cookie blocking and cross-origin iframe / popup connection failures.
-  if (typeof window !== 'undefined' && window.location && window.location.hostname && !['localhost', '127.0.0.1'].includes(window.location.hostname)) {
-    if (app.options && (window.location.hostname.endsWith('.web.app') || window.location.hostname.endsWith('.firebaseapp.com'))) {
-      app.options.authDomain = window.location.hostname;
-    }
+  // Canonical authDomain MUST be dealforge-507515.firebaseapp.com.
+  // Never override authDomain with window.location.hostname (such as dealforge-507515.web.app).
+  // Google's OAuth 2.0 Client ID specifically authorizes https://dealforge-507515.firebaseapp.com/__/auth/handler.
+  // Overriding authDomain with web.app causes Google OAuth Error 400: redirect_uri_mismatch.
+  if (app.options) {
+    app.options.authDomain = 'dealforge-507515.firebaseapp.com';
   }
 
   auth = firebase.auth();
   firestore = firebase.firestore();
 
-  console.log('🔥 Firebase initialized with authDomain:', app.options?.authDomain);
+  console.log('🔥 Firebase initialized with canonical authDomain:', app.options?.authDomain);
   return { app, auth, firestore };
 }
 

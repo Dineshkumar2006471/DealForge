@@ -31,7 +31,7 @@ auth.onAuthStateChanged(async (user) => {
       let claims = await user.getIdTokenResult();
       if (claims.claims.role !== 'manager' || !claims.claims.organizationId) {
         console.log('🔄 Provisioning manager access for user:', user.email);
-        const apiUrl = (window.DEALFORGE_API_URL || 'https://dealforge-core-6li7mfkrtq-uc.a.run.app/api').replace(/\/$/, '');
+        const apiUrl = (window.DEALFORGE_API_URL || 'https://dealforge-core-442569512705.us-central1.run.app/api').replace(/\/$/, '');
         const idToken = await user.getIdToken();
         const provRes = await fetch(`${apiUrl}/public/auth/provision`, {
           method: 'POST',

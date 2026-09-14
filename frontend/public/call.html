@@ -242,6 +242,8 @@
 
     const streamingPlayer = new StreamingAudioQueuePlayer();
 
+    let currentAudioResolver = null;
+
     function playAssistantAudio(audioBase64) {
       return new Promise((resolve) => {
         if (!audioBase64) return resolve();
@@ -250,26 +252,39 @@
             try { currentAudio.pause(); } catch (_) {}
             currentAudio = null;
           }
+          if (currentAudioResolver) {
+            const prevResolve = currentAudioResolver;
+            currentAudioResolver = null;
+            prevResolve();
+          }
+          currentAudioResolver = resolve;
           currentAudio = new Audio('data:audio/wav;base64,' + audioBase64);
           transitionState(CALL_STATES.SPEAKING);
-          currentAudio.onended = () => {
+          const finish = () => {
             currentAudio = null;
+            if (currentAudioResolver) {
+              const r = currentAudioResolver;
+              currentAudioResolver = null;
+              r();
+            }
             if (active) transitionState(CALL_STATES.LISTENING);
-            resolve();
           };
+          currentAudio.onended = finish;
           currentAudio.onerror = (err) => {
             console.error('Audio playback error:', err);
-            currentAudio = null;
-            if (active) transitionState(CALL_STATES.LISTENING);
-            resolve();
+            finish();
           };
           currentAudio.play().catch(err => {
             console.warn('Audio play was interrupted or rejected:', err);
-            if (active) transitionState(CALL_STATES.LISTENING);
-            resolve();
+            finish();
           });
         } catch (e) {
           console.error('Failed to create Audio object:', e);
+          if (currentAudioResolver) {
+            const r = currentAudioResolver;
+            currentAudioResolver = null;
+            r();
+          }
           if (active) transitionState(CALL_STATES.LISTENING);
           resolve();
         }
@@ -629,6 +644,7 @@
         active = true;
         muteButton.disabled = false;
         setButton('End Call', false);
+        callButton.disabled = false;
         if (credentials.expiresAt) scheduleRenewal(credentials.expiresAt);
         // Live transcript deltas handle captions for openai_realtime and browser_speech.
         // Only Agora needs the 2.5s polling fallback since it has no client-side transcript events.
@@ -669,18 +685,37 @@
     }
 
     async function end() {
+      if (!active && callButton.disabled) return;
+      active = false;
       callButton.disabled = true;
-      setStatus('Disconnecting…');
+      setStatus('Call ended');
+      setButton('Call ended', false);
+
+      if (currentAudioResolver) {
+        const r = currentAudioResolver;
+        currentAudioResolver = null;
+        r();
+      }
+
+      // 1. Immediately clean up local hardware, WebRTC, mic, and timers
       try {
-        const result = await api(`/public/calls/${encodeURIComponent(linkToken)}/stop`, { method: 'POST', body: JSON.stringify({ sessionCredential: call.sessionCredential }) });
         await cleanup();
-        setButton('Call ended', false);
-        callButton.disabled = true;
-        setStatus(result.agentStopped ? 'Call ended' : 'Disconnected — agent cleanup pending', result.agentStopped ? undefined : 'var(--amber)');
+      } catch (cleanErr) {
+        console.warn('Local call cleanup note:', cleanErr);
+      }
+
+      // 2. Notify backend that the call has stopped (graceful / non-blocking)
+      try {
+        if (call?.sessionCredential && linkToken) {
+          const result = await api(`/public/calls/${encodeURIComponent(linkToken)}/stop`, {
+            method: 'POST',
+            body: JSON.stringify({ sessionCredential: call.sessionCredential })
+          });
+          setStatus(result?.agentStopped ? 'Call ended' : 'Call ended — agent cleanup pending');
+        }
       } catch (error) {
-        errorText.textContent = error.message || 'Unable to confirm call termination.';
-        setStatus('Termination needs attention', 'var(--red)');
-        callButton.disabled = false;
+        console.warn('Backend call stop notification note:', error.message || error);
+        setStatus('Call ended');
       }
     }
 
@@ -723,6 +758,11 @@
       } else if (currentAudio) {
         try { currentAudio.pause(); } catch (_) {}
         currentAudio = null;
+        if (currentAudioResolver) {
+          const r = currentAudioResolver;
+          currentAudioResolver = null;
+          r();
+        }
         transitionState(CALL_STATES.LISTENING);
       }
       if (currentState === CALL_STATES.LISTENING) {
