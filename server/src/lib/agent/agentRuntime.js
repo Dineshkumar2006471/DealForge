@@ -16,7 +16,11 @@ require('../tools/bookMeeting');
 require('../tools/requestMeetingDetails');
 require('../tools/escalateToHuman');
 require('../integrations/hubspot');
-async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-${uuidv4()}`, turnId = null } = {}) {
+async function executeCustomerTurn(
+  session,
+  userText,
+  { res, chatId = `chatcmpl-${uuidv4()}`, turnId = null, onTextChunk = null } = {},
+) {
   const context = {
     organizationId: session.organizationId,
     dealId: session.dealId,
@@ -67,17 +71,26 @@ async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-
     return { duplicate: true, content: '', receiptId: receipt.receiptId };
   }
 
-  await addMessage(session.sessionId, { role: 'user', content: userText.trim() });
+  // Fire-and-forget: user message persistence is not needed before Gemini sees
+  // the text (it already has userText in its messages array via currentModelMessages).
+  const addUserMsgPromise = addMessage(session.sessionId, { role: 'user', content: userText.trim() }).catch((e) =>
+    console.warn('Deferred addMessage(user) note:', e.message),
+  );
 
-  // Deterministic conversation evidence extraction (MEDDIC and Deal State)
+  // Fire-and-forget: evidence extraction updates deal state *for future turns*.
+  // The current turn already has the user text in Gemini's context.
   const tEvidenceStart = Date.now();
-  try {
-    const { extractAndApplyEvidence } = require('../evidence/evidenceExtractor');
-    await extractAndApplyEvidence(userText, context);
-  } catch (extractErr) {
-    console.warn('Evidence extraction note:', extractErr.message);
-  }
-  const tEvidenceEnd = Date.now();
+  let tEvidenceEnd = tEvidenceStart;
+  const evidencePromise = (async () => {
+    try {
+      const { extractAndApplyEvidence } = require('../evidence/evidenceExtractor');
+      await extractAndApplyEvidence(userText, context);
+    } catch (extractErr) {
+      console.warn('Evidence extraction note:', extractErr.message);
+    } finally {
+      tEvidenceEnd = Date.now();
+    }
+  })();
 
   // A percentage discount request is a high-value policy boundary. Route it
   // deterministically instead of hoping the generative model elects to call a
@@ -216,6 +229,14 @@ async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-
         if (!tGeminiFirstToken) tGeminiFirstToken = Date.now();
         content += choice.delta.content;
         initialTextChunks.push(chunk);
+        // Stream text deltas to caller immediately so TTS can start on first sentence
+        if (typeof onTextChunk === 'function') {
+          try {
+            onTextChunk(choice.delta.content);
+          } catch (_) {
+            /* best-effort */
+          }
+        }
       }
       if (choice.delta?.tool_calls) {
         calls.push(
@@ -323,21 +344,31 @@ async function executeCustomerTurn(session, userText, { res, chatId = `chatcmpl-
         }
       }
     }
+    // Persist assistant message — must complete before return so receipt attachment works
     if (content) await addMessage(session.sessionId, { role: 'assistant', content });
-    await writeAuditEvent({
-      organizationId: context.organizationId,
-      dealId: context.dealId,
-      sessionId: context.sessionId,
-      eventType: EVENT_TYPES.AGENT_RESPONSE_COMPLETED,
-      trigger: 'Response completed',
-      actionResult: { verified: true, hasContent: Boolean(content) },
+    // Ensure deferred user message + evidence are settled before metrics are final
+    await Promise.all([addUserMsgPromise, evidencePromise]).catch(() => {});
+    // Non-critical: audit + autonomy deferred to fire-and-forget
+    setImmediate(async () => {
+      try {
+        await writeAuditEvent({
+          organizationId: context.organizationId,
+          dealId: context.dealId,
+          sessionId: context.sessionId,
+          eventType: EVENT_TYPES.AGENT_RESPONSE_COMPLETED,
+          trigger: 'Response completed',
+          actionResult: { verified: true, hasContent: Boolean(content) },
+        });
+      } catch (_) {
+        /* non-critical */
+      }
+      try {
+        const { refreshAutonomy } = require('./autonomyService');
+        await refreshAutonomy(context);
+      } catch (_) {
+        /* non-critical */
+      }
     });
-    try {
-      const { refreshAutonomy } = require('./autonomyService');
-      await refreshAutonomy(context);
-    } catch (_) {
-      /* non-critical side effect */
-    }
     tToolsEnd = tToolsEnd || Date.now();
     const tTurnEnd = Date.now();
     const metrics = {

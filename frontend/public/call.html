@@ -319,6 +319,10 @@
         streamingPlayer.onPlaybackStarted = () => {
           if (!t7) t7 = performance.now();
           transitionState(CALL_STATES.SPEAKING);
+          // Unmute mic as soon as playback starts — enables barge-in detection
+          if (voiceClient && typeof voiceClient.setMuted === 'function') {
+            voiceClient.setMuted(false);
+          }
         };
         streamingPlayer.onPlaybackEnded = () => {
           if (active && !isTurnInFlight) transitionState(CALL_STATES.LISTENING);
@@ -402,6 +406,7 @@
         transitionState(CALL_STATES.LISTENING);
       } finally {
         isTurnInFlight = false;
+        // Safety fallback: ensure mic is unmuted even if playback never started
         if (active && voiceClient && typeof voiceClient.setMuted === 'function') {
           voiceClient.setMuted(false);
         }

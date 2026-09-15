@@ -219,49 +219,90 @@ router.post('/calls/:linkToken/turn', async (req, res, next) => {
     const wantsStream =
       req.headers.accept?.includes('text/event-stream') || req.body?.stream === true || req.query?.stream === 'true';
 
-    const s2 = Date.now();
-    const { executeCustomerTurn } = require('../lib/agent/agentRuntime');
-    const result = await executeCustomerTurn(session, userText, { turnId });
-    const assistantText = result.content || '';
-
-    const request = await getLatestMeetingRequest(session.sessionId).catch(() => null);
-
     if (wantsStream) {
-      // Set SSE headers for ultra-low-latency streaming to browser
+      // ═══════════════════════════════════════════════════════════════════════
+      // PIPELINED SSE: Open stream BEFORE executeCustomerTurn so the browser
+      // receives audio as soon as the first sentence is generated — not after
+      // the entire Gemini response + evidence + audit + autonomy have finished.
+      // ═══════════════════════════════════════════════════════════════════════
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
       if (typeof res.flushHeaders === 'function') res.flushHeaders();
 
-      // Emit text event immediately so browser displays assistant transcript instantly
-      res.write(`event: text\ndata: ${JSON.stringify({ assistantText, meetingRequest: request })}\n\n`);
-
-      const s12 = Date.now();
-      let s13 = 0;
-      const audioChunks = [];
+      const s2 = Date.now();
+      const { executeCustomerTurn } = require('../lib/agent/agentRuntime');
       const { streamSpeech } = require('../lib/tts/sarvamStreamingTts');
 
-      try {
-        if (assistantText) {
-          await streamSpeech(assistantText, {
-            onChunk: (chunk) => {
-              if (!s13) s13 = Date.now();
-              if (chunk.audioBase64) {
-                audioChunks.push(chunk.audioBase64);
-                res.write(`event: audio_chunk\ndata: ${JSON.stringify(chunk)}\n\n`);
-              }
-            },
-          });
+      // Sentence boundary accumulator: buffers Gemini text deltas until a
+      // sentence-ending punctuation is found, then fires TTS on the sentence.
+      let sentenceBuffer = '';
+      let fullText = '';
+      let sentenceIndex = 0;
+      const firstTextEmitted = false;
+      let s12 = 0; // TTS start timestamp
+      let s13 = 0; // TTS first byte timestamp
+      const audioChunks = [];
+      const ttsSentencePromises = [];
+
+      // Fire TTS for one completed sentence and emit its audio chunks to SSE
+      function fireSentenceTts(sentence) {
+        const idx = sentenceIndex++;
+        if (!s12) s12 = Date.now();
+        const p = streamSpeech(sentence, {
+          onChunk: (chunk) => {
+            if (!s13) s13 = Date.now();
+            if (chunk.audioBase64 && !res.writableEnded) {
+              audioChunks.push(chunk.audioBase64);
+              res.write(`event: audio_chunk\ndata: ${JSON.stringify(chunk)}\n\n`);
+            }
+          },
+        }).catch((err) => console.warn(`Sentence TTS #${idx} error:`, err.message));
+        ttsSentencePromises.push(p);
+      }
+
+      // Sentence-ending regex: period, question mark, exclamation, colon, semicolon
+      // followed by a space or end of string — avoids splitting on "3.5%" or "Mr."
+      const SENTENCE_END = /(?<=[.!?;:])\s+/;
+
+      const onTextChunk = (delta) => {
+        sentenceBuffer += delta;
+        fullText += delta;
+
+        // Split at sentence boundaries and fire TTS for each complete sentence
+        const parts = sentenceBuffer.split(SENTENCE_END);
+        if (parts.length > 1) {
+          // All but last part are complete sentences
+          for (let i = 0; i < parts.length - 1; i++) {
+            const sentence = parts[i].trim();
+            if (sentence) fireSentenceTts(sentence);
+          }
+          sentenceBuffer = parts[parts.length - 1];
         }
-      } catch (streamErr) {
-        console.warn('Sarvam stream speech error:', streamErr.message);
+      };
+
+      const result = await executeCustomerTurn(session, userText, { turnId, onTextChunk });
+      const assistantText = result.content || fullText;
+
+      // Flush any remaining sentence buffer as the final TTS segment
+      if (sentenceBuffer.trim()) {
+        fireSentenceTts(sentenceBuffer.trim());
+        sentenceBuffer = '';
+      }
+
+      // Wait for all sentence TTS operations to complete
+      await Promise.all(ttsSentencePromises);
+
+      // Emit text event with the complete assistant text (browser updates caption)
+      if (!firstTextEmitted) {
+        const request = await getLatestMeetingRequest(session.sessionId).catch(() => null);
+        res.write(`event: text\ndata: ${JSON.stringify({ assistantText, meetingRequest: request })}\n\n`);
       }
 
       const s14 = Date.now();
-      const s15 = Date.now();
-      const totalBackendMs = s15 - s0;
+      const totalBackendMs = s14 - s0;
       const ttsTTFB = s13 ? s13 - s12 : 0;
-      const ttsTotalMs = s14 - s12;
+      const ttsTotalMs = s12 ? s14 - s12 : 0;
 
       // Attach complete turn response to Firestore receipt asynchronously
       if (result.receiptId || turnId) {
@@ -290,10 +331,18 @@ router.post('/calls/:linkToken/turn', async (req, res, next) => {
 
       // Log safe diagnostic line (Section 3 of prompt)
       console.log(
-        `[VOICE LATENCY SERVER] turnId=${turnId || 'auto'} entry=${s1 - s0}ms claim=${s2 - s1}ms evidence=${metrics.evidenceMs}ms geminiTTFU=${metrics.geminiFirstTokenMs}ms tools=${metrics.toolsMs}ms ttsTTFB=${ttsTTFB}ms ttsTotal=${ttsTotalMs}ms moss=${metrics.mossLatencyMs}ms TOTAL=${totalBackendMs}ms`,
+        `[VOICE LATENCY SERVER] turnId=${turnId || 'auto'} entry=${s1 - s0}ms evidence=${metrics.evidenceMs}ms geminiTTFU=${metrics.geminiFirstTokenMs}ms tools=${metrics.toolsMs}ms ttsTTFB=${ttsTTFB}ms ttsTotal=${ttsTotalMs}ms moss=${metrics.mossLatencyMs}ms TOTAL=${totalBackendMs}ms`,
       );
       return;
     }
+
+    // Non-streaming JSON path
+    const s2 = Date.now();
+    const { executeCustomerTurn } = require('../lib/agent/agentRuntime');
+    const result = await executeCustomerTurn(session, userText, { turnId });
+    const assistantText = result.content || '';
+
+    const request = await getLatestMeetingRequest(session.sessionId).catch(() => null);
 
     // Standard non-streaming JSON path (for automated tests and standard callers)
     const s12 = Date.now();
