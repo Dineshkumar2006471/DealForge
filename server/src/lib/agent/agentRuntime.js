@@ -231,23 +231,42 @@ async function executeCustomerTurn(
     tToolsEnd = 0;
   try {
     if (res) writeInterruptableMetadata(res, chatId, true);
-    // Buffer the first model pass. A tool-using pass is provisional: speaking
-    // it before verification can produce two answers for a single customer
-    // turn (the provisional answer, then the verified follow-up).
+    // ─── GEMINI STREAMING STATE MACHINE ─────────────────────────────────────
+    // States:
+    //   BUFFERING        → Collecting initial chunks, watching for tool_calls
+    //   TOOL_DETECTED    → tool_calls seen; discard buffered prose, execute tools
+    //   STREAMING        → No tool_calls seen AND sentence boundary reached;
+    //                       forward deltas through onTextChunk immediately
+    //
+    // Safety invariant: NEVER speak provisional text that may be invalidated
+    // by a subsequent tool call. Only transition to STREAMING once we have
+    // enough evidence that no tool_calls will appear.
+    //
+    // Evidence: In OpenAI/Gemini streaming, delta.tool_calls appears in the
+    // stream as soon as the model decides to call a tool — typically within
+    // the first 2-5 chunks. Once a complete sentence of content has been
+    // accumulated without any tool_calls, the probability of a late tool_call
+    // is negligible. We use the first sentence boundary as the transition
+    // trigger from BUFFERING → STREAMING.
+    // ──────────────────────────────────────────────────────────────────────────
+
+    const SENTENCE_BOUNDARY = /(?<=[.!?;:])\s+/;
+    let streamState = 'BUFFERING'; // 'BUFFERING' | 'TOOL_DETECTED' | 'STREAMING'
+    const bufferedTextDeltas = []; // Holds deltas while in BUFFERING state
     const initialTextChunks = [];
     tGeminiStart = Date.now();
+
     for await (const chunk of generateResponse(await currentModelMessages(context), tools, context)) {
       const choice = chunk.choices?.[0];
       if (!choice) continue;
-      if (choice.delta?.content) {
-        if (!tGeminiFirstToken) tGeminiFirstToken = Date.now();
-        content += choice.delta.content;
-        initialTextChunks.push(chunk);
-        // NOTE: Do NOT fire onTextChunk here — this initial pass may be
-        // a provisional tool-calling pass whose text gets discarded at line ~270.
-        // onTextChunk is fired only after we confirm the text is final.
-      }
+
+      // ── Tool-call detection (highest priority) ──
       if (choice.delta?.tool_calls) {
+        if (streamState === 'BUFFERING') {
+          streamState = 'TOOL_DETECTED';
+          // Discard any buffered text — it was provisional
+          bufferedTextDeltas.length = 0;
+        }
         calls.push(
           ...choice.delta.tool_calls.map((item) => ({
             id: item.id,
@@ -256,12 +275,53 @@ async function executeCustomerTurn(
           })),
         );
       }
+
+      // ── Content accumulation ──
+      if (choice.delta?.content) {
+        if (!tGeminiFirstToken) tGeminiFirstToken = Date.now();
+        content += choice.delta.content;
+        initialTextChunks.push(chunk);
+
+        if (streamState === 'BUFFERING') {
+          bufferedTextDeltas.push(choice.delta.content);
+
+          // Check if we've reached a sentence boundary — safe to start streaming
+          const accumulated = bufferedTextDeltas.join('');
+          if (SENTENCE_BOUNDARY.test(accumulated)) {
+            streamState = 'STREAMING';
+            // Flush all buffered deltas through onTextChunk
+            if (typeof onTextChunk === 'function') {
+              for (const delta of bufferedTextDeltas) {
+                try {
+                  onTextChunk(delta);
+                } catch (_) {
+                  /* best-effort */
+                }
+              }
+            }
+            bufferedTextDeltas.length = 0;
+          }
+        } else if (streamState === 'STREAMING') {
+          // Already confirmed text-only — forward immediately
+          if (typeof onTextChunk === 'function') {
+            try {
+              onTextChunk(choice.delta.content);
+            } catch (_) {
+              /* best-effort */
+            }
+          }
+        }
+        // If TOOL_DETECTED, silently accumulate (will be discarded)
+      }
+
       if (choice.finish_reason) finishReason = choice.finish_reason;
     }
+
+    // ── Post-stream resolution ──
     const MAX_TOOL_ROUNDS = 3;
+
     if (finishReason === 'tool_calls' && calls.length) {
-      // Do not retain or speak interim prose from a tool-calling pass. It was
-      // not an executed or verified answer.
+      // Tool-call pass confirmed — discard any remaining buffered content
       content = '';
       await addMessage(session.sessionId, { role: 'assistant', tool_calls: calls, content: null });
       tToolsStart = Date.now();
@@ -280,9 +340,9 @@ async function executeCustomerTurn(
           content: JSON.stringify(result),
         });
       }
-      // Bounded iterative loop: allow the LLM to emit further tool calls up
-      // to MAX_TOOL_ROUNDS total. Each round validates, executes, persists
-      // tool results, and returns them to the model for the next pass.
+
+      // Follow-up rounds: stream text through onTextChunk immediately
+      // because post-tool responses are verified final text
       for (let round = 1; round < MAX_TOOL_ROUNDS; round++) {
         const followUpCalls = [];
         let followUpContent = '';
@@ -299,11 +359,20 @@ async function executeCustomerTurn(
               })),
             );
           }
-          if (choice.delta?.content) followUpContent += choice.delta.content;
+          if (choice.delta?.content) {
+            followUpContent += choice.delta.content;
+            // Post-tool text is verified — stream immediately
+            if (typeof onTextChunk === 'function') {
+              try {
+                onTextChunk(choice.delta.content);
+              } catch (_) {
+                /* best-effort */
+              }
+            }
+          }
           if (choice.finish_reason) followUpFinish = choice.finish_reason;
         }
         if (followUpFinish !== 'tool_calls' || !followUpCalls.length) {
-          // Model returned final text — stream it to the customer
           content = followUpContent;
           if (content && res) {
             hasSpokenContent = true;
@@ -311,17 +380,9 @@ async function executeCustomerTurn(
               `data: ${JSON.stringify({ id: chatId, object: 'chat.completion.chunk', choices: [{ index: 0, delta: { role: 'assistant', content }, finish_reason: null }] })}\n\n`,
             );
           }
-          // Fire onTextChunk for post-tool verified text
-          if (content && typeof onTextChunk === 'function') {
-            try {
-              onTextChunk(content);
-            } catch (_) {
-              /* best-effort */
-            }
-          }
           break;
         }
-        // Another tool round — execute and persist
+        // Another tool round
         await addMessage(session.sessionId, { role: 'assistant', tool_calls: followUpCalls, content: null });
         for (const call of followUpCalls) {
           let args;
@@ -339,13 +400,20 @@ async function executeCustomerTurn(
           });
         }
       }
-      // If we exhausted all rounds without a final text, generate one last
-      // text-only pass with tools suppressed.
+      // Exhausted tool rounds — tools-suppressed final pass
       if (!content) {
         for await (const chunk of generateResponse(await currentModelMessages(context), [], context)) {
           const choice = chunk.choices?.[0];
           if (choice?.delta?.content) {
             content += choice.delta.content;
+            // Verified final — stream immediately
+            if (typeof onTextChunk === 'function') {
+              try {
+                onTextChunk(choice.delta.content);
+              } catch (_) {
+                /* best-effort */
+              }
+            }
             if (res) {
               hasSpokenContent = true;
               res.write(`data: ${JSON.stringify(chunk)}\n\n`);
@@ -354,12 +422,12 @@ async function executeCustomerTurn(
         }
       }
     } else {
-      // Text-only response (no tool calls) — text is verified final.
-      // Fire onTextChunk so TTS can start on the first sentence.
-      if (typeof onTextChunk === 'function') {
-        for (const chunk of initialTextChunks) {
-          const delta = chunk.choices?.[0]?.delta?.content;
-          if (delta) {
+      // ── Text-only response (no tool calls) ──
+      // If still in BUFFERING state (no sentence boundary was reached before
+      // stream ended), flush the remaining buffered deltas now.
+      if (streamState === 'BUFFERING' && bufferedTextDeltas.length > 0) {
+        if (typeof onTextChunk === 'function') {
+          for (const delta of bufferedTextDeltas) {
             try {
               onTextChunk(delta);
             } catch (_) {

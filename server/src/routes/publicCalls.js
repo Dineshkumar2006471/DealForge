@@ -234,31 +234,58 @@ router.post('/calls/:linkToken/turn', async (req, res, next) => {
       const { executeCustomerTurn } = require('../lib/agent/agentRuntime');
       const { streamSpeech } = require('../lib/tts/sarvamStreamingTts');
 
-      // Sentence boundary accumulator: buffers Gemini text deltas until a
-      // sentence-ending punctuation is found, then fires TTS on the sentence.
+      // ─── Ordered TTS Queue ──────────────────────────────────────────────
+      // Producer: onTextChunk accumulates text and enqueues complete sentences.
+      // Consumer: processes sentences sequentially — one TTS at a time — so
+      // audio chunks arrive in deterministic order. No overlap, no reordering.
+      // ────────────────────────────────────────────────────────────────────────
       let sentenceBuffer = '';
       let fullText = '';
       let sentenceIndex = 0;
-
       let s12 = 0; // TTS start timestamp
       let s13 = 0; // TTS first byte timestamp
       const audioChunks = [];
-      const ttsSentencePromises = [];
 
-      // Fire TTS for one completed sentence and emit its audio chunks to SSE
-      function fireSentenceTts(sentence) {
-        const idx = sentenceIndex++;
-        if (!s12) s12 = Date.now();
-        const p = streamSpeech(sentence, {
-          onChunk: (chunk) => {
-            if (!s13) s13 = Date.now();
-            if (chunk.audioBase64 && !res.writableEnded) {
-              audioChunks.push(chunk.audioBase64);
-              res.write(`event: audio_chunk\ndata: ${JSON.stringify(chunk)}\n\n`);
-            }
-          },
-        }).catch((err) => console.warn(`Sentence TTS #${idx} error:`, err.message));
-        ttsSentencePromises.push(p);
+      // Ordered queue state
+      const sentenceQueue = []; // Pending sentences to synthesize
+      let queueProcessing = false; // Consumer lock
+      let queueDone = false; // Signals no more sentences will be enqueued
+      let queueResolve; // Resolves when queue is fully drained
+      const queueDrained = new Promise((r) => {
+        queueResolve = r;
+      });
+
+      // Consumer: processes one sentence at a time, in order
+      async function processQueue() {
+        if (queueProcessing) return; // Only one consumer
+        queueProcessing = true;
+        while (sentenceQueue.length > 0) {
+          const sentence = sentenceQueue.shift();
+          const idx = sentenceIndex++;
+          if (!s12) s12 = Date.now();
+          try {
+            await streamSpeech(sentence, {
+              onChunk: (chunk) => {
+                if (!s13) s13 = Date.now();
+                if (chunk.audioBase64 && !res.writableEnded) {
+                  audioChunks.push(chunk.audioBase64);
+                  res.write(`event: audio_chunk\ndata: ${JSON.stringify(chunk)}\n\n`);
+                }
+              },
+            });
+          } catch (err) {
+            console.warn(`Sentence TTS #${idx} error:`, err.message);
+          }
+        }
+        queueProcessing = false;
+        if (queueDone && sentenceQueue.length === 0) {
+          queueResolve();
+        }
+      }
+
+      function enqueueSentence(sentence) {
+        sentenceQueue.push(sentence);
+        processQueue(); // Kick consumer (no-op if already running)
       }
 
       // Sentence-ending regex: period, question mark, exclamation, colon, semicolon
@@ -269,13 +296,12 @@ router.post('/calls/:linkToken/turn', async (req, res, next) => {
         sentenceBuffer += delta;
         fullText += delta;
 
-        // Split at sentence boundaries and fire TTS for each complete sentence
+        // Split at sentence boundaries and enqueue each complete sentence
         const parts = sentenceBuffer.split(SENTENCE_END);
         if (parts.length > 1) {
-          // All but last part are complete sentences
           for (let i = 0; i < parts.length - 1; i++) {
             const sentence = parts[i].trim();
-            if (sentence) fireSentenceTts(sentence);
+            if (sentence) enqueueSentence(sentence);
           }
           sentenceBuffer = parts[parts.length - 1];
         }
@@ -286,12 +312,16 @@ router.post('/calls/:linkToken/turn', async (req, res, next) => {
 
       // Flush any remaining sentence buffer as the final TTS segment
       if (sentenceBuffer.trim()) {
-        fireSentenceTts(sentenceBuffer.trim());
+        enqueueSentence(sentenceBuffer.trim());
         sentenceBuffer = '';
       }
 
-      // Wait for all sentence TTS operations to complete
-      await Promise.all(ttsSentencePromises);
+      // Signal no more sentences and wait for queue to drain
+      queueDone = true;
+      if (sentenceQueue.length === 0 && !queueProcessing) {
+        queueResolve();
+      }
+      await queueDrained;
 
       // Emit text event with the complete assistant text (browser updates caption)
       {
