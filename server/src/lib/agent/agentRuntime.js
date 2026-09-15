@@ -71,16 +71,27 @@ async function executeCustomerTurn(
     return { duplicate: true, content: '', receiptId: receipt.receiptId };
   }
 
-  // Fire-and-forget: user message persistence is not needed before Gemini sees
-  // the text (it already has userText in its messages array via currentModelMessages).
-  const addUserMsgPromise = addMessage(session.sessionId, { role: 'user', content: userText.trim() }).catch((e) =>
-    console.warn('Deferred addMessage(user) note:', e.message),
-  );
-
-  // Fire-and-forget: evidence extraction updates deal state *for future turns*.
-  // The current turn already has the user text in Gemini's context.
+  // ───────────────────────────────────────────────────────────────────────────
+  // PERSISTENCE OPTIMIZATION — parallel but NOT fire-and-forget
+  //
+  // addMessage(user) MUST complete before:
+  //   • currentModelMessages() — it calls getHistory() which reads from Firestore
+  //   • discount/meeting early-return paths — they write assistant messages
+  //
+  // extractAndApplyEvidence CAN be deferred because:
+  //   1. Gemini does NOT depend on its result — it has userText in context directly
+  //   2. Policy authorization (discount/meeting regex) uses userText, not deal state
+  //   3. No correctness race — evidence updates deal state for FUTURE turns only
+  //   4. Failure is safely retried (non-critical enrichment)
+  //
+  // Strategy: run both in parallel, await both before proceeding.
+  // Saves ~30-60ms vs sequential (max(60ms, 30-150ms) instead of sum).
+  // ───────────────────────────────────────────────────────────────────────────
   const tEvidenceStart = Date.now();
   let tEvidenceEnd = tEvidenceStart;
+
+  const addUserMsgPromise = addMessage(session.sessionId, { role: 'user', content: userText.trim() });
+
   const evidencePromise = (async () => {
     try {
       const { extractAndApplyEvidence } = require('../evidence/evidenceExtractor');
@@ -91,6 +102,9 @@ async function executeCustomerTurn(
       tEvidenceEnd = Date.now();
     }
   })();
+
+  // Await BOTH before any path that reads history or writes assistant messages
+  await Promise.all([addUserMsgPromise, evidencePromise]);
 
   // A percentage discount request is a high-value policy boundary. Route it
   // deterministically instead of hoping the generative model elects to call a
@@ -229,14 +243,9 @@ async function executeCustomerTurn(
         if (!tGeminiFirstToken) tGeminiFirstToken = Date.now();
         content += choice.delta.content;
         initialTextChunks.push(chunk);
-        // Stream text deltas to caller immediately so TTS can start on first sentence
-        if (typeof onTextChunk === 'function') {
-          try {
-            onTextChunk(choice.delta.content);
-          } catch (_) {
-            /* best-effort */
-          }
-        }
+        // NOTE: Do NOT fire onTextChunk here — this initial pass may be
+        // a provisional tool-calling pass whose text gets discarded at line ~270.
+        // onTextChunk is fired only after we confirm the text is final.
       }
       if (choice.delta?.tool_calls) {
         calls.push(
@@ -302,6 +311,14 @@ async function executeCustomerTurn(
               `data: ${JSON.stringify({ id: chatId, object: 'chat.completion.chunk', choices: [{ index: 0, delta: { role: 'assistant', content }, finish_reason: null }] })}\n\n`,
             );
           }
+          // Fire onTextChunk for post-tool verified text
+          if (content && typeof onTextChunk === 'function') {
+            try {
+              onTextChunk(content);
+            } catch (_) {
+              /* best-effort */
+            }
+          }
           break;
         }
         // Another tool round — execute and persist
@@ -337,6 +354,20 @@ async function executeCustomerTurn(
         }
       }
     } else {
+      // Text-only response (no tool calls) — text is verified final.
+      // Fire onTextChunk so TTS can start on the first sentence.
+      if (typeof onTextChunk === 'function') {
+        for (const chunk of initialTextChunks) {
+          const delta = chunk.choices?.[0]?.delta?.content;
+          if (delta) {
+            try {
+              onTextChunk(delta);
+            } catch (_) {
+              /* best-effort */
+            }
+          }
+        }
+      }
       if (res) {
         for (const chunk of initialTextChunks) {
           hasSpokenContent = true;
@@ -346,8 +377,7 @@ async function executeCustomerTurn(
     }
     // Persist assistant message — must complete before return so receipt attachment works
     if (content) await addMessage(session.sessionId, { role: 'assistant', content });
-    // Ensure deferred user message + evidence are settled before metrics are final
-    await Promise.all([addUserMsgPromise, evidencePromise]).catch(() => {});
+    // addUserMsgPromise + evidencePromise already settled at line ~100
     // Non-critical: audit + autonomy deferred to fire-and-forget
     setImmediate(async () => {
       try {

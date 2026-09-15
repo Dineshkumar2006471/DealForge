@@ -239,7 +239,7 @@ router.post('/calls/:linkToken/turn', async (req, res, next) => {
       let sentenceBuffer = '';
       let fullText = '';
       let sentenceIndex = 0;
-      const firstTextEmitted = false;
+
       let s12 = 0; // TTS start timestamp
       let s13 = 0; // TTS first byte timestamp
       const audioChunks = [];
@@ -294,7 +294,7 @@ router.post('/calls/:linkToken/turn', async (req, res, next) => {
       await Promise.all(ttsSentencePromises);
 
       // Emit text event with the complete assistant text (browser updates caption)
-      if (!firstTextEmitted) {
+      {
         const request = await getLatestMeetingRequest(session.sessionId).catch(() => null);
         res.write(`event: text\ndata: ${JSON.stringify({ assistantText, meetingRequest: request })}\n\n`);
       }
