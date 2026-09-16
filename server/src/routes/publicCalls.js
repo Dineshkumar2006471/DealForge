@@ -260,21 +260,58 @@ router.post('/calls/:linkToken/turn', async (req, res, next) => {
         if (queueProcessing) return; // Only one consumer
         queueProcessing = true;
         while (sentenceQueue.length > 0) {
-          const sentence = sentenceQueue.shift();
+          const rawSentence = sentenceQueue.shift();
           const idx = sentenceIndex++;
           if (!s12) s12 = Date.now();
+
+          // Sanitize text for natural speech
+          const { sanitizeVoiceText } = require('../lib/tts/sanitizeVoiceText');
+          const sentence = sanitizeVoiceText(rawSentence);
+          if (!sentence) {
+            console.warn(
+              `[VOICE_PIPELINE] Sentence #${idx} empty after sanitization, raw="${rawSentence.slice(0, 80)}"`,
+            );
+            continue;
+          }
+
+          console.log(`[VOICE_PIPELINE] Sentence #${idx} len=${sentence.length} text="${sentence.slice(0, 100)}"`);
+
           try {
-            await streamSpeech(sentence, {
-              onChunk: (chunk) => {
-                if (!s13) s13 = Date.now();
-                if (chunk.audioBase64 && !res.writableEnded) {
-                  audioChunks.push(chunk.audioBase64);
-                  res.write(`event: audio_chunk\ndata: ${JSON.stringify(chunk)}\n\n`);
-                }
-              },
-            });
+            // Await the FULL sentence synthesis before sending to browser.
+            // Sarvam WebSocket emits raw fragments of a single MP3 stream. If we send those
+            // raw fragments to the browser's decodeAudioData, it fails to decode them because
+            // they are cut mid-frame, causing severe skipping, clicks, and robotic 'throat' artifacts.
+            // By concatenating the chunks into one complete MP3 buffer per sentence, the browser
+            // decodes it flawlessly and schedules it gaplessly.
+            const ttsStart = Date.now();
+            const ttsRes = await streamSpeech(sentence);
+            const ttsMs = Date.now() - ttsStart;
+
+            if (ttsRes && ttsRes.audioBase64List && ttsRes.audioBase64List.length > 0) {
+              const fullBuffer = Buffer.concat(ttsRes.audioBase64List.map((b) => Buffer.from(b, 'base64')));
+              const fullBase64 = fullBuffer.toString('base64');
+
+              console.log(
+                `[VOICE_PIPELINE] Sentence #${idx} TTS OK chunks=${ttsRes.totalChunks} bytes=${fullBuffer.length} tts_ms=${ttsMs}`,
+              );
+
+              if (!s13) s13 = Date.now();
+              if (!res.writableEnded) {
+                audioChunks.push(fullBase64);
+                res.write(
+                  `event: audio_chunk\ndata: ${JSON.stringify({
+                    chunkIndex: idx,
+                    audioBase64: fullBase64,
+                    contentType: 'audio/mp3',
+                    isFinal: false,
+                  })}\n\n`,
+                );
+              }
+            } else {
+              console.warn(`[VOICE_PIPELINE] Sentence #${idx} TTS returned no audio`);
+            }
           } catch (err) {
-            console.warn(`Sentence TTS #${idx} error:`, err.message);
+            console.warn(`[VOICE_PIPELINE] Sentence #${idx} TTS error:`, err.message);
           }
         }
         queueProcessing = false;
@@ -288,9 +325,14 @@ router.post('/calls/:linkToken/turn', async (req, res, next) => {
         processQueue(); // Kick consumer (no-op if already running)
       }
 
-      // Sentence-ending regex: period, question mark, exclamation, colon, semicolon
-      // followed by a space or end of string — avoids splitting on "3.5%" or "Mr."
-      const SENTENCE_END = /(?<=[.!?;:])\s+/;
+      // ─── Sentence Segmentation ──────────────────────────────────────────────
+      // Split ONLY on period, question mark, exclamation mark followed by space.
+      // Do NOT split on colons, semicolons, or commas — they break prosody.
+      // Minimum segment length of 40 chars ensures natural speaking units.
+      // Short segments are grouped with the next one for natural flow.
+      // ────────────────────────────────────────────────────────────────────────
+      const SENTENCE_END = /(?<=[.?!])\s+/;
+      const MIN_SEGMENT_LENGTH = 40;
 
       const onTextChunk = (delta) => {
         sentenceBuffer += delta;
@@ -299,11 +341,27 @@ router.post('/calls/:linkToken/turn', async (req, res, next) => {
         // Split at sentence boundaries and enqueue each complete sentence
         const parts = sentenceBuffer.split(SENTENCE_END);
         if (parts.length > 1) {
+          // Accumulate short fragments into natural speaking units
+          let accumulated = '';
           for (let i = 0; i < parts.length - 1; i++) {
-            const sentence = parts[i].trim();
-            if (sentence) enqueueSentence(sentence);
+            const part = parts[i].trim();
+            if (!part) continue;
+
+            if (accumulated) {
+              accumulated += ' ' + part;
+            } else {
+              accumulated = part;
+            }
+
+            // Only enqueue if we have enough text for natural speech
+            if (accumulated.length >= MIN_SEGMENT_LENGTH) {
+              enqueueSentence(accumulated);
+              accumulated = '';
+            }
           }
-          sentenceBuffer = parts[parts.length - 1];
+          // Any remaining short accumulated text goes back to the buffer
+          const lastPart = parts[parts.length - 1];
+          sentenceBuffer = accumulated ? accumulated + ' ' + lastPart : lastPart;
         }
       };
 
@@ -378,14 +436,20 @@ router.post('/calls/:linkToken/turn', async (req, res, next) => {
     const s12 = Date.now();
     let audioBase64 = result.audioBase64 || null;
     let ttsLatency = 0;
-    let s13 = 0;
+    const s13 = 0;
     if (assistantText && !audioBase64) {
       try {
         const { streamSpeech } = require('../lib/tts/sarvamStreamingTts');
         const ttsRes = await streamSpeech(assistantText);
-        s13 = Date.now();
+
         ttsLatency = ttsRes.totalMs || Date.now() - s12;
-        audioBase64 = ttsRes.audioBase64List?.[0] || null;
+
+        if (ttsRes && ttsRes.audioBase64List && ttsRes.audioBase64List.length > 0) {
+          const fullBuffer = Buffer.concat(ttsRes.audioBase64List.map((b) => Buffer.from(b, 'base64')));
+          audioBase64 = fullBuffer.toString('base64');
+        } else {
+          audioBase64 = null;
+        }
       } catch (err) {
         console.error('Sarvam TTS error for customer turn:', err.message);
       }

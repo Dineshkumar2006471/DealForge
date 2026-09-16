@@ -19,9 +19,11 @@
 
 const WebSocket = require('ws');
 const { synthesizeSpeech } = require('./sarvamTtsService');
+const { sanitizeVoiceText } = require('./sanitizeVoiceText');
 
 const SARVAM_WS_URL = 'wss://api.sarvam.ai/text-to-speech/ws?model=bulbul:v3&send_completion_event=true';
-const DEFAULT_SPEAKER = 'ishita';
+const DEFAULT_SPEAKER = process.env.SARVAM_SPEAKER || 'ishita';
+const DEFAULT_PACE = parseFloat(process.env.SARVAM_PACE) || 1.05;
 const DEFAULT_SAMPLE_RATE = '24000';
 const DEFAULT_CODEC = 'mp3';
 
@@ -35,13 +37,22 @@ const DEFAULT_CODEC = 'mp3';
  * @param {number} [options.timeoutMs=8000] - Hard timeout before fallback
  * @returns {Promise<{ totalChunks: number, ttfbMs: number, totalMs: number, audioBase64List: string[] }>}
  */
-async function streamSpeech(text, { speaker = DEFAULT_SPEAKER, onChunk = null, timeoutMs = 8000 } = {}) {
+async function streamSpeech(
+  text,
+  { speaker = DEFAULT_SPEAKER, pace = DEFAULT_PACE, onChunk = null, timeoutMs = 8000 } = {},
+) {
   const apiKey = process.env.SARVAM_API_KEY;
-  const cleanText = String(text || '').trim();
+  // Sanitize text for natural speech — strip markdown, bullets, code, etc.
+  const cleanText = sanitizeVoiceText(String(text || ''));
 
   if (!cleanText) {
+    console.warn('[Sarvam TTS] Empty text after sanitization, original:', String(text || '').slice(0, 100));
     throw new Error('text is required for speech synthesis');
   }
+
+  console.log(
+    `[VOICE_TEXT_DEBUG] original_len=${String(text || '').length} sanitized_len=${cleanText.length} speaker=${speaker} pace=${pace} text="${cleanText.slice(0, 120)}"`,
+  );
 
   // Fallback if no API key is set
   if (!apiKey) {
@@ -141,7 +152,7 @@ async function streamSpeech(text, { speaker = DEFAULT_SPEAKER, onChunk = null, t
       });
 
       ws.on('open', () => {
-        // Step 1: Config
+        // Step 1: Config — include pace for natural conversational speed
         ws.send(
           JSON.stringify({
             type: 'config',
@@ -149,11 +160,10 @@ async function streamSpeech(text, { speaker = DEFAULT_SPEAKER, onChunk = null, t
               model: 'bulbul:v3',
               language_code: 'en-IN',
               speaker: speaker || DEFAULT_SPEAKER,
+              pace: pace,
               speech_sample_rate: DEFAULT_SAMPLE_RATE,
               output_audio_codec: DEFAULT_CODEC,
               output_audio_bitrate: '128k',
-              min_buffer_size: 50,
-              max_chunk_length: 150,
             },
           }),
         );
@@ -178,8 +188,13 @@ async function streamSpeech(text, { speaker = DEFAULT_SPEAKER, onChunk = null, t
               tFirstByte = Date.now();
             }
             const chunkBase64 = msg.data.audio;
+            const chunkBytes = Buffer.from(chunkBase64, 'base64').length;
             audioBase64List.push(chunkBase64);
             const ttfbMs = tFirstByte - tStart;
+
+            console.log(
+              `[VOICE_AUDIO_DEBUG] chunk_index=${chunkIndex} content_type=${msg.data.content_type || 'audio/mp3'} bytes=${chunkBytes} ttfb=${ttfbMs}ms elapsed=${Date.now() - tStart}ms`,
+            );
 
             if (typeof onChunk === 'function') {
               onChunk({
@@ -189,6 +204,8 @@ async function streamSpeech(text, { speaker = DEFAULT_SPEAKER, onChunk = null, t
                 ttfbMs,
                 isFinal: false,
               });
+            } else {
+              chunkIndex++;
             }
           } else if (msg.type === 'event' && msg.data?.event_type === 'final') {
             if (isSettled) return;
@@ -196,6 +213,11 @@ async function streamSpeech(text, { speaker = DEFAULT_SPEAKER, onChunk = null, t
             cleanup();
             const totalMs = Date.now() - tStart;
             const ttfbMs = tFirstByte ? tFirstByte - tStart : totalMs;
+
+            const totalBytes = audioBase64List.reduce((sum, b) => sum + Buffer.from(b, 'base64').length, 0);
+            console.log(
+              `[VOICE_AUDIO_DEBUG] COMPLETE chunks=${audioBase64List.length} total_bytes=${totalBytes} ttfb=${ttfbMs}ms total=${totalMs}ms`,
+            );
 
             if (typeof onChunk === 'function') {
               onChunk({
