@@ -37,8 +37,8 @@ describe('Sarvam Bulbul v3 Streaming TTS Service', () => {
     assert.ok(first, 'First chunk must exist');
     assert.equal(typeof first.chunkIndex, 'number');
     assert.ok(
-      ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/pcm', 'audio/pcm;rate=24000', 'audio/l16'].some((type) =>
-        first.contentType.includes(type) || type.includes(first.contentType),
+      ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/pcm', 'audio/pcm;rate=24000', 'audio/l16'].some(
+        (type) => first.contentType.includes(type) || type.includes(first.contentType),
       ),
     );
   });
