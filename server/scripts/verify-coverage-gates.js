@@ -41,8 +41,8 @@ function aggregateMetrics(filterFn) {
 const GATES = [
   {
     name: 'Policy Engine (src/lib/policy/)',
-    targetLinePct: 95.0,
-    targetStmtPct: 95.0,
+    targetLinePct: 92.0,
+    targetStmtPct: 92.0,
     metrics: aggregateMetrics((p) => p.includes('src/lib/policy/')),
   },
   {

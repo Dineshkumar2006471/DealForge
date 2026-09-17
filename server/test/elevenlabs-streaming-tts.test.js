@@ -1,18 +1,12 @@
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { streamSpeech, SARVAM_WS_URL, DEFAULT_SPEAKER } = require('../src/lib/tts/elevenlabsStreamingTts');
+const { streamSpeech } = require('../src/lib/tts/elevenlabsStreamingTts');
 
-describe('Sarvam Bulbul v3 Streaming TTS Service', () => {
+describe('ElevenLabs Streaming TTS Service', () => {
   it('1. Rejects empty or missing text with clear validation error', async () => {
     await assert.rejects(async () => streamSpeech(''), /text is required/);
     await assert.rejects(async () => streamSpeech(null), /text is required/);
-  });
-
-  it('2. Exposes correct default configuration and official AsyncAPI endpoint', () => {
-    assert.ok(SARVAM_WS_URL.includes('wss://api.sarvam.ai/text-to-speech/ws'));
-    assert.ok(SARVAM_WS_URL.includes('model=bulbul:v3'));
-    assert.equal(DEFAULT_SPEAKER, 'ishita');
   });
 
   it('3. Streaming synthesis yields audio chunks with monotonic latency tracking', async () => {
@@ -43,14 +37,17 @@ describe('Sarvam Bulbul v3 Streaming TTS Service', () => {
     );
   });
 
-  it('4. Safe error handling never leaks SARVAM_API_KEY in errors or outputs', async () => {
+  it('4. Safe error handling never leaks ELEVENLABS_API_KEY in errors or outputs', async () => {
     try {
       const res = await streamSpeech('Short test phrase');
       const serialized = JSON.stringify(res);
-      assert.ok(!serialized.includes(process.env.SARVAM_API_KEY || 'no_key_found'), 'API key must never be in result');
+      assert.ok(
+        !serialized.includes(process.env.ELEVENLABS_API_KEY || 'no_key_found'),
+        'API key must never be in result',
+      );
     } catch (err) {
       assert.ok(
-        !err.message.includes(process.env.SARVAM_API_KEY || 'no_key_found'),
+        !err.message.includes(process.env.ELEVENLABS_API_KEY || 'no_key_found'),
         'API key must never be in error message',
       );
     }
