@@ -39,6 +39,9 @@ function createApp() {
 
   // Centralized error handler with structured logging
   app.use((error, req, res, _next) => {
+    if (res.headersSent) {
+      return;
+    }
     const status = error instanceof HttpError ? error.status : error.name === 'ZodError' ? 400 : 500;
     if (status >= 500) {
       logger.error('Unhandled request error', {

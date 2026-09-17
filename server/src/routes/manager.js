@@ -135,6 +135,22 @@ router.post('/deals', async (req, res, next) => {
   }
 });
 
+router.get('/deals', async (req, res, next) => {
+  try {
+    const snapshot = await db
+      .collection('deals')
+      .where('organizationId', '==', req.manager.organizationId)
+      .limit(50)
+      .get();
+    const deals = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    // Sort deals by latest update
+    deals.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    res.json(deals);
+  } catch (error) {
+    next(error);
+  }
+});
+
 async function ownedDeal(dealId, organizationId) {
   const ref = db.collection('deals').doc(dealId);
   const snapshot = await ref.get();
@@ -171,6 +187,49 @@ router.get('/deals/:dealId/call-sessions', async (req, res, next) => {
       })
       .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
     res.json({ dealId: req.params.dealId, sessions });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/calls/:sessionId/details', async (req, res, next) => {
+  try {
+    const ref = sessionRef(req.params.sessionId);
+    const doc = await ref.get();
+    if (!doc.exists || doc.data().organizationId !== req.manager.organizationId) {
+      throw new HttpError(404, 'Call session not found');
+    }
+    
+    // Fetch evidence
+    const evidenceSnap = await db.collection('evidenceLedger')
+      .where('sessionId', '==', req.params.sessionId)
+      .get();
+    const evidenceList = evidenceSnap.docs.map(d => ({ evidenceId: d.id, ...d.data() }));
+
+    // Fetch approvals
+    const approvalsSnap = await db.collection('approvals')
+      .where('sessionId', '==', req.params.sessionId)
+      .get();
+    const approvals = approvalsSnap.docs.map(d => d.data());
+
+    // Fetch audit events
+    const auditSnap = await db.collection('auditEvents')
+      .where('sessionId', '==', req.params.sessionId)
+      .orderBy('timestamp', 'desc')
+      .limit(50)
+      .get();
+    const auditEvents = auditSnap.docs.map(d => ({ eventId: d.id, ...d.data() }));
+
+    // Fetch history
+    const { getHistory } = require('../lib/agent/conversationHistory');
+    const history = await getHistory(req.params.sessionId);
+
+    res.json({
+      evidenceList,
+      approvals,
+      auditEvents,
+      history: history.filter(m => m.role === 'user' || m.role === 'assistant')
+    });
   } catch (error) {
     next(error);
   }

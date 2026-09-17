@@ -12,7 +12,7 @@
 
 require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 
-const { streamSpeech } = require('../src/lib/tts/sarvamStreamingTts');
+const { streamSpeech } = require('../src/lib/tts/elevenlabsStreamingTts');
 const { sanitizeVoiceText } = require('../src/lib/tts/sanitizeVoiceText');
 
 const TEST_SENTENCES = [

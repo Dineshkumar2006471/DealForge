@@ -116,7 +116,12 @@ router.post('/calls/:linkToken/join', joinRateLimit, async (req, res, next) => {
   }
 });
 async function activeSessionFromCredential(req) {
-  const { sessionCredential } = parse(sessionCredentialSchema, { sessionCredential: req.body?.sessionCredential });
+  const credential =
+    req.body?.sessionCredential ||
+    req.query?.sessionCredential ||
+    req.query?.credential ||
+    req.headers?.['x-session-credential'];
+  const { sessionCredential } = parse(sessionCredentialSchema, { sessionCredential: credential });
   const { session } = await findSessionByHash('hashedRefreshToken', sessionCredential);
   if (session.status !== 'ACTIVE' || session.revokedAt || new Date(session.expiresAt) <= new Date()) {
     throw new HttpError(410, 'Call session is not active');
@@ -206,6 +211,147 @@ router.post('/calls/:linkToken/ready', async (req, res, next) => {
   }
 });
 
+router.all('/calls/:linkToken/events', async (req, res, next) => {
+  try {
+    const session = await activeSessionFromCredential(req);
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    if (typeof res.flushHeaders === 'function') res.flushHeaders();
+    res.write(': ping\n\n');
+    if (typeof res.flush === 'function') res.flush();
+
+    res.write(`event: connected\ndata: ${JSON.stringify({ sessionId: session.sessionId })}\n\n`);
+    if (typeof res.flush === 'function') res.flush();
+
+    const keepAliveInterval = setInterval(() => {
+      if (!res.writableEnded) {
+        res.write(': ping\n\n');
+        if (typeof res.flush === 'function') res.flush();
+      }
+    }, 15000);
+
+    const connectTime = new Date(Date.now() - 5000).toISOString();
+    const { claimApprovedApprovals, completeApproval } = require('../lib/policy/approvalQueue');
+    const { executeTool } = require('../lib/tools/registry');
+    const { streamSpeech } = require('../lib/tts/elevenlabsStreamingTts');
+
+    const eventsRef = db.collection('callSessions').doc(session.sessionId).collection('events');
+    const unsubscribe = eventsRef
+      .where('resolvedAt', '>=', connectTime)
+      .onSnapshot(
+        async (snapshot) => {
+          for (const change of snapshot.docChanges()) {
+            if (change.type !== 'added') continue;
+            const eventDoc = change.doc;
+            const eventData = eventDoc.data();
+            if (eventData.eventType !== 'APPROVAL_RESOLVED') continue;
+
+            // Atomic claim of event document
+            let shouldProcess = false;
+            await db.runTransaction(async (tx) => {
+              const current = await tx.get(eventDoc.ref);
+              if (!current.exists || current.data().processed) return;
+              tx.update(eventDoc.ref, { processed: true, processedAt: new Date().toISOString() });
+              shouldProcess = true;
+            });
+
+            if (!shouldProcess) continue;
+
+            console.log(
+              `[PROACTIVE_APPROVAL] Handling ${eventData.decision} for approval ${eventData.approvalId} on session ${session.sessionId}`,
+            );
+
+            let spoken = '';
+            if (eventData.decision === 'APPROVED') {
+              const claimedList = await claimApprovedApprovals({
+                organizationId: session.organizationId,
+                dealId: session.dealId,
+                sessionId: session.sessionId,
+              });
+              const approval = claimedList.find((a) => a.approvalId === eventData.approvalId) || claimedList[0];
+              if (approval) {
+                const executed = await executeTool(approval.exactToolName, approval.exactValidatedArguments, {
+                  organizationId: session.organizationId,
+                  dealId: session.dealId,
+                  sessionId: session.sessionId,
+                  approvedReplay: {
+                    approvalId: approval.approvalId,
+                    toolName: approval.exactToolName,
+                    args: approval.exactValidatedArguments,
+                  },
+                });
+                if (executed.approved) {
+                  await completeApproval(approval.approvalId, session.organizationId);
+                }
+              }
+              spoken = 'Good news — my manager approved that concession, so I can apply it.';
+            } else {
+              spoken = "My manager couldn't approve that concession, but I can still look at other options.";
+            }
+
+            // Persist assistant message
+            await addMessage(session.sessionId, { role: 'assistant', content: spoken });
+
+            await writeAuditEvent({
+              organizationId: session.organizationId,
+              dealId: session.dealId,
+              sessionId: session.sessionId,
+              eventType: EVENT_TYPES.AGENT_RESPONSE_COMPLETED,
+              trigger: `Proactive approval resolution (${eventData.decision}) spoken to customer`,
+              actionResult: { verified: true, spoken, decision: eventData.decision },
+            });
+
+            const isAgoraAgent = session.agentId && !['openai_realtime', 'browser_speech'].includes(session.agentId);
+            if (isAgoraAgent) {
+              await speakAgent(session, spoken, { priority: 'INTERRUPT', interruptable: false }).catch((e) =>
+                console.warn('speakAgent note:', e.message),
+              );
+            }
+
+            let chunkIdx = 0;
+            try {
+              await streamSpeech(spoken, {
+                onChunk: ({ audioBase64, contentType, isFinal }) => {
+                  if (audioBase64 && !res.writableEnded) {
+                    res.write(
+                      `event: audio_chunk\ndata: ${JSON.stringify({
+                        chunkIndex: chunkIdx++,
+                        audioBase64,
+                        contentType: contentType || 'audio/pcm;rate=24000',
+                        isFinal: Boolean(isFinal),
+                        proactive: true,
+                      })}\n\n`,
+                    );
+                    if (typeof res.flush === 'function') res.flush();
+                  }
+                },
+              });
+            } catch (ttsErr) {
+              console.warn('[PROACTIVE_APPROVAL] TTS error:', ttsErr.message);
+            }
+
+            if (!res.writableEnded) {
+              res.write(`event: text\ndata: ${JSON.stringify({ assistantText: spoken, proactive: true })}\n\n`);
+            }
+          }
+        },
+        (err) => {
+          console.warn('[PROACTIVE_APPROVAL] Listener note:', err.message);
+        },
+      );
+
+    req.on('close', () => {
+      clearInterval(keepAliveInterval);
+      unsubscribe();
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post('/calls/:linkToken/turn', async (req, res, next) => {
   const s0 = Date.now();
   try {
@@ -226,13 +372,16 @@ router.post('/calls/:linkToken/turn', async (req, res, next) => {
       // the entire Gemini response + evidence + audit + autonomy have finished.
       // ═══════════════════════════════════════════════════════════════════════
       res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
       res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
       if (typeof res.flushHeaders === 'function') res.flushHeaders();
+      res.write(': ping\n\n');
+      if (typeof res.flush === 'function') res.flush();
 
       const s2 = Date.now();
       const { executeCustomerTurn } = require('../lib/agent/agentRuntime');
-      const { streamSpeech } = require('../lib/tts/sarvamStreamingTts');
+      const { streamSpeech } = require('../lib/tts/elevenlabsStreamingTts');
 
       // ─── Ordered TTS Queue ──────────────────────────────────────────────
       // Producer: onTextChunk accumulates text and enqueues complete sentences.
@@ -277,39 +426,29 @@ router.post('/calls/:linkToken/turn', async (req, res, next) => {
           console.log(`[VOICE_PIPELINE] Sentence #${idx} len=${sentence.length} text="${sentence.slice(0, 100)}"`);
 
           try {
-            // Await the FULL sentence synthesis before sending to browser.
-            // Sarvam WebSocket emits raw fragments of a single MP3 stream. If we send those
-            // raw fragments to the browser's decodeAudioData, it fails to decode them because
-            // they are cut mid-frame, causing severe skipping, clicks, and robotic 'throat' artifacts.
-            // By concatenating the chunks into one complete MP3 buffer per sentence, the browser
-            // decodes it flawlessly and schedules it gaplessly.
             const ttsStart = Date.now();
-            const ttsRes = await streamSpeech(sentence);
+            let subChunk = 0;
+            const ttsRes = await streamSpeech(sentence, {
+              onChunk: ({ chunkIndex: cIdx, audioBase64, contentType, isFinal }) => {
+                if (audioBase64 && !res.writableEnded) {
+                  if (!s13) s13 = Date.now();
+                  audioChunks.push(audioBase64);
+                  res.write(
+                    `event: audio_chunk\ndata: ${JSON.stringify({
+                      chunkIndex: idx * 1000 + (cIdx !== undefined ? cIdx : subChunk++),
+                      audioBase64,
+                      contentType: contentType || 'audio/pcm;rate=24000',
+                      isFinal: Boolean(isFinal),
+                    })}\n\n`,
+                  );
+                  if (typeof res.flush === 'function') res.flush();
+                }
+              },
+            });
             const ttsMs = Date.now() - ttsStart;
-
-            if (ttsRes && ttsRes.audioBase64List && ttsRes.audioBase64List.length > 0) {
-              const fullBuffer = Buffer.concat(ttsRes.audioBase64List.map((b) => Buffer.from(b, 'base64')));
-              const fullBase64 = fullBuffer.toString('base64');
-
-              console.log(
-                `[VOICE_PIPELINE] Sentence #${idx} TTS OK chunks=${ttsRes.totalChunks} bytes=${fullBuffer.length} tts_ms=${ttsMs}`,
-              );
-
-              if (!s13) s13 = Date.now();
-              if (!res.writableEnded) {
-                audioChunks.push(fullBase64);
-                res.write(
-                  `event: audio_chunk\ndata: ${JSON.stringify({
-                    chunkIndex: idx,
-                    audioBase64: fullBase64,
-                    contentType: 'audio/mp3',
-                    isFinal: false,
-                  })}\n\n`,
-                );
-              }
-            } else {
-              console.warn(`[VOICE_PIPELINE] Sentence #${idx} TTS returned no audio`);
-            }
+            console.log(
+              `[VOICE_PIPELINE] Sentence #${idx} TTS OK chunks=${ttsRes.totalChunks} tts_ms=${ttsMs} contentType=${ttsRes.contentType}`,
+            );
           } catch (err) {
             console.warn(`[VOICE_PIPELINE] Sentence #${idx} TTS error:`, err.message);
           }
@@ -326,42 +465,25 @@ router.post('/calls/:linkToken/turn', async (req, res, next) => {
       }
 
       // ─── Sentence Segmentation ──────────────────────────────────────────────
-      // Split ONLY on period, question mark, exclamation mark followed by space.
-      // Do NOT split on colons, semicolons, or commas — they break prosody.
-      // Minimum segment length of 40 chars ensures natural speaking units.
-      // Short segments are grouped with the next one for natural flow.
+      // Split on period, question mark, or exclamation mark followed by space.
+      // Natural language complete sentences are enqueued immediately without 40-char gate.
       // ────────────────────────────────────────────────────────────────────────
       const SENTENCE_END = /(?<=[.?!])\s+/;
-      const MIN_SEGMENT_LENGTH = 40;
 
       const onTextChunk = (delta) => {
         sentenceBuffer += delta;
         fullText += delta;
 
-        // Split at sentence boundaries and enqueue each complete sentence
+        // Split at sentence boundaries and enqueue each complete sentence immediately
         const parts = sentenceBuffer.split(SENTENCE_END);
         if (parts.length > 1) {
-          // Accumulate short fragments into natural speaking units
-          let accumulated = '';
           for (let i = 0; i < parts.length - 1; i++) {
             const part = parts[i].trim();
-            if (!part) continue;
-
-            if (accumulated) {
-              accumulated += ' ' + part;
-            } else {
-              accumulated = part;
-            }
-
-            // Only enqueue if we have enough text for natural speech
-            if (accumulated.length >= MIN_SEGMENT_LENGTH) {
-              enqueueSentence(accumulated);
-              accumulated = '';
+            if (part) {
+              enqueueSentence(part);
             }
           }
-          // Any remaining short accumulated text goes back to the buffer
-          const lastPart = parts[parts.length - 1];
-          sentenceBuffer = accumulated ? accumulated + ' ' + lastPart : lastPart;
+          sentenceBuffer = parts[parts.length - 1];
         }
       };
 
@@ -439,7 +561,7 @@ router.post('/calls/:linkToken/turn', async (req, res, next) => {
     const s13 = 0;
     if (assistantText && !audioBase64) {
       try {
-        const { streamSpeech } = require('../lib/tts/sarvamStreamingTts');
+        const { streamSpeech } = require('../lib/tts/elevenlabsStreamingTts');
         const ttsRes = await streamSpeech(assistantText);
 
         ttsLatency = ttsRes.totalMs || Date.now() - s12;

@@ -13,7 +13,7 @@ require('dotenv').config({ path: './.env' });
 const { performance } = require('perf_hooks');
 const http = require('http');
 const express = require('express');
-const { streamSpeech } = require('../src/lib/tts/sarvamStreamingTts');
+const { streamSpeech } = require('../src/lib/tts/elevenlabsStreamingTts');
 const { synthesizeSpeech } = require('../src/lib/tts/sarvamTtsService');
 const { retrieveRelevantContext } = require('../src/lib/retrieval/mossRetriever');
 const { syncKnowledgeDocs, syncDealContext } = require('../src/lib/retrieval/mossIndexer');

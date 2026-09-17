@@ -113,7 +113,7 @@ describe('Voice Latency Streaming Pipeline', () => {
   });
 
   it('streamSpeech exports are available for sentence-level TTS', () => {
-    const tts = require('../src/lib/tts/sarvamStreamingTts');
+    const tts = require('../src/lib/tts/elevenlabsStreamingTts');
     assert.equal(typeof tts.streamSpeech, 'function', 'streamSpeech should be exported');
     assert.equal(typeof tts.SARVAM_WS_URL, 'string', 'SARVAM_WS_URL should be exported');
     assert.equal(typeof tts.DEFAULT_SPEAKER, 'string', 'DEFAULT_SPEAKER should be exported');

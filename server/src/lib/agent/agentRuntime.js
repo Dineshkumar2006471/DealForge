@@ -21,17 +21,39 @@ async function executeCustomerTurn(
   userText,
   { res, chatId = `chatcmpl-${uuidv4()}`, turnId = null, onTextChunk = null } = {},
 ) {
+  // Parallelize deal validation, history read, and Moss semantic retrieval
+  const tMossStart = Date.now();
+  const mossPromise = (async () => {
+    try {
+      const { retrieveRelevantContext } = require('../retrieval/mossRetriever');
+      return await retrieveRelevantContext({
+        organizationId: session.organizationId,
+        dealId: session.dealId,
+        sessionId: session.sessionId,
+        userText: (userText || '').trim(),
+      });
+    } catch (mossErr) {
+      console.warn('Moss retrieval note:', mossErr.message);
+      return { results: [], latencyMs: Date.now() - tMossStart, index: 'none', cacheHit: false };
+    }
+  })();
+
+  const [deal, initialHistory] = await Promise.all([
+    getDeal(session.dealId, session.organizationId, session.sessionId),
+    getHistory(session.sessionId),
+  ]);
+  if (!deal) {
+    throw new Error('Bound deal not found');
+  }
+
+  let history = initialHistory;
   const context = {
     organizationId: session.organizationId,
     dealId: session.dealId,
     sessionId: session.sessionId,
-    turnNumber: (await getTurnNumber(session.sessionId)) + 1,
+    turnNumber: history.filter((m) => m?.role === 'user').length + 1,
     turnId: turnId || `turn_${Date.now()}`,
   };
-  let history = await getHistory(session.sessionId);
-  if (!(await getDeal(context.dealId, context.organizationId, context.sessionId))) {
-    throw new Error('Bound deal not found');
-  }
 
   // Agora sends lifecycle and empty ASR turns around joins, TTS, and reconnects.
   // The RTC-ready Speak request owns the only greeting. An empty lifecycle turn is
@@ -71,40 +93,21 @@ async function executeCustomerTurn(
     return { duplicate: true, content: '', receiptId: receipt.receiptId };
   }
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // PERSISTENCE OPTIMIZATION — parallel but NOT fire-and-forget
-  //
-  // addMessage(user) MUST complete before:
-  //   • currentModelMessages() — it calls getHistory() which reads from Firestore
-  //   • discount/meeting early-return paths — they write assistant messages
-  //
-  // extractAndApplyEvidence CAN be deferred because:
-  //   1. Gemini does NOT depend on its result — it has userText in context directly
-  //   2. Policy authorization (discount/meeting regex) uses userText, not deal state
-  //   3. No correctness race — evidence updates deal state for FUTURE turns only
-  //   4. Failure is safely retried (non-critical enrichment)
-  //
-  // Strategy: run both in parallel, await both before proceeding.
-  // Saves ~30-60ms vs sequential (max(60ms, 30-150ms) instead of sum).
-  // ───────────────────────────────────────────────────────────────────────────
+  // Persist user message synchronously before model reasoning
   const tEvidenceStart = Date.now();
-  let tEvidenceEnd = tEvidenceStart;
+  await addMessage(session.sessionId, { role: 'user', content: userText.trim() });
+  history.push({ role: 'user', content: userText.trim() });
+  const tEvidenceEnd = Date.now();
 
-  const addUserMsgPromise = addMessage(session.sessionId, { role: 'user', content: userText.trim() });
-
-  const evidencePromise = (async () => {
+  // Non-critical evidence extraction runs in background without blocking LLM reasoning
+  setImmediate(async () => {
     try {
       const { extractAndApplyEvidence } = require('../evidence/evidenceExtractor');
       await extractAndApplyEvidence(userText, context);
     } catch (extractErr) {
       console.warn('Evidence extraction note:', extractErr.message);
-    } finally {
-      tEvidenceEnd = Date.now();
     }
-  })();
-
-  // Await BOTH before any path that reads history or writes assistant messages
-  await Promise.all([addUserMsgPromise, evidencePromise]);
+  });
 
   // A percentage discount request is a high-value policy boundary. Route it
   // deterministically instead of hoping the generative model elects to call a
@@ -196,20 +199,13 @@ async function executeCustomerTurn(
     }
   }
 
-  // Low-latency Moss semantic retrieval (Section 11-14)
-  const tMossStart = Date.now();
+  // Await Moss semantic retrieval that started in parallel at turn entry
   let retrievedDocs = [];
   let mossLatencyMs = 0;
   let mossIndex = 'none';
   let mossCacheHit = false;
   try {
-    const { retrieveRelevantContext } = require('../retrieval/mossRetriever');
-    const retrieval = await retrieveRelevantContext({
-      organizationId: context.organizationId,
-      dealId: context.dealId,
-      sessionId: context.sessionId,
-      userText,
-    });
+    const retrieval = await mossPromise;
     retrievedDocs = retrieval.results || [];
     mossLatencyMs = retrieval.latencyMs || Date.now() - tMossStart;
     mossIndex = retrieval.index || 'none';
@@ -220,7 +216,6 @@ async function executeCustomerTurn(
   context.retrievedDocs = retrievedDocs;
 
   const tools = getToolDefinitions();
-  history = await getHistory(session.sessionId);
   let content = '';
   const calls = [];
   let finishReason;
@@ -237,17 +232,6 @@ async function executeCustomerTurn(
     //   TOOL_DETECTED    → tool_calls seen; discard buffered prose, execute tools
     //   STREAMING        → No tool_calls seen AND sentence boundary reached;
     //                       forward deltas through onTextChunk immediately
-    //
-    // Safety invariant: NEVER speak provisional text that may be invalidated
-    // by a subsequent tool call. Only transition to STREAMING once we have
-    // enough evidence that no tool_calls will appear.
-    //
-    // Evidence: In OpenAI/Gemini streaming, delta.tool_calls appears in the
-    // stream as soon as the model decides to call a tool — typically within
-    // the first 2-5 chunks. Once a complete sentence of content has been
-    // accumulated without any tool_calls, the probability of a late tool_call
-    // is negligible. We use the first sentence boundary as the transition
-    // trigger from BUFFERING → STREAMING.
     // ──────────────────────────────────────────────────────────────────────────
 
     const SENTENCE_BOUNDARY = /(?<=[.!?;:])\s+/;
@@ -256,7 +240,7 @@ async function executeCustomerTurn(
     const initialTextChunks = [];
     tGeminiStart = Date.now();
 
-    for await (const chunk of generateResponse(await currentModelMessages(context), tools, context)) {
+    for await (const chunk of generateResponse(await currentModelMessages(context, { deal, history }), tools, context)) {
       const choice = chunk.choices?.[0];
       if (!choice) continue;
 
@@ -555,19 +539,19 @@ function explicitMeetingRequest(text) {
   return /(?:schedule|book|set up)\s*(?:a\s*)?(?:review|meeting|call|demo|follow-up)/i.test(String(text || ''));
 }
 
-async function currentModelMessages(context) {
-  const [deal, history, approvalSnapshot] = await Promise.all([
-    getDeal(context.dealId, context.organizationId, context.sessionId),
-    getHistory(context.sessionId),
-    db
-      .collection('approvals')
-      .where('organizationId', '==', context.organizationId)
-      .where('dealId', '==', context.dealId)
-      .where('sessionId', '==', context.sessionId)
-      .limit(20)
-      .get(),
-  ]);
+async function currentModelMessages(context, preloaded = {}) {
+  const deal = preloaded.deal || (await getDeal(context.dealId, context.organizationId, context.sessionId));
   if (!deal) throw new Error('Bound deal not found');
+
+  const history = preloaded.history || (await getHistory(context.sessionId));
+
+  const approvalSnapshot = await db
+    .collection('approvals')
+    .where('organizationId', '==', context.organizationId)
+    .where('dealId', '==', context.dealId)
+    .where('sessionId', '==', context.sessionId)
+    .limit(20)
+    .get();
   const resolvedApprovals = approvalSnapshot.docs
     .map((doc) => doc.data())
     .filter((approval) => ['APPROVED', 'REJECTED', 'EXPIRED'].includes(approval.status));

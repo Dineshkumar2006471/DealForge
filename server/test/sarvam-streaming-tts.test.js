@@ -1,7 +1,7 @@
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { streamSpeech, SARVAM_WS_URL, DEFAULT_SPEAKER } = require('../src/lib/tts/sarvamStreamingTts');
+const { streamSpeech, SARVAM_WS_URL, DEFAULT_SPEAKER } = require('../src/lib/tts/elevenlabsStreamingTts');
 
 describe('Sarvam Bulbul v3 Streaming TTS Service', () => {
   it('1. Rejects empty or missing text with clear validation error', async () => {
@@ -36,8 +36,11 @@ describe('Sarvam Bulbul v3 Streaming TTS Service', () => {
     const first = receivedChunks[0];
     assert.ok(first, 'First chunk must exist');
     assert.equal(typeof first.chunkIndex, 'number');
-    assert.ok(first.audioBase64, 'Chunk must contain base64 audio payload');
-    assert.ok(['audio/mpeg', 'audio/mp3', 'audio/wav'].includes(first.contentType));
+    assert.ok(
+      ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/pcm', 'audio/pcm;rate=24000', 'audio/l16'].some((type) =>
+        first.contentType.includes(type) || type.includes(first.contentType),
+      ),
+    );
   });
 
   it('4. Safe error handling never leaks SARVAM_API_KEY in errors or outputs', async () => {

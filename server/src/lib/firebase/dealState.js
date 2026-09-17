@@ -271,22 +271,40 @@ async function appendDiscountLedger(dealId, entry, organizationId, sessionId = n
  */
 async function updateNextBestAction(dealId, nextBestAction, organizationId, sessionId = null) {
   const ref = stateRef(dealId, sessionId);
+  const parentRef = db.collection('deals').doc(dealId);
   await db.runTransaction(async (tx) => {
     const deal = await tx.get(ref);
     if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found');
-    tx.update(ref, {
+    let parent = null;
+    if (sessionId) {
+      parent = await tx.get(parentRef);
+    }
+    const updatePayload = {
       nextBestAction: { ...nextBestAction, generatedAt: nextBestAction.generatedAt || new Date().toISOString() },
       updatedAt: new Date().toISOString(),
-    });
+    };
+    tx.update(ref, updatePayload);
+    if (parent && parent.exists && parent.data().organizationId === organizationId) {
+      tx.update(parentRef, updatePayload);
+    }
   });
 }
 
 async function updateDealHealth(dealId, dealHealth, organizationId, sessionId = null) {
   const ref = stateRef(dealId, sessionId);
+  const parentRef = db.collection('deals').doc(dealId);
   await db.runTransaction(async (tx) => {
     const deal = await tx.get(ref);
     if (!deal.exists || deal.data().organizationId !== organizationId) throw new Error('Bound deal not found');
-    tx.update(ref, { dealHealth, updatedAt: new Date().toISOString() });
+    let parent = null;
+    if (sessionId) {
+      parent = await tx.get(parentRef);
+    }
+    const updatePayload = { dealHealth, updatedAt: new Date().toISOString() };
+    tx.update(ref, updatePayload);
+    if (parent && parent.exists && parent.data().organizationId === organizationId) {
+      tx.update(parentRef, updatePayload);
+    }
   });
 }
 

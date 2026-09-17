@@ -73,14 +73,42 @@ async function synthesizeSpeech(
 
   const latency = Date.now() - start;
 
-  if (!response) {
-    throw new HttpError(502, `Upstream TTS provider unreachable: ${lastError?.message || 'network error'}`);
-  }
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Sarvam TTS API failed:', response.status, errorText);
-    throw new HttpError(502, `Upstream TTS provider failed (${response.status})`);
+  if (!response || !response.ok) {
+    const errorText = response ? await response.text() : (lastError?.message || 'unreachable');
+    console.warn(`[SarvamTTS] API failed (${response?.status || 'unreachable'}): ${errorText}. Falling back to OpenAI TTS.`);
+    if (process.env.OPENAI_API_KEY) {
+      try {
+        const oaiRes = await fetch('https://api.openai.com/v1/audio/speech', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'tts-1',
+            input: text.trim(),
+            voice: 'alloy',
+            response_format: codec === 'linear16' ? 'pcm' : (codec === 'mp3' ? 'mp3' : 'wav'),
+            speed: pace || 1.0,
+          }),
+        });
+        if (oaiRes.ok) {
+          const buf = Buffer.from(await oaiRes.arrayBuffer());
+          const audioBase64 = buf.toString('base64');
+          console.info('OpenAI TTS Fallback OK', { latency: Date.now() - start, audioBytes: buf.length, codec });
+          return {
+            audioBuffer: buf,
+            audioBase64,
+            sampleRate: codec === 'linear16' ? 24000 : sampleRate,
+            codec: codec === 'linear16' ? 'linear16' : (codec === 'mp3' ? 'mp3' : 'wav'),
+            latency: Date.now() - start,
+          };
+        }
+      } catch (oaiErr) {
+        console.error('OpenAI TTS fallback error:', oaiErr.message);
+      }
+    }
+    throw new HttpError(502, `Upstream TTS provider failed (${response?.status || 502})`);
   }
 
   const data = await response.json();

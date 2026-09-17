@@ -400,6 +400,7 @@
     let hubspotOpUnsubscribe = null;
     let messagesUnsubscribe = null;
     let currentDealData = null;
+    let currentSessionState = null;
     let currentHubspotOp = null;
 
     function updateConversationUrl() {
@@ -503,11 +504,12 @@
 
       hubspotOpUnsubscribe = db.collection('externalOperations')
         .where('organizationId', '==', window.managerOrganizationId)
-        .where('sessionId', '==', selectedSessionId)
+        .where('dealId', '==', dealId)
         .where('provider', '==', 'hubspot')
-        .limit(1)
+        .limit(5)
         .onSnapshot(snapshot => {
-          currentHubspotOp = !snapshot.empty ? snapshot.docs[0].data() : null;
+          const matchingDoc = snapshot.docs.find(d => !selectedSessionId || d.data().sessionId === selectedSessionId) || snapshot.docs[0];
+          currentHubspotOp = matchingDoc ? matchingDoc.data() : null;
           renderHubSpotCard(currentDealData, currentHubspotOp);
         }, err => console.warn('HubSpot op listen note:', err.message));
 
@@ -571,6 +573,8 @@
     }
 
     function renderDealState(data) {
+      currentSessionState = data;
+      renderHubSpotCard(currentDealData, currentHubspotOp);
       const activeSession = callSessions.find(s => s.sessionId === selectedSessionId);
       const resolvedCompany = (data.company?.value && data.company.value !== 'Pending' && data.company.value !== 'Loading...')
         ? data.company.value
@@ -850,7 +854,7 @@
       const lastSyncEl = document.getElementById('hubspot-last-sync');
       const linkEl = document.getElementById('hubspot-deal-link');
 
-      const hs = dealData?.integrations?.hubspot;
+      const hs = dealData?.integrations?.hubspot || currentSessionState?.integrations?.hubspot;
       if (!hs || !hs.dealId) {
         if (statusEl) { statusEl.textContent = 'NOT LINKED'; statusEl.style.color = 'var(--mute)'; }
         if (dealIdEl) dealIdEl.textContent = '—';

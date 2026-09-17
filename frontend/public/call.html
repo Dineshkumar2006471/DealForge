@@ -49,6 +49,7 @@
     let renewalTimer = null;
     let captionsUnsubscribe = null;
     let captionsPollingTimer = null;
+    let proactiveEventsSource = null;
     const orbElement = document.getElementById('call-orb');
 
     // Explicit 5-State State Machine (Rule #8)
@@ -206,7 +207,23 @@
             bytes[i] = binaryStr.charCodeAt(i);
           }
 
-          const audioBuffer = await ctx.decodeAudioData(bytes.buffer.slice(0));
+          let audioBuffer;
+          if (contentType && (contentType.includes('pcm') || contentType.includes('linear16') || contentType.includes('raw'))) {
+            let sampleRate = 24000;
+            const rateMatch = contentType.match(/rate=(\d+)/);
+            if (rateMatch) {
+              sampleRate = parseInt(rateMatch[1], 10) || 24000;
+            }
+            const numSamples = Math.floor(len / 2);
+            audioBuffer = ctx.createBuffer(1, numSamples, sampleRate);
+            const channelData = audioBuffer.getChannelData(0);
+            const view = new DataView(bytes.buffer, bytes.byteOffset, numSamples * 2);
+            for (let i = 0; i < numSamples; i++) {
+              channelData[i] = view.getInt16(i * 2, true) / 32768.0;
+            }
+          } else {
+            audioBuffer = await ctx.decodeAudioData(bytes.buffer.slice(0));
+          }
           const tDecodeEnd = performance.now();
           const decodeDuration = tDecodeEnd - tDecodeStart;
 
@@ -463,6 +480,10 @@
       if (captionsPollingTimer) { clearInterval(captionsPollingTimer); captionsPollingTimer = null; }
       if (meetingRequestUnsubscribe) { meetingRequestUnsubscribe(); meetingRequestUnsubscribe = null; }
       if (meetingRequestPollingTimer) { clearInterval(meetingRequestPollingTimer); meetingRequestPollingTimer = null; }
+      if (proactiveEventsSource) {
+        try { proactiveEventsSource.close(); } catch (_) {}
+        proactiveEventsSource = null;
+      }
       isAgentSpeaking = false;
       isTurnInFlight = false;
       transitionState(CALL_STATES.IDLE);
@@ -584,6 +605,52 @@
       meetingRequestPollingTimer = setInterval(pollMeetingRequest, 4000);
     }
 
+    function startProactiveEvents() {
+      if (proactiveEventsSource) {
+        try { proactiveEventsSource.close(); } catch (_) {}
+        proactiveEventsSource = null;
+      }
+      if (!call?.sessionCredential || !active) return;
+      const eventsUrl = `${BACKEND_URL}/public/calls/${encodeURIComponent(linkToken)}/events?credential=${encodeURIComponent(call.sessionCredential)}`;
+      try {
+        console.log('[PROACTIVE_EVENTS] Subscribing to session events SSE stream...');
+        proactiveEventsSource = new EventSource(eventsUrl);
+        proactiveEventsSource.addEventListener('connected', (e) => {
+          console.log('[PROACTIVE_EVENTS] Connected to session events channel:', e.data);
+        });
+        proactiveEventsSource.addEventListener('audio_chunk', async (e) => {
+          try {
+            const data = JSON.parse(e.data);
+            if (data.audioBase64) {
+              console.log('[PROACTIVE_EVENTS] Audio chunk received:', data.chunkIndex, data.contentType);
+              await streamingPlayer.enqueueChunk(data.audioBase64, data.contentType || 'audio/pcm;rate=24000');
+            }
+          } catch (err) {
+            console.warn('[PROACTIVE_EVENTS] Audio parse error:', err);
+          }
+        });
+        proactiveEventsSource.addEventListener('text', (e) => {
+          try {
+            const data = JSON.parse(e.data);
+            if (data.assistantText) {
+              console.log('[PROACTIVE_EVENTS] Spoken text received:', data.assistantText);
+              appendCaption('assistant', data.assistantText);
+            }
+          } catch (err) {
+            console.warn('[PROACTIVE_EVENTS] Text parse error:', err);
+          }
+        });
+        proactiveEventsSource.onerror = () => {
+          if (!active && proactiveEventsSource) {
+            try { proactiveEventsSource.close(); } catch (_) {}
+            proactiveEventsSource = null;
+          }
+        };
+      } catch (err) {
+        console.warn('[PROACTIVE_EVENTS] EventSource initialization failed:', err);
+      }
+    }
+
     function localDateTomorrow() { const value = new Date(); value.setDate(value.getDate() + 1); return value.toISOString().slice(0, 10); }
     document.getElementById('meeting-timezone').value = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
     document.getElementById('meeting-date').value = localDateTomorrow();
@@ -687,6 +754,7 @@
         // Only Agora needs the 2.5s polling fallback since it has no client-side transcript events.
         if (provider === 'agora') startCaptionFallback();
         startMeetingRequestFallback();
+        startProactiveEvents();
 
         // Request greeting from server
         const readyRes = await api(`/public/calls/${encodeURIComponent(linkToken)}/ready`, {

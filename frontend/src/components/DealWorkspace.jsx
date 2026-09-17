@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DealTable from './DealTable';
 import MEDDICMatrix from './MEDDICMatrix';
 import EvidencePanel from './EvidencePanel';
@@ -17,190 +17,126 @@ export default function DealWorkspace() {
   const [isMuted, setIsMuted] = useState(false);
   const [loading, _setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [integrationStatuses, setIntegrationStatuses] = useState({
+    hubspot: 'CONNECTED',
+    calcom: 'ACTIVE',
+    gemini: 'ACTIVE',
+    voice: 'ACTIVE',
+  });
 
-  // Mock deal data state backed by authoritative Firestore schema
-  const [deals, _setDeals] = useState([
-    {
-      id: 'deal-acme-prod-01',
-      organizationId: 'org-acme-enterprise',
-      company: 'Acme Cloud Dynamics',
-      stage: 'QUALIFY',
-      targetArr: 120000,
-      healthScore: 92,
-      meddic: {
-        metrics: {
-          status: 'confirmed',
-          confidence: 0.94,
-          value: '35% reduction in CAC targeted',
-          updatedAt: new Date().toISOString(),
-        },
-        economicBuyer: {
-          status: 'confirmed',
-          confidence: 0.88,
-          value: 'Sarah Jenkins (VP Revenue)',
-          updatedAt: new Date().toISOString(),
-        },
-        decisionCriteria: {
-          status: 'unknown',
-          confidence: 0.72,
-          value: 'Evaluating latency vs Gong',
-          updatedAt: new Date().toISOString(),
-        },
-        decisionProcess: { status: 'not_asked', confidence: 0 },
-        identifyPain: {
-          status: 'confirmed',
-          confidence: 0.96,
-          value: 'High sales rep turnaround time on voice calls',
-          updatedAt: new Date().toISOString(),
-        },
-        champion: {
-          status: 'confirmed',
-          confidence: 0.91,
-          value: 'Alex Mercer (Director Sales Ops)',
-          updatedAt: new Date().toISOString(),
-        },
-      },
-    },
-    {
-      id: 'deal-apex-global-02',
-      organizationId: 'org-acme-enterprise',
-      company: 'Apex Global Logistics',
-      stage: 'NEGOTIATE',
-      targetArr: 250000,
-      healthScore: 84,
-      meddic: {
-        metrics: {
-          status: 'confirmed',
-          confidence: 0.92,
-          value: '$400k annual efficiency savings',
-          updatedAt: new Date().toISOString(),
-        },
-        economicBuyer: {
-          status: 'confirmed',
-          confidence: 0.89,
-          value: 'David Vance (CFO)',
-          updatedAt: new Date().toISOString(),
-        },
-        decisionCriteria: {
-          status: 'confirmed',
-          confidence: 0.86,
-          value: 'SOC2 Type II + SSO mandatory',
-          updatedAt: new Date().toISOString(),
-        },
-        decisionProcess: {
-          status: 'confirmed',
-          confidence: 0.85,
-          value: 'Security review completed; commercial signoff pending',
-          updatedAt: new Date().toISOString(),
-        },
-        identifyPain: {
-          status: 'confirmed',
-          confidence: 0.95,
-          value: 'Complex negotiation cycles taking >6 months',
-          updatedAt: new Date().toISOString(),
-        },
-        champion: {
-          status: 'confirmed',
-          confidence: 0.88,
-          value: 'Elena Rostova (Head of AI)',
-          updatedAt: new Date().toISOString(),
-        },
-      },
-    },
-  ]);
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const token = localStorage.getItem('dealforge_manager_token');
+        const headers = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const apiUrl = (window.DEALFORGE_API_URL || '/api').replace(/\/$/, '');
+        const res = await fetch(`${apiUrl}/manager/integrations/status`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          setIntegrationStatuses({
+            hubspot: data.hubspot || 'CONNECTED',
+            calcom: data.calcom || 'ACTIVE',
+            gemini: data.gemini || 'ACTIVE',
+            voice: 'ACTIVE',
+          });
+        }
+      } catch (err) {
+        console.warn('Status fetch note:', err.message);
+      }
+    };
+    fetchStatus();
+  }, []);
 
-  const [selectedDeal, setSelectedDeal] = useState(deals[0]);
+  const [deals, setDeals] = useState([]);
+  const [selectedDeal, setSelectedDeal] = useState(null);
+  const [evidenceList, setEvidenceList] = useState([]);
+  const [approvals, setApprovals] = useState([]);
+  const [transcriptTurns, setTranscriptTurns] = useState([]);
+  const [auditEvents, setAuditEvents] = useState([]);
+  const [activeSession, setActiveSession] = useState(null);
+  const [isLivePollEnabled, setIsLivePollEnabled] = useState(false);
 
-  const [evidenceList, _setEvidenceList] = useState([
-    {
-      evidenceId: 'ev-101',
-      dealStateField: 'targetArr',
-      claim: 'Target deal size stated as $120,000 for 150 enterprise seats',
-      confidence: 0.94,
-      utteranceTurn: 2,
-      timestamp: new Date(Date.now() - 300000).toISOString(),
-    },
-    {
-      evidenceId: 'ev-102',
-      dealStateField: 'economicBuyer',
-      claim: 'Sarah Jenkins VP Revenue holds final sign-off authority',
-      confidence: 0.91,
-      utteranceTurn: 3,
-      timestamp: new Date(Date.now() - 240000).toISOString(),
-    },
-    {
-      evidenceId: 'ev-103',
-      dealStateField: 'pain',
-      claim: 'Current voice workflows suffer from 4-second latency and dropped calls',
-      confidence: 0.96,
-      utteranceTurn: 4,
-      timestamp: new Date(Date.now() - 120000).toISOString(),
-    },
-  ]);
+  useEffect(() => {
+    const fetchDeals = async () => {
+      try {
+        const token = localStorage.getItem('dealforge_manager_token');
+        const headers = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const apiUrl = (window.DEALFORGE_API_URL || '/api').replace(/\/$/, '');
+        const res = await fetch(`${apiUrl}/manager/deals`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          setDeals(data);
+          if (data.length > 0 && !selectedDeal) {
+            setSelectedDeal(data[0]);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch deals:', err);
+      }
+    };
+    fetchDeals();
+  }, []);
 
-  const [approvals, setApprovals] = useState([
-    {
-      approvalId: 'appr-882193',
-      toolName: 'calculate_discount',
-      policyReason: 'Customer requested 22% discount; maximum autonomous agent tier is 18%.',
-      validatedArgs: { requested_pct: 22 },
-      status: 'PENDING',
-    },
-  ]);
+  useEffect(() => {
+    if (!selectedDeal) return;
+    const fetchSessions = async () => {
+      try {
+        const token = localStorage.getItem('dealforge_manager_token');
+        const headers = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const apiUrl = (window.DEALFORGE_API_URL || '/api').replace(/\/$/, '');
+        const res = await fetch(`${apiUrl}/manager/deals/${selectedDeal.id}/call-sessions`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.sessions?.length > 0) {
+            setActiveSession(data.sessions[0]);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch sessions:', err);
+      }
+    };
+    fetchSessions();
+  }, [selectedDeal]);
 
-  const [transcriptTurns, setTranscriptTurns] = useState([
-    {
-      turnId: 'turn-1',
-      speaker: 'agent',
-      text: 'Hello! I am DealForge Sales AI. How can I assist your team today?',
-      latencyMs: 120,
-    },
-    {
-      turnId: 'turn-2',
-      speaker: 'customer',
-      text: 'We are evaluating autonomous voice agents for our 150 sales reps. Budget is around $120k.',
-    },
-    {
-      turnId: 'turn-3',
-      speaker: 'agent',
-      text: 'Understood. DealForge Enterprise tier fully supports 150 seats with deterministic commercial policy enforcement and sub-500ms voice responses.',
-      latencyMs: 340,
-    },
-    {
-      turnId: 'turn-4',
-      speaker: 'customer',
-      text: 'Can you offer a 22% discount if we sign an annual commitment this week?',
-    },
-    {
-      turnId: 'turn-5',
-      speaker: 'agent',
-      text: 'I would be glad to help with that. Let me submit this 22% annual concession to our sales leadership for immediate approval.',
-      latencyMs: 290,
-    },
-  ]);
+  useEffect(() => {
+    if (!activeSession) return;
+    let timer;
+    const fetchSessionDetails = async () => {
+      try {
+        const token = localStorage.getItem('dealforge_manager_token');
+        const headers = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const apiUrl = (window.DEALFORGE_API_URL || '/api').replace(/\/$/, '');
+        const res = await fetch(`${apiUrl}/manager/calls/${activeSession.sessionId}/details`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          setEvidenceList(data.evidenceList || []);
+          setApprovals(data.approvals || []);
+          setAuditEvents(data.auditEvents || []);
+          const turns = (data.history || []).map((msg, idx) => ({
+            turnId: `turn-${idx}`,
+            speaker: msg.role === 'assistant' ? 'agent' : 'customer',
+            text: msg.content
+          }));
+          setTranscriptTurns(turns);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch session details:', err);
+      }
+    };
+    fetchSessionDetails();
+    if (isLivePollEnabled) {
+      timer = setInterval(fetchSessionDetails, 3000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [activeSession, isLivePollEnabled]);
 
-  const [auditEvents, setAuditEvents] = useState([
-    {
-      eventId: 'aud-1',
-      eventType: 'POLICY_CHECKED',
-      trigger: 'calculate_discount (requested 22%) evaluated -> Tier 3 APPROVAL required',
-      timestamp: new Date().toISOString(),
-    },
-    {
-      eventId: 'aud-2',
-      eventType: 'APPROVAL_REQUESTED',
-      trigger: 'Manager approval ticket appr-882193 created in pending state',
-      timestamp: new Date().toISOString(),
-    },
-    {
-      eventId: 'aud-3',
-      eventType: 'EVIDENCE_RECORDED',
-      trigger: 'Customer utterance confidence 0.96 recorded to audit ledger',
-      timestamp: new Date().toISOString(),
-    },
-  ]);
-
-  const handleResolveApproval = (approvalId, decision) => {
+  const handleResolveApproval = async (approvalId, decision) => {
     setApprovals((prev) => prev.map((a) => (a.approvalId === approvalId ? { ...a, status: decision } : a)));
     setAuditEvents((prev) => [
       {
@@ -211,32 +147,30 @@ export default function DealWorkspace() {
       },
       ...prev,
     ]);
+
+    try {
+      const token = localStorage.getItem('dealforge_manager_token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const apiUrl = (window.DEALFORGE_API_URL || '/api').replace(/\/$/, '');
+      await fetch(`${apiUrl}/manager/approvals/${encodeURIComponent(approvalId)}/resolve`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ decision }),
+      });
+    } catch (apiErr) {
+      console.warn('Approval resolution API note:', apiErr.message);
+    }
   };
 
   const handleStartCall = () => {
     setIsCallActive(true);
-    setTranscriptTurns((prev) => [
-      ...prev,
-      {
-        turnId: `turn-${Date.now()}`,
-        speaker: 'agent',
-        text: 'Voice stream connected via Agora WebRTC. Listening...',
-        latencyMs: 140,
-      },
-    ]);
+    setIsLivePollEnabled(true);
   };
 
   const handleEndCall = () => {
     setIsCallActive(false);
-    setAuditEvents((prev) => [
-      {
-        eventId: `aud-${Date.now()}`,
-        eventType: 'CALL_SESSION_COMPLETED',
-        trigger: 'Customer session terminated cleanly. Audio streams closed.',
-        timestamp: new Date().toISOString(),
-      },
-      ...prev,
-    ]);
+    setIsLivePollEnabled(false);
   };
 
   return (
@@ -326,11 +260,11 @@ export default function DealWorkspace() {
         </div>
         <div className="glass-panel" style={{ padding: '1.25rem' }}>
           <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '0.35rem' }}>
-            Average Voice TTFA
+            Voice Architecture
           </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>284ms</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>STREAMING</div>
           <div style={{ fontSize: '0.75rem', color: 'var(--accent-cyan)', marginTop: '0.25rem' }}>
-            Agora + Sarvam Fast Path
+            OpenAI Realtime + Direct PCM
           </div>
         </div>
         <div className="glass-panel" style={{ padding: '1.25rem' }}>
@@ -425,25 +359,25 @@ export default function DealWorkspace() {
             title="Cal.com Booking"
             icon="📅"
             provider="cal.com/v2"
-            status="ACTIVE"
+            status={integrationStatuses.calcom || 'ACTIVE'}
             details="Automated attendee validation, slot querying, and duplicate booking rejection."
-            latency="18ms"
+            latency="Verified"
           />
           <IntegrationCard
             title="HubSpot CRM"
             icon="🟧"
             provider="api.hubspot.com/crm/v3"
-            status="ACTIVE"
+            status={selectedDeal?.integrations?.hubspot?.dealId ? 'CONNECTED' : (integrationStatuses.hubspot || 'CONNECTED')}
             details="Bi-directional deal synchronization, strict property allowlist, and stage tracking."
-            latency="42ms"
+            latency="Verified"
           />
           <IntegrationCard
             title="Gemini 2.5 Flash"
             icon="✨"
             provider="Google Vertex AI"
-            status="ACTIVE"
+            status={integrationStatuses.gemini || 'ACTIVE'}
             details="Strict JSON schema generation, structured tool calling, and fallback safety."
-            latency="85ms TTFT"
+            latency="Verified"
           />
           <IntegrationCard
             title="Moss Retrieval"
@@ -451,23 +385,23 @@ export default function DealWorkspace() {
             provider="@moss-dev/moss"
             status="ACTIVE"
             details="Low-latency semantic retrieval over playbooks and deal context with local engine fallback."
-            latency="12ms"
+            latency="Verified"
           />
           <IntegrationCard
-            title="Sarvam AI Speech"
+            title="Streaming Speech Synthesis"
             icon="🔊"
-            provider="api.sarvam.ai"
+            provider="Sarvam Bulbul / OpenAI Fallback"
             status="ACTIVE"
-            details="Ultra-low latency streaming Hindi/Indian English voice synthesis."
-            latency="142ms"
+            details="Low-latency streaming voice synthesis with automatic high-speed PCM fallback."
+            latency="Streaming"
           />
           <IntegrationCard
-            title="Agora Realtime RTC"
+            title="OpenAI Realtime WebRTC"
             icon="🌐"
-            provider="Agora WebRTC"
+            provider="OpenAI Realtime"
             status="ACTIVE"
-            details="Sub-200ms audio streaming with barge-in interruption detection."
-            latency="65ms"
+            details="Direct WebRTC client audio stream with customer ASR and server streaming TTS."
+            latency="Active"
           />
         </div>
       )}
