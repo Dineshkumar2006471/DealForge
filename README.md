@@ -22,12 +22,12 @@
   <a href="#"><img src="https://img.shields.io/badge/Architecture-Production%20Grade-brightgreen.svg" alt="Architecture" /></a>
   <a href="#"><img src="https://img.shields.io/badge/DealForge%20CI%2FCD%20Pipeline-passing-brightgreen.svg" alt="CI/CD" /></a>
   <a href="https://platform.openai.com"><img src="https://img.shields.io/badge/Voice-OpenAI%20Realtime%20WebRTC%20GA-orange.svg" alt="OpenAI Realtime" /></a>
-  <a href="https://sarvam.ai"><img src="https://img.shields.io/badge/TTS-Sarvam%20Bulbul%20v3-purple.svg" alt="Sarvam TTS" /></a>
+  <a href="https://elevenlabs.ai"><img src="https://img.shields.io/badge/TTS-ElevenLabs%20Bulbul%20v3-purple.svg" alt="ElevenLabs TTS" /></a>
   <a href="https://moss.dev"><img src="https://img.shields.io/badge/Retrieval-Moss%20Semantic%20Layer-teal.svg" alt="Moss Retrieval" /></a>
 </p>
 
 <p align="center">
-  <strong>Autonomous Commercial Voice Conversations · Deterministic Policy Guardrails · Real-time MEDDIC Extraction · Sub-80ms Moss Retrieval · Sarvam Bulbul v3 Streaming TTS · Bidirectional HubSpot CRM & Cal.com Scheduling</strong>
+  <strong>Autonomous Commercial Voice Conversations · Deterministic Policy Guardrails · Real-time MEDDIC Extraction · Sub-80ms Moss Retrieval · ElevenLabs Flash v2.5 Streaming TTS · Bidirectional HubSpot CRM & Cal.com Scheduling</strong>
 </p>
 
 <p align="center">
@@ -60,7 +60,7 @@ In enterprise B2B sales, reps waste over **35% of their selling capacity** on ma
 
 **DealForge** is an enterprise-grade autonomous sales copilot that conducts natural, real-time voice discovery calls with prospective buyers while operating inside strictly verified commercial guardrails:
 
-1. **Conducts Natural Real-Time Discovery Calls**: Speaks via OpenAI Realtime WebRTC transport and ultra-low-latency Sarvam Bulbul v3 streaming TTS with realistic cadence and Indian-accented English.
+1. **Conducts Natural Real-Time Discovery Calls**: Speaks via OpenAI Realtime WebRTC transport and ultra-low-latency ElevenLabs Flash v2.5 streaming TTS with realistic cadence and Indian-accented English.
 2. **Extracts Live MEDDIC Qualification Evidence**: Extracts Metrics, Economic Buyer, Decision Criteria, Decision Process, Identify Pain, and Champion directly from customer dialogue with cryptographic audit provenance.
 3. **Enforces Deterministic Discount Policy (Zero Hallucination)**:
    - Discretionary discounts up to 18% are autonomously confirmed.
@@ -95,7 +95,7 @@ flowchart TB
 
   subgraph Voice & Audio Transport [Real-Time Audio]
     OpenAI[OpenAI Realtime WebRTC GA\nv1/realtime/calls]
-    Sarvam[Sarvam Bulbul v3 WebSocket\nwss://api.sarvam.ai/text-to-speech/ws]
+    ElevenLabs[ElevenLabs Flash v2.5 WebSocket\nwss://api.elevenlabs.io/v1/text-to-speech]
   end
 
   subgraph Enterprise Ecosystem [Enterprise Integrations]
@@ -109,7 +109,7 @@ flowchart TB
   CloudRun <-->|Transaction & Audit State| Firestore
   CloudRun <-->|Reasoning Turns| Gemini
   CloudRun <-->|Sub-80ms Context Queries| Moss
-  CloudRun <-->|Audio Chunk Streaming| Sarvam
+  CloudRun <-->|Audio Chunk Streaming| ElevenLabs
   CloudRun <-->|CRM Sync| HubSpot
   CloudRun <-->|Meeting Booking| CalCom
 ```
@@ -128,7 +128,7 @@ sequenceDiagram
   participant CloudRun as Cloud Run Backend
   participant Moss as Moss Retrieval Layer
   participant Gemini as Vertex AI Gemini 2.5 Flash
-  participant Sarvam as Sarvam Bulbul v3 WebSocket
+  participant ElevenLabs as ElevenLabs Flash v2.5 WebSocket
   participant Firestore as Cloud Firestore
 
   Customer->>Browser: Speaks "We have 300 reps and need enterprise pricing."
@@ -146,14 +146,14 @@ sequenceDiagram
   Gemini-->>CloudRun: Stream assistant response text
   CloudRun-->>Browser: SSE event: {"type":"text", "assistantText":"..."}
 
-  CloudRun->>Sarvam: WebSocket send text chunk
-  Sarvam-->>CloudRun: WebSocket audio chunk 0 (MP3)
+  CloudRun->>ElevenLabs: WebSocket send text chunk
+  ElevenLabs-->>CloudRun: WebSocket audio chunk 0 (MP3)
   CloudRun-->>Browser: SSE event: {"type":"audio_chunk", "chunkIndex":0}
   
   Note over Browser: Web Audio AudioContext plays Chunk 0 immediately (~15ms startup)
   
   loop Remaining Chunks
-    Sarvam-->>CloudRun: WebSocket audio chunk N
+    ElevenLabs-->>CloudRun: WebSocket audio chunk N
     CloudRun-->>Browser: SSE event: {"type":"audio_chunk", "chunkIndex":N}
     Note over Browser: Chunks enqueue seamlessly on timeline
   end
@@ -174,7 +174,7 @@ DealForge utilizes Moss as a low-latency semantic retrieval and context accelera
   - Commercial Pricing & Tiers ($29 Starter, $79 Pro, $149 Enterprise)
   - Core Autonomous Platform Capabilities
   - Security, Encryption (TLS 1.3, AES-256) & SOC 2 Type II Compliance
-  - Ecosystem Integrations (HubSpot, Cal.com, OpenAI, Sarvam)
+  - Ecosystem Integrations (HubSpot, Cal.com, OpenAI, ElevenLabs)
   - Implementation & Onboarding FAQs
   - MEDDIC Qualification Guidance
   - Discovery & Qualification Question Playbook
@@ -223,7 +223,7 @@ Empirical latency measurements from 100 automated retrieval queries and 20 repre
 
 | Latency Milestone | Baseline Monolithic REST | DealForge Streaming Pipeline | Delta / Attribution |
 | :--- | :--- | :--- | :--- |
-| **TTS First Audio (TTFB)** | ~1,429 ms | ~1,136 ms | **-293 ms** (Sarvam Bulbul v3 Streaming) |
+| **TTS First Audio (TTFB)** | ~1,429 ms | ~1,136 ms | **-293 ms** (ElevenLabs Flash v2.5 Streaming) |
 | **Browser Audio Startup** | ~200 ms (Full WAV decode) | ~15 ms (Web Audio Chunk Queue) | **-185 ms** (Immediate Chunk 0 playback) |
 | **End-to-End Voice TTFA** | **~4,800 ms – 5,200 ms** | **~1,500 ms – 1,800 ms** | **~3.2s reduction** (Streaming TTS + Web Audio) |
 | **Moss Retrieval Latency (P50)** | N/A | **64.21 ms** | High-speed semantic context retrieval |
@@ -254,7 +254,7 @@ Empirical latency measurements from 100 automated retrieval queries and 20 repre
 ### 2. Security
 - **No Secret Exposure**: Zero API keys or credentials in frontend code, client bundles, or Moss index documents.
 - **Tenant Isolation**: Multi-tenant isolation enforced by Firestore security rules and organization-scoped queries.
-- **Ephemeral Credentials**: Browser receives only short-lived, single-use call credentials (`clientSecret`). Primary keys (`OPENAI_API_KEY`, `SARVAM_API_KEY`, `MOSS_PROJECT_KEY`) remain strictly server-side.
+- **Ephemeral Credentials**: Browser receives only short-lived, single-use call credentials (`clientSecret`). Primary keys (`OPENAI_API_KEY`, `ELEVENLABS_API_KEY`, `MOSS_PROJECT_KEY`) remain strictly server-side.
 - **XSS & Injection Protection**: HTML output escapes untrusted user inputs; DOM manipulation uses text nodes exclusively.
 
 ### 3. Accessibility
@@ -288,7 +288,7 @@ cd DealForge
 cd server
 npm install
 cp .env.example .env
-# Configure your GCP_PROJECT_ID, SARVAM_API_KEY, OPENAI_API_KEY, and MOSS credentials in .env
+# Configure your GCP_PROJECT_ID, ELEVENLABS_API_KEY, OPENAI_API_KEY, and MOSS credentials in .env
 ```
 
 ### 3. Run Test Suite
@@ -345,7 +345,7 @@ DealForge/
 │   │   │   ├── agent/            # Agent runtime & next-best-action engine
 │   │   │   ├── policy/           # Deterministic commercial policy engine
 │   │   │   ├── retrieval/        # Moss 2-index indexer & low-latency retriever
-│   │   │   ├── tts/              # Sarvam Bulbul v3 WebSocket streaming service
+│   │   │   ├── tts/              # ElevenLabs Flash v2.5 WebSocket streaming service
 │   │   │   ├── integrations/     # HubSpot CRM & Cal.com v2 integrations
 │   │   │   └── firebase/         # Firestore deal state & transaction managers
 │   └── test/                     # 96 comprehensive automated tests

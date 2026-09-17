@@ -150,5 +150,5 @@ The following architectural pillars remain unchanged:
 ## Remaining Risks & Improvement Opportunities
 
 1. **Full TypeScript Migration for Legacy Routes**: While critical business domain modules, policy engine, validation, and security are strictly compiler-checked with TypeScript, express route handlers remain commonJS JavaScript.
-2. **External Vendor Dependencies**: Real-time voice latency depends on upstream WebSocket latency from Sarvam and OpenAI Realtime APIs.
+2. **External Vendor Dependencies**: Real-time voice latency depends on upstream WebSocket latency from ElevenLabs and OpenAI Realtime APIs.
 3. **Live Browser E2E in Headless CI**: While Playwright E2E tests run locally against development servers, cloud CI runs integration and mock E2E suites to avoid external display server dependencies.

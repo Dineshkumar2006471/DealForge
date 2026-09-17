@@ -10,7 +10,7 @@
 **DealForge** is an enterprise-grade, deterministic AI voice negotiation agent designed for high-stakes B2B sales conversations. Built specifically under the **Real-Time Voice and Conversational AI** track, DealForge empowers commercial sales teams by conducting natural, sub-second spoken negotiations while strictly enforcing mathematical pricing floors, hard policy guardrails, and automated qualification workflows.
 
 Unlike generic conversational agents that suffer from unpredictable hallucinations, rogue concessions, and high-latency roundtrips, DealForge couples:
-1. **Ultra-Low-Latency Voice Streaming**: OpenAI Realtime WebRTC / Sarvam Bulbul v3 WebSocket streaming TTS for conversational time-to-first-audio (TTFA) under 1.5 seconds.
+1. **Ultra-Low-Latency Voice Streaming**: OpenAI Realtime WebRTC / ElevenLabs Flash v2.5 WebSocket streaming TTS for conversational time-to-first-audio (TTFA) under 1.5 seconds.
 2. **Moss Low-Latency Semantic Retrieval**: Sub-10ms dual-index vector and keyword context search providing instantaneous access to playbooks, competitor matrices, pricing tiers, and real-time deal state.
 3. **Deterministic Hard Commercial Guardrails**: Finite State Machine policy engine with zero-hallucination discounting (hard 15% automatic limit, 16–25% human-in-the-loop approval, >25% hard programmatic rejection).
 4. **Autonomous MEDDIC & Evidence Provenance**: Sentence-level audio and transcript attribution capturing economic buyer, decision criteria, pain, metrics, timeline, and competitor intelligence.
@@ -39,7 +39,7 @@ DealForge solves this by providing an AI negotiation partner that speaks fluentl
 | **Sarah Chen** | VP of Sales / Commercial Director | Margin protection, predictable deal velocity, zero rogue discounts. | Sets hard commercial policies, reviews real-time approval requests in the Manager Command Center with full evidence provenance. |
 | **David Patel** | Enterprise Account Executive | High inbound qualification volume, administrative overhead in HubSpot. | Deploys DealForge customer call links; agent qualifies leads, extracts MEDDIC, and syncs verified deals automatically. |
 | **Elena Rostova** | RevOps & Compliance Lead | Regulatory audit trails, accurate CRM records, reproducible pricing decisions. | Immutable Firestore audit logs, sentence-level customer utterance provenance, deterministic state machine enforcement. |
-| **Prospective Customer** | Enterprise Buyer (e.g. Northstar Labs) | Instant answers, transparent pricing, seamless scheduling without sales friction. | Sub-second voice conversation with Sarvam/OpenAI, zero awkward pauses, immediate calendar booking via Cal.com. |
+| **Prospective Customer** | Enterprise Buyer (e.g. Northstar Labs) | Instant answers, transparent pricing, seamless scheduling without sales friction. | Sub-second voice conversation with ElevenLabs/OpenAI, zero awkward pauses, immediate calendar booking via Cal.com. |
 
 ---
 
@@ -48,7 +48,7 @@ DealForge solves this by providing an AI negotiation partner that speaks fluentl
 ### 4.1 Real-Time Voice & Conversational AI
 DealForge implements a production-grade WebRTC and WebSocket audio architecture:
 - **Realtime WebRTC Audio**: Browser connects directly to OpenAI Realtime GA APIs via ephemeral, short-lived tokens minted by the DealForge server, ensuring permanent API keys never touch the client.
-- **Sarvam Bulbul v3 Streaming TTS**: Low-latency Indian English voice synthesis streaming raw PCM chunks over WebSockets to a dedicated Web Audio API queue player.
+- **ElevenLabs Flash v2.5 Streaming TTS**: Low-latency Indian English voice synthesis streaming raw PCM chunks over WebSockets to a dedicated Web Audio API queue player.
 - **Interruptible Conversational Turn State**: Immediate audio cut-off and client-side playback drain upon customer speech detection (barge-in support).
 
 ### 4.2 Moss Low-Latency Semantic Retrieval Integration
@@ -122,7 +122,7 @@ sequenceDiagram
     end
     Server->>Gemini: Stream Generation with Grounded Context
     Gemini-->>Server: Assistant Turn Response
-    Server->>Browser: Sarvam Bulbul v3 Audio Chunks / Captions
+    Server->>Browser: ElevenLabs Flash v2.5 Audio Chunks / Captions
     Browser-->>Customer: Natural Voice Playback (<1.5s TTFA)
     Server->>Hub: Bidirectional Sync (CRM Record + Calendar Slot)
     Server->>Manager: Real-Time Workspace State Update (SSE)
@@ -135,7 +135,7 @@ sequenceDiagram
 ### 6.1 Real-Time Negotiation & Voice Pipeline (FR-01)
 - **FR-01.1**: The agent must maintain two-way conversational audio with latency from customer speech end to assistant speech start (TTFA) under 1.8 seconds.
 - **FR-01.2**: Customer speech interrupts ongoing TTS playback immediately without buffering outdated sentences.
-- **FR-01.3**: Audio synthesis must support natural Indian English prosody via Sarvam Bulbul v3 with Ishita speaker profile.
+- **FR-01.3**: Audio synthesis must support natural Indian English prosody via ElevenLabs Flash v2.5 with Sarah speaker profile.
 
 ### 6.2 Moss Semantic Retrieval (FR-02)
 - **FR-02.1**: Queries must be dynamically routed based on intent classification (product questions to `dealforge-knowledge`, customer status to `dealforge-deal-context`).
@@ -195,7 +195,7 @@ sequenceDiagram
 | **Evidence Extraction** | Regex + Deterministic Parser | < 10 ms | 4 ms | 8 ms |
 | **Policy Evaluation** | In-Memory Finite State Engine | < 5 ms | 1 ms | 3 ms |
 | **LLM Reasoning & Stream** | Gemini 2.5 Flash | < 750 ms | 580 ms | 820 ms |
-| **TTS TTFB** | Sarvam Bulbul v3 WebSocket | < 250 ms | 180 ms | 260 ms |
+| **TTS TTFB** | ElevenLabs Flash v2.5 WebSocket | < 250 ms | 180 ms | 260 ms |
 | **Total Conversational TTFA** | End-to-End Pipeline | < 1,800 ms | **1,520 ms** | **1,780 ms** |
 
 ---
@@ -203,7 +203,7 @@ sequenceDiagram
 ## 9. Release Milestones & Acceptance Criteria
 
 - [x] **Milestone 1**: OpenAI Realtime WebRTC voice client operational with ephemeral token security.
-- [x] **Milestone 2**: Sarvam Bulbul v3 streaming TTS integrated with Web Audio queue player.
+- [x] **Milestone 2**: ElevenLabs Flash v2.5 streaming TTS integrated with Web Audio queue player.
 - [x] **Milestone 3**: Moss 2-index architecture deployed (`dealforge-knowledge` + `dealforge-deal-context`).
 - [x] **Milestone 4**: Deterministic commercial policy engine validating discounts and manager approvals.
 - [x] **Milestone 5**: Full MEDDIC extraction with sentence-level audio and turn provenance.

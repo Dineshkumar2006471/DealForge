@@ -19,7 +19,7 @@ Customer stops speaking
   → 40ms    Moss retrieveRelevantContext
   → 600-1500ms  Gemini generateContentStream (BUFFERED)     ← CRITICAL
   → 0ms     SSE headers set (BUT ONLY NOW)                  ← CRITICAL
-  → 200-800ms  Sarvam TTS (FULL TEXT, NOT STREAMED)         ← CRITICAL
+  → 200-800ms  ElevenLabs TTS (FULL TEXT, NOT STREAMED)         ← CRITICAL
   → 50ms    browser decode + playback
   ────────────────────────────────────────
   TOTAL: ~2000-3800ms server + ~700-1000ms client = 3-5s silence
@@ -62,7 +62,7 @@ Customer stops speaking
   → Gemini streaming starts
   → 300-600ms  Gemini first token
   → First sentence boundary detected
-  → IMMEDIATELY: Sarvam TTS starts on first sentence
+  → IMMEDIATELY: ElevenLabs TTS starts on first sentence
   → 150-250ms  TTS first audio chunk
   → emit audio_chunk → browser plays
   → Meanwhile: Gemini continues → more sentences → more TTS

@@ -60,7 +60,7 @@ async function streamOpenAiTtsPcm(cleanText, { speed = DEFAULT_PACE, voice = 'al
     if (done) break;
     if (!tFirstByte) tFirstByte = Date.now();
 
-    let combined = leftover.length ? Buffer.concat([leftover, Buffer.from(value)]) : Buffer.from(value);
+    const combined = leftover.length ? Buffer.concat([leftover, Buffer.from(value)]) : Buffer.from(value);
     // Align to 2-byte sample boundary
     const evenLength = combined.length - (combined.length % 2);
     if (evenLength > 0) {
@@ -225,7 +225,9 @@ async function streamSpeech(
           if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
             ws.close();
           }
-        } catch (_) {}
+        } catch (_) {
+          // ignore error
+        }
       }
     };
 
@@ -233,9 +235,7 @@ async function streamSpeech(
       if (isSettled) return;
       isSettled = true;
       cleanup();
-      runFallback(`WebSocket timeout after ${timeoutMs}ms`)
-        .then(resolve)
-        .catch(reject);
+      runFallback(`WebSocket timeout after ${timeoutMs}ms`).then(resolve).catch(reject);
     }, timeoutMs);
 
     try {
@@ -281,9 +281,7 @@ async function streamSpeech(
             cleanup();
             const errMsg = msg.data?.message || msg.message || JSON.stringify(msg);
             console.warn('[Sarvam Streaming TTS] Received error message:', errMsg);
-            runFallback(`Sarvam API error: ${errMsg}`)
-              .then(resolve)
-              .catch(reject);
+            runFallback(`Sarvam API error: ${errMsg}`).then(resolve).catch(reject);
             return;
           }
 
@@ -339,9 +337,7 @@ async function streamSpeech(
         if (isSettled) return;
         isSettled = true;
         cleanup();
-        runFallback(`WebSocket error: ${err.message}`)
-          .then(resolve)
-          .catch(reject);
+        runFallback(`WebSocket error: ${err.message}`).then(resolve).catch(reject);
       });
 
       ws.on('close', (code) => {
@@ -350,18 +346,14 @@ async function streamSpeech(
         if (audioBase64List.length === 0) {
           isSettled = true;
           cleanup();
-          runFallback(`WebSocket closed unexpectedly with code ${code}`)
-            .then(resolve)
-            .catch(reject);
+          runFallback(`WebSocket closed unexpectedly with code ${code}`).then(resolve).catch(reject);
         }
       });
     } catch (createErr) {
       if (isSettled) return;
       isSettled = true;
       cleanup();
-      runFallback(`Init error: ${createErr.message}`)
-        .then(resolve)
-        .catch(reject);
+      runFallback(`Init error: ${createErr.message}`).then(resolve).catch(reject);
     }
   });
 }

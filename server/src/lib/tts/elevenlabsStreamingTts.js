@@ -53,7 +53,7 @@ async function streamOpenAiTtsPcmFallback(cleanText, { speed = 1.0, voice = 'all
     if (done) break;
     if (!tFirstByte) tFirstByte = Date.now();
 
-    let combined = leftover.length ? Buffer.concat([leftover, Buffer.from(value)]) : Buffer.from(value);
+    const combined = leftover.length ? Buffer.concat([leftover, Buffer.from(value)]) : Buffer.from(value);
     // Align to 2-byte sample boundary
     const evenLength = combined.length - (combined.length % 2);
     if (evenLength > 0) {
@@ -167,7 +167,7 @@ async function streamSpeech(
       }),
       signal: controller.signal,
     });
-    
+
     clearTimeout(timeoutId);
 
     if (!res.ok) {
@@ -183,7 +183,7 @@ async function streamSpeech(
       if (done) break;
       if (!tFirstByte) tFirstByte = Date.now();
 
-      let combined = leftover.length ? Buffer.concat([leftover, Buffer.from(value)]) : Buffer.from(value);
+      const combined = leftover.length ? Buffer.concat([leftover, Buffer.from(value)]) : Buffer.from(value);
       // Align to 2-byte sample boundary
       const evenLength = combined.length - (combined.length % 2);
       if (evenLength > 0) {
