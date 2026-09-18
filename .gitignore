@@ -16,9 +16,11 @@ node_modules/
 frontend/public/node_modules/
 test-results/
 *.wav
+*.mp3
 scratch/
 recent_logs.json
 session_logs.json
+release-evidence.md
 frontend/dist/
 server/coverage/
 coverage/
