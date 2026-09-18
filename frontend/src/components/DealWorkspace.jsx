@@ -119,7 +119,7 @@ export default function DealWorkspace() {
           const turns = (data.history || []).map((msg, idx) => ({
             turnId: `turn-${idx}`,
             speaker: msg.role === 'assistant' ? 'agent' : 'customer',
-            text: msg.content
+            text: msg.content,
           }));
           setTranscriptTurns(turns);
         }
@@ -367,7 +367,9 @@ export default function DealWorkspace() {
             title="HubSpot CRM"
             icon="🟧"
             provider="api.hubspot.com/crm/v3"
-            status={selectedDeal?.integrations?.hubspot?.dealId ? 'CONNECTED' : (integrationStatuses.hubspot || 'CONNECTED')}
+            status={
+              selectedDeal?.integrations?.hubspot?.dealId ? 'CONNECTED' : integrationStatuses.hubspot || 'CONNECTED'
+            }
             details="Bi-directional deal synchronization, strict property allowlist, and stage tracking."
             latency="Verified"
           />

@@ -71,9 +71,7 @@ async function resolveApproval(approvalId, decision, manager) {
     tx.update(ref, { status: next, resolvedAt: timestamp, resolvedBy: manager.uid });
     const eventId = uuidv4();
     const sessionDoc = db.collection('callSessions').doc(approval.sessionId);
-    const eventRef = typeof sessionDoc.collection === 'function'
-      ? sessionDoc.collection('events').doc(eventId)
-      : null;
+    const eventRef = typeof sessionDoc.collection === 'function' ? sessionDoc.collection('events').doc(eventId) : null;
     if (eventRef) {
       tx.set(eventRef, {
         eventId,

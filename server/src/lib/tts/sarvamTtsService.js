@@ -74,8 +74,10 @@ async function synthesizeSpeech(
   const latency = Date.now() - start;
 
   if (!response || !response.ok) {
-    const errorText = response ? await response.text() : (lastError?.message || 'unreachable');
-    console.warn(`[SarvamTTS] API failed (${response?.status || 'unreachable'}): ${errorText}. Falling back to OpenAI TTS.`);
+    const errorText = response ? await response.text() : lastError?.message || 'unreachable';
+    console.warn(
+      `[SarvamTTS] API failed (${response?.status || 'unreachable'}): ${errorText}. Falling back to OpenAI TTS.`,
+    );
     if (process.env.OPENAI_API_KEY) {
       try {
         const oaiRes = await fetch('https://api.openai.com/v1/audio/speech', {
@@ -88,7 +90,7 @@ async function synthesizeSpeech(
             model: 'tts-1',
             input: text.trim(),
             voice: 'alloy',
-            response_format: codec === 'linear16' ? 'pcm' : (codec === 'mp3' ? 'mp3' : 'wav'),
+            response_format: codec === 'linear16' ? 'pcm' : codec === 'mp3' ? 'mp3' : 'wav',
             speed: pace || 1.0,
           }),
         });
@@ -100,7 +102,7 @@ async function synthesizeSpeech(
             audioBuffer: buf,
             audioBase64,
             sampleRate: codec === 'linear16' ? 24000 : sampleRate,
-            codec: codec === 'linear16' ? 'linear16' : (codec === 'mp3' ? 'mp3' : 'wav'),
+            codec: codec === 'linear16' ? 'linear16' : codec === 'mp3' ? 'mp3' : 'wav',
             latency: Date.now() - start,
           };
         }

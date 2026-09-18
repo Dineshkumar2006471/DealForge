@@ -239,109 +239,107 @@ router.all('/calls/:linkToken/events', async (req, res, next) => {
     const { streamSpeech } = require('../lib/tts/elevenlabsStreamingTts');
 
     const eventsRef = db.collection('callSessions').doc(session.sessionId).collection('events');
-    const unsubscribe = eventsRef
-      .where('resolvedAt', '>=', connectTime)
-      .onSnapshot(
-        async (snapshot) => {
-          for (const change of snapshot.docChanges()) {
-            if (change.type !== 'added') continue;
-            const eventDoc = change.doc;
-            const eventData = eventDoc.data();
-            if (eventData.eventType !== 'APPROVAL_RESOLVED') continue;
+    const unsubscribe = eventsRef.where('resolvedAt', '>=', connectTime).onSnapshot(
+      async (snapshot) => {
+        for (const change of snapshot.docChanges()) {
+          if (change.type !== 'added') continue;
+          const eventDoc = change.doc;
+          const eventData = eventDoc.data();
+          if (eventData.eventType !== 'APPROVAL_RESOLVED') continue;
 
-            // Atomic claim of event document
-            let shouldProcess = false;
-            await db.runTransaction(async (tx) => {
-              const current = await tx.get(eventDoc.ref);
-              if (!current.exists || current.data().processed) return;
-              tx.update(eventDoc.ref, { processed: true, processedAt: new Date().toISOString() });
-              shouldProcess = true;
-            });
+          // Atomic claim of event document
+          let shouldProcess = false;
+          await db.runTransaction(async (tx) => {
+            const current = await tx.get(eventDoc.ref);
+            if (!current.exists || current.data().processed) return;
+            tx.update(eventDoc.ref, { processed: true, processedAt: new Date().toISOString() });
+            shouldProcess = true;
+          });
 
-            if (!shouldProcess) continue;
+          if (!shouldProcess) continue;
 
-            console.log(
-              `[PROACTIVE_APPROVAL] Handling ${eventData.decision} for approval ${eventData.approvalId} on session ${session.sessionId}`,
-            );
+          console.log(
+            `[PROACTIVE_APPROVAL] Handling ${eventData.decision} for approval ${eventData.approvalId} on session ${session.sessionId}`,
+          );
 
-            let spoken = '';
-            if (eventData.decision === 'APPROVED') {
-              const claimedList = await claimApprovedApprovals({
-                organizationId: session.organizationId,
-                dealId: session.dealId,
-                sessionId: session.sessionId,
-              });
-              const approval = claimedList.find((a) => a.approvalId === eventData.approvalId) || claimedList[0];
-              if (approval) {
-                const executed = await executeTool(approval.exactToolName, approval.exactValidatedArguments, {
-                  organizationId: session.organizationId,
-                  dealId: session.dealId,
-                  sessionId: session.sessionId,
-                  approvedReplay: {
-                    approvalId: approval.approvalId,
-                    toolName: approval.exactToolName,
-                    args: approval.exactValidatedArguments,
-                  },
-                });
-                if (executed.approved) {
-                  await completeApproval(approval.approvalId, session.organizationId);
-                }
-              }
-              spoken = 'Good news — my manager approved that concession, so I can apply it.';
-            } else {
-              spoken = "My manager couldn't approve that concession, but I can still look at other options.";
-            }
-
-            // Persist assistant message
-            await addMessage(session.sessionId, { role: 'assistant', content: spoken });
-
-            await writeAuditEvent({
+          let spoken = '';
+          if (eventData.decision === 'APPROVED') {
+            const claimedList = await claimApprovedApprovals({
               organizationId: session.organizationId,
               dealId: session.dealId,
               sessionId: session.sessionId,
-              eventType: EVENT_TYPES.AGENT_RESPONSE_COMPLETED,
-              trigger: `Proactive approval resolution (${eventData.decision}) spoken to customer`,
-              actionResult: { verified: true, spoken, decision: eventData.decision },
             });
-
-            const isAgoraAgent = session.agentId && !['openai_realtime', 'browser_speech'].includes(session.agentId);
-            if (isAgoraAgent) {
-              await speakAgent(session, spoken, { priority: 'INTERRUPT', interruptable: false }).catch((e) =>
-                console.warn('speakAgent note:', e.message),
-              );
-            }
-
-            let chunkIdx = 0;
-            try {
-              await streamSpeech(spoken, {
-                onChunk: ({ audioBase64, contentType, isFinal }) => {
-                  if (audioBase64 && !res.writableEnded) {
-                    res.write(
-                      `event: audio_chunk\ndata: ${JSON.stringify({
-                        chunkIndex: chunkIdx++,
-                        audioBase64,
-                        contentType: contentType || 'audio/pcm;rate=24000',
-                        isFinal: Boolean(isFinal),
-                        proactive: true,
-                      })}\n\n`,
-                    );
-                    if (typeof res.flush === 'function') res.flush();
-                  }
+            const approval = claimedList.find((a) => a.approvalId === eventData.approvalId) || claimedList[0];
+            if (approval) {
+              const executed = await executeTool(approval.exactToolName, approval.exactValidatedArguments, {
+                organizationId: session.organizationId,
+                dealId: session.dealId,
+                sessionId: session.sessionId,
+                approvedReplay: {
+                  approvalId: approval.approvalId,
+                  toolName: approval.exactToolName,
+                  args: approval.exactValidatedArguments,
                 },
               });
-            } catch (ttsErr) {
-              console.warn('[PROACTIVE_APPROVAL] TTS error:', ttsErr.message);
+              if (executed.approved) {
+                await completeApproval(approval.approvalId, session.organizationId);
+              }
             }
-
-            if (!res.writableEnded) {
-              res.write(`event: text\ndata: ${JSON.stringify({ assistantText: spoken, proactive: true })}\n\n`);
-            }
+            spoken = 'Good news — my manager approved that concession, so I can apply it.';
+          } else {
+            spoken = "My manager couldn't approve that concession, but I can still look at other options.";
           }
-        },
-        (err) => {
-          console.warn('[PROACTIVE_APPROVAL] Listener note:', err.message);
-        },
-      );
+
+          // Persist assistant message
+          await addMessage(session.sessionId, { role: 'assistant', content: spoken });
+
+          await writeAuditEvent({
+            organizationId: session.organizationId,
+            dealId: session.dealId,
+            sessionId: session.sessionId,
+            eventType: EVENT_TYPES.AGENT_RESPONSE_COMPLETED,
+            trigger: `Proactive approval resolution (${eventData.decision}) spoken to customer`,
+            actionResult: { verified: true, spoken, decision: eventData.decision },
+          });
+
+          const isAgoraAgent = session.agentId && !['openai_realtime', 'browser_speech'].includes(session.agentId);
+          if (isAgoraAgent) {
+            await speakAgent(session, spoken, { priority: 'INTERRUPT', interruptable: false }).catch((e) =>
+              console.warn('speakAgent note:', e.message),
+            );
+          }
+
+          let chunkIdx = 0;
+          try {
+            await streamSpeech(spoken, {
+              onChunk: ({ audioBase64, contentType, isFinal }) => {
+                if (audioBase64 && !res.writableEnded) {
+                  res.write(
+                    `event: audio_chunk\ndata: ${JSON.stringify({
+                      chunkIndex: chunkIdx++,
+                      audioBase64,
+                      contentType: contentType || 'audio/pcm;rate=24000',
+                      isFinal: Boolean(isFinal),
+                      proactive: true,
+                    })}\n\n`,
+                  );
+                  if (typeof res.flush === 'function') res.flush();
+                }
+              },
+            });
+          } catch (ttsErr) {
+            console.warn('[PROACTIVE_APPROVAL] TTS error:', ttsErr.message);
+          }
+
+          if (!res.writableEnded) {
+            res.write(`event: text\ndata: ${JSON.stringify({ assistantText: spoken, proactive: true })}\n\n`);
+          }
+        }
+      },
+      (err) => {
+        console.warn('[PROACTIVE_APPROVAL] Listener note:', err.message);
+      },
+    );
 
     req.on('close', () => {
       clearInterval(keepAliveInterval);

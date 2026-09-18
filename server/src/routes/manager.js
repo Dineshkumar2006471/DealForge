@@ -199,26 +199,23 @@ router.get('/calls/:sessionId/details', async (req, res, next) => {
     if (!doc.exists || doc.data().organizationId !== req.manager.organizationId) {
       throw new HttpError(404, 'Call session not found');
     }
-    
+
     // Fetch evidence
-    const evidenceSnap = await db.collection('evidenceLedger')
-      .where('sessionId', '==', req.params.sessionId)
-      .get();
-    const evidenceList = evidenceSnap.docs.map(d => ({ evidenceId: d.id, ...d.data() }));
+    const evidenceSnap = await db.collection('evidenceLedger').where('sessionId', '==', req.params.sessionId).get();
+    const evidenceList = evidenceSnap.docs.map((d) => ({ evidenceId: d.id, ...d.data() }));
 
     // Fetch approvals
-    const approvalsSnap = await db.collection('approvals')
-      .where('sessionId', '==', req.params.sessionId)
-      .get();
-    const approvals = approvalsSnap.docs.map(d => d.data());
+    const approvalsSnap = await db.collection('approvals').where('sessionId', '==', req.params.sessionId).get();
+    const approvals = approvalsSnap.docs.map((d) => d.data());
 
     // Fetch audit events
-    const auditSnap = await db.collection('auditEvents')
+    const auditSnap = await db
+      .collection('auditEvents')
       .where('sessionId', '==', req.params.sessionId)
       .orderBy('timestamp', 'desc')
       .limit(50)
       .get();
-    const auditEvents = auditSnap.docs.map(d => ({ eventId: d.id, ...d.data() }));
+    const auditEvents = auditSnap.docs.map((d) => ({ eventId: d.id, ...d.data() }));
 
     // Fetch history
     const { getHistory } = require('../lib/agent/conversationHistory');
@@ -228,7 +225,7 @@ router.get('/calls/:sessionId/details', async (req, res, next) => {
       evidenceList,
       approvals,
       auditEvents,
-      history: history.filter(m => m.role === 'user' || m.role === 'assistant')
+      history: history.filter((m) => m.role === 'user' || m.role === 'assistant'),
     });
   } catch (error) {
     next(error);

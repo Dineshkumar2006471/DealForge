@@ -77,30 +77,30 @@ In enterprise B2B sales, reps waste over **35% of their selling capacity** on ma
 ```mermaid
 flowchart TB
   subgraph Client Tier [Browser & Mobile Clients]
-    Customer[Customer Call Interface\ncall.html · Web Audio Chunk Player]
-    Manager[Manager Workspace\noverview.html · deals.html · dashboard.html]
+    Customer["Customer Call Interface\ncall.html · Web Audio Chunk Player"]
+    Manager["Manager Workspace\noverview.html · deals.html · dashboard.html"]
   end
 
   subgraph Cloud Edge [Google Cloud Serverless]
-    FirebaseHosting[Firebase Hosting\ndealforge-507515.web.app]
-    CloudRun[Cloud Run Backend\ndealforge-core\nExpress 5 · Node.js]
-    FirebaseAuth[Firebase Authentication\nRBAC · Manager Claims]
-    Firestore[(Cloud Firestore\nAuthoritative Source of Truth)]
+    FirebaseHosting["Firebase Hosting\ndealforge-507515.web.app"]
+    CloudRun["Cloud Run Backend\ndealforge-core\nExpress 5 · Node.js"]
+    FirebaseAuth["Firebase Authentication\nRBAC · Manager Claims"]
+    Firestore[("Cloud Firestore\nAuthoritative Source of Truth")]
   end
 
   subgraph Reasoning & Retrieval [AI & Semantic Layer]
-    Gemini[Google Vertex AI Gemini 2.5 Flash\nStructured Reasoning & Tool Execution]
-    Moss[Moss Low-Latency Retrieval\ndealforge-knowledge · dealforge-deal-context]
+    Gemini["Google Vertex AI Gemini 2.5 Flash\nStructured Reasoning & Tool Execution"]
+    Moss["Moss Low-Latency Retrieval\ndealforge-knowledge · dealforge-deal-context"]
   end
 
   subgraph Voice & Audio Transport [Real-Time Audio]
-    OpenAI[OpenAI Realtime WebRTC GA\nv1/realtime/calls]
-    ElevenLabs[ElevenLabs Flash v2.5 WebSocket\nwss://api.elevenlabs.io/v1/text-to-speech]
+    OpenAI["OpenAI Realtime WebRTC GA\nv1/realtime/calls"]
+    ElevenLabs["ElevenLabs Flash v2.5 WebSocket\nwss://api.elevenlabs.io/v1/text-to-speech"]
   end
 
   subgraph Enterprise Ecosystem [Enterprise Integrations]
-    HubSpot[HubSpot CRM API\nBidirectional Stage, Notes & Contacts]
-    CalCom[Cal.com API v2\nVerified Slot Search & Real-Time Booking]
+    HubSpot["HubSpot CRM API\nBidirectional Stage, Notes & Contacts"]
+    CalCom["Cal.com API v2\nVerified Slot Search & Real-Time Booking"]
   end
 
   Customer <-->|WebRTC Voice Audio| OpenAI

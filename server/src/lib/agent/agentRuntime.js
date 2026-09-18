@@ -46,7 +46,7 @@ async function executeCustomerTurn(
     throw new Error('Bound deal not found');
   }
 
-  let history = initialHistory;
+  const history = initialHistory;
   const context = {
     organizationId: session.organizationId,
     dealId: session.dealId,
@@ -240,7 +240,11 @@ async function executeCustomerTurn(
     const initialTextChunks = [];
     tGeminiStart = Date.now();
 
-    for await (const chunk of generateResponse(await currentModelMessages(context, { deal, history }), tools, context)) {
+    for await (const chunk of generateResponse(
+      await currentModelMessages(context, { deal, history }),
+      tools,
+      context,
+    )) {
       const choice = chunk.choices?.[0];
       if (!choice) continue;
 

@@ -16,7 +16,8 @@ export default function App() {
           color: 'var(--text-muted)',
         }}
       >
-        DealForge Autonomous AI Sales Engine &bull; Deterministic Commercial Policy Gating &bull; Streaming Low-Latency Voice
+        DealForge Autonomous AI Sales Engine &bull; Deterministic Commercial Policy Gating &bull; Streaming Low-Latency
+        Voice
       </footer>
     </div>
   );
